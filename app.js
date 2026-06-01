@@ -2024,7 +2024,7 @@ function parseGen4Gen5Save(buffer) {
         }
         
         if (sum === checksum) {
-            const shuffleIndex = ((pid & 0x3E0000) >>> 17) % 24;
+            const shuffleIndex = ((pid & 0x3E000) >>> 13) % 24;
             const order = blockOrders[shuffleIndex];
             
             const blockA = new Uint16Array(16);
