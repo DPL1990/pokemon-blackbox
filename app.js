@@ -37,6 +37,7 @@ const ALL_RIBBONS = [
 let currentGameId = localStorage.getItem("bb_current_game") || "red";
 let pokemonDatabase = JSON.parse(localStorage.getItem("bb_database")) || [];
 let currentSpriteStyle = localStorage.getItem("bb_sprite_style") || "classic";
+let activeHofIndex = 0;
 
 const SUGGESTIONS = {
     natures: ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"],
@@ -70,33 +71,142 @@ function initDB() {
     });
 }
 
-function saveHofImage(gameId, base64Data) {
+function getHofRecords(gameId) {
     return new Promise((resolve, reject) => {
         if (!dbInstance) {
-            reject("Banco de dados não inicializado");
-            return;
-        }
-        const tx = dbInstance.transaction("hall_of_fame", "readwrite");
-        const store = tx.objectStore("hall_of_fame");
-        const request = store.put(base64Data, gameId);
-        
-        request.onsuccess = () => resolve();
-        request.onerror = (e) => reject(e.target.error);
-    });
-}
-
-function getHofImage(gameId) {
-    return new Promise((resolve, reject) => {
-        if (!dbInstance) {
-            resolve(null);
+            resolve([]);
             return;
         }
         const tx = dbInstance.transaction("hall_of_fame", "readonly");
         const store = tx.objectStore("hall_of_fame");
         const request = store.get(gameId);
         
-        request.onsuccess = (e) => resolve(e.target.result);
+        request.onsuccess = (e) => {
+            const data = e.target.result;
+            if (!data) {
+                resolve([]);
+            } else if (typeof data === "string") {
+                // Migração de dados legados (imagem base64 única)
+                const legacyRecord = {
+                    id: "hof_legacy_" + Date.now(),
+                    type: "upload",
+                    data: data,
+                    title: "Mural de Honra (Legado)",
+                    date: new Date().toLocaleDateString('pt-PT')
+                };
+                const migratedList = [legacyRecord];
+                
+                // Grava a lista migrada em segundo plano de forma silenciosa
+                const writeTx = dbInstance.transaction("hall_of_fame", "readwrite");
+                writeTx.objectStore("hall_of_fame").put(migratedList, gameId);
+                
+                resolve(migratedList);
+            } else if (Array.isArray(data)) {
+                resolve(data);
+            } else {
+                resolve([]);
+            }
+        };
         request.onerror = (e) => reject(e.target.error);
+    });
+}
+
+function saveHofRecord(gameId, record) {
+    return getHofRecords(gameId).then(records => {
+        records.push(record);
+        return new Promise((resolve, reject) => {
+            if (!dbInstance) {
+                reject("Banco de dados não inicializado");
+                return;
+            }
+            const tx = dbInstance.transaction("hall_of_fame", "readwrite");
+            const store = tx.objectStore("hall_of_fame");
+            const request = store.put(records, gameId);
+            
+            request.onsuccess = () => resolve();
+            request.onerror = (e) => reject(e.target.error);
+        });
+    });
+}
+
+function saveHofImage(gameId, base64Data) {
+    const record = {
+        id: "hof_upload_" + Date.now(),
+        type: "upload",
+        data: base64Data,
+        title: "Mural Carregado",
+        date: new Date().toLocaleDateString('pt-PT')
+    };
+    return saveHofRecord(gameId, record);
+}
+
+function deleteHofRecord(gameId, index) {
+    return getHofRecords(gameId).then(records => {
+        if (index >= 0 && index < records.length) {
+            records.splice(index, 1);
+            return new Promise((resolve, reject) => {
+                if (!dbInstance) {
+                    reject("Banco de dados não inicializado");
+                    return;
+                }
+                const tx = dbInstance.transaction("hall_of_fame", "readwrite");
+                const store = tx.objectStore("hall_of_fame");
+                const request = store.put(records, gameId);
+                
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject(e.target.error);
+            });
+        }
+}
+
+function generateHofFromActiveTeam() {
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
+    if (activeTeam.length === 0) {
+        alert("A tua equipa ativa para este cartucho está vazia! Adiciona Pokémon à equipa primeiro.");
+        return;
+    }
+    activeTeam.sort((a, b) => a.slotIndex - b.slotIndex);
+    
+    const record = {
+        id: "hof_gen_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+        type: "generated",
+        team: activeTeam.map(p => ({
+            species: p.species,
+            nickname: p.nickname || "",
+            level: p.level || 50,
+            isShiny: p.isShiny || false,
+            pokedexId: p.pokedexId || 1,
+            ball: p.ball || "poke",
+            gender: p.gender || "⚲"
+        })),
+        title: `${GAMES_DB.find(g => g.id === currentGameId)?.name || 'Pokémon BlackBox'}`,
+        date: new Date().toLocaleDateString('pt-PT')
+    };
+
+    saveHofRecord(currentGameId, record).then(() => {
+        getHofRecords(currentGameId).then(records => {
+            activeHofIndex = records.length - 1;
+            renderAll();
+        });
+    }).catch(err => {
+        console.error("Erro ao gerar HOF:", err);
+        alert("Erro ao gerar o Mural de Honra.");
+    });
+}
+
+function deleteActiveHof() {
+    if (!confirm("Tens a certeza absoluta que queres eliminar este Mural de Honra?")) return;
+    deleteHofRecord(currentGameId, activeHofIndex).then(() => {
+        activeHofIndex = 0;
+        renderAll();
+    }).catch(err => console.error(err));
+}
+
+function navigateHof(dir) {
+    getHofRecords(currentGameId).then(records => {
+        if (records.length <= 1) return;
+        activeHofIndex = (activeHofIndex + dir + records.length) % records.length;
+        renderAll();
     });
 }
 // ---------------------------------
@@ -183,24 +293,105 @@ function renderAll() {
         }
     }
 
-    // Render HOF image asynchronously from IndexedDB
-    const hofImgEl = document.getElementById("hof-img");
-    const hofPlaceholderEl = document.getElementById("hof-placeholder");
-    hofImgEl.dataset.gameId = currentGameId;
+    // Render HOF dynamically from IndexedDB (supporting multiple generated & uploads)
+    const hofDisplayArea = document.getElementById("hof-display-area");
+    const hofNavigation = document.getElementById("hof-navigation");
+    const hofCounter = document.getElementById("hof-counter");
+    const btnDeleteHof = document.getElementById("btn-delete-hof");
     
-    hofImgEl.style.display = "none";
-    hofPlaceholderEl.style.display = "flex";
+    // Guardar o gameId ativo no momento do pedido assíncrono
+    hofDisplayArea.dataset.gameId = currentGameId;
 
-    getHofImage(currentGameId).then(currentHofImg => {
-        if (hofImgEl.dataset.gameId !== currentGameId) return;
+    getHofRecords(currentGameId).then(records => {
+        if (hofDisplayArea.dataset.gameId !== currentGameId) return;
         
-        if (currentHofImg) {
-            hofImgEl.src = currentHofImg;
-            hofImgEl.style.display = "block";
-            hofPlaceholderEl.style.display = "none";
+        if (records.length === 0) {
+            // Sem HOFs registados: exibe o placeholder padrão
+            hofDisplayArea.innerHTML = `
+                <div id="hof-placeholder" onclick="document.getElementById('hof-input').click()" style="cursor: pointer; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; color: var(--text-muted); font-size: 0.75rem; font-weight: 600; text-align: center; padding: 20px; box-sizing: border-box;">
+                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="width: 24px; height: 24px; stroke: var(--text-muted); margin-bottom: 8px;">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <span>Subir screenshot ou Gerar da Equipa</span>
+                </div>
+            `;
+            hofNavigation.style.display = "none";
+            btnDeleteHof.style.display = "none";
+        } else {
+            // Garantir limites de activeHofIndex
+            if (activeHofIndex >= records.length) activeHofIndex = records.length - 1;
+            if (activeHofIndex < 0) activeHofIndex = 0;
+            
+            const activeHof = records[activeHofIndex];
+            btnDeleteHof.style.display = "block";
+            
+            // Exibir navegação apenas se houver mais de 1 HOF
+            if (records.length > 1) {
+                hofNavigation.style.display = "flex";
+                hofCounter.innerText = `${activeHofIndex + 1} / ${records.length}`;
+            } else {
+                hofNavigation.style.display = "none";
+            }
+            
+            if (activeHof.type === "upload") {
+                // HOF do tipo screenshot carregado
+                hofDisplayArea.innerHTML = `
+                    <img id="hof-img" src="${activeHof.data}" alt="Mural de Honra" style="width: 100%; height: 100%; object-fit: cover;">
+                    <div class="hof-overlay" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; color: #fff; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; cursor: pointer;" onclick="document.getElementById('hof-input').click()">Mudar Imagem</div>
+                `;
+                // Hover effect local para o overlay
+                hofDisplayArea.onmouseenter = () => { if (hofDisplayArea.querySelector(".hof-overlay")) hofDisplayArea.querySelector(".hof-overlay").style.opacity = 1; };
+                hofDisplayArea.onmouseleave = () => { if (hofDisplayArea.querySelector(".hof-overlay")) hofDisplayArea.querySelector(".hof-overlay").style.opacity = 0; };
+            } else if (activeHof.type === "generated") {
+                // HOF dinâmico 3D da equipa
+                const gameThemeClass = `v-${currentGameId}`;
+                const cardTitle = activeHof.title;
+                const membersHTML = activeHof.team.map(tm => {
+                    let spriteUrl = "";
+                    const pokedexId = tm.pokedexId || 1;
+                    const isShiny = tm.isShiny;
+                    
+                    if (currentSpriteStyle === "3d-home") {
+                        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+                    } else if (currentSpriteStyle === "3d-animated") {
+                        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${isShiny ? 'shiny/' : ''}${pokedexId}.gif`;
+                    } else {
+                        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+                    }
+                    
+                    const name = tm.nickname ? tm.nickname : tm.species;
+                    
+                    return `
+                        <div class="hof-card-member">
+                            <img class="hof-member-sprite" src="${spriteUrl}" alt="${tm.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
+                            <div class="hof-member-name">${name}</div>
+                            <div class="hof-member-meta">
+                                <img class="ball-mini" style="width: 8px; height: 8px;" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${tm.ball || 'poke'}-ball.png" alt="${tm.ball}">
+                                <span>Lv. ${tm.level}</span>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+                
+                hofDisplayArea.innerHTML = `
+                    <div class="hof-card ${gameThemeClass}">
+                        <div class="hof-card-title">🏆 ${cardTitle}</div>
+                        <div class="hof-card-grid">
+                            ${membersHTML}
+                        </div>
+                        <div class="hof-card-footer">
+                            <span>MURAL DE HONRA</span>
+                            <span>${activeHof.date}</span>
+                        </div>
+                    </div>
+                `;
+                hofDisplayArea.onmouseenter = null;
+                hofDisplayArea.onmouseleave = null;
+            }
         }
     }).catch(err => {
-        console.error("Erro ao obter HOF do IndexedDB:", err);
+        console.error("Erro ao obter HOFs do IndexedDB:", err);
     });
 
     // Apply filter panel logic in real-time
