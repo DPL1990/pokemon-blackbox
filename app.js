@@ -38,6 +38,8 @@ let currentGameId = localStorage.getItem("bb_current_game") || "red";
 let pokemonDatabase = JSON.parse(localStorage.getItem("bb_database")) || [];
 let currentSpriteStyle = localStorage.getItem("bb_sprite_style") || "classic";
 let activeHofIndex = 0;
+let selectionMode = false;
+let selectedPokemonIds = new Set();
 
 const SUGGESTIONS = {
     natures: ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"],
@@ -614,9 +616,10 @@ function createSlotHTML(p, index, type) {
     const displayName = p.nickname ? `${p.nickname}` : p.species;
     const subText = p.nickname ? p.species : `Lv. ${p.level}`;
     const badgeLabel = p.currentGame ? p.currentGame.toUpperCase() : '??';
+    const selectedClass = (typeof selectedPokemonIds !== 'undefined' && selectedPokemonIds.has(p.id)) ? 'selected-specimen' : '';
 
     return `
-        <div class="slot ${typeClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+        <div class="slot ${typeClass} ${selectedClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
                 <img class="slot-sprite" draggable="false" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
@@ -964,6 +967,10 @@ function openModalForNew() {
 }
 
 function openModalForEdit(id) {
+    if (selectionMode) {
+        toggleSpecimenSelection(id);
+        return;
+    }
     const p = pokemonDatabase.find(pkmn => pkmn.id === id); 
     if (!p) return;
     
@@ -1495,6 +1502,108 @@ function cleanupDuplicates() {
     }
     
     localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+}
+
+function toggleSelectionMode() {
+    selectionMode = !selectionMode;
+    const btn = document.getElementById("btn-toggle-select-mode");
+    const bar = document.getElementById("multi-action-bar");
+    
+    if (selectionMode) {
+        btn.innerText = "✕ Sair da Seleção";
+        btn.classList.add("btn-danger");
+        bar.classList.add("active");
+        selectedPokemonIds.clear();
+        updateFabSelectedCount();
+        
+        // Populate game select in fab
+        const gameOptions = GAMES_DB.map(g => `<option value="${g.id}">${g.name} (Gen ${g.gen})</option>`).join("");
+        document.getElementById("fab-transfer-game").innerHTML = gameOptions;
+    } else {
+        btn.innerText = "✅ Seleção Múltipla";
+        btn.classList.remove("btn-danger");
+        bar.classList.remove("active");
+        selectedPokemonIds.clear();
+        
+        // Remove selection classes
+        document.querySelectorAll(".slot.selected-specimen").forEach(el => {
+            el.classList.remove("selected-specimen");
+        });
+    }
+}
+
+function toggleSpecimenSelection(id) {
+    const slotEl = document.querySelector(`.slot[data-id="${id}"]`);
+    if (selectedPokemonIds.has(id)) {
+        selectedPokemonIds.delete(id);
+        if (slotEl) slotEl.classList.remove("selected-specimen");
+    } else {
+        selectedPokemonIds.add(id);
+        if (slotEl) slotEl.classList.add("selected-specimen");
+    }
+    updateFabSelectedCount();
+}
+
+function updateFabSelectedCount() {
+    const count = selectedPokemonIds.size;
+    document.getElementById("fab-selected-count").innerText = `${count} Pokémon selecionados`;
+    
+    // Disable/enable action buttons based on selection count
+    const buttons = document.querySelectorAll("#multi-action-bar button");
+    buttons.forEach(btn => {
+        if (btn.innerText.includes("Cancelar")) return;
+        btn.disabled = count === 0;
+    });
+}
+
+function executeMassTransfer() {
+    const count = selectedPokemonIds.size;
+    if (count === 0) return;
+    
+    const targetGameId = document.getElementById("fab-transfer-game").value;
+    const targetGameName = GAMES_DB.find(g => g.id === targetGameId)?.name || targetGameId;
+    
+    if (!confirm(`Tens a certeza que queres migrar os ${count} Pokémon selecionados para o cartucho ${targetGameName}?`)) {
+        return;
+    }
+    
+    let migratedCount = 0;
+    selectedPokemonIds.forEach(id => {
+        const pkmn = pokemonDatabase.find(p => p.id === id);
+        if (pkmn) {
+            if (pkmn.currentGame !== targetGameId) {
+                if (!pkmn.history) pkmn.history = [];
+                pkmn.history.push(pkmn.currentGame);
+                pkmn.currentGame = targetGameId;
+            }
+            pkmn.slotType = "box";
+            pkmn.slotIndex = 0;
+            migratedCount++;
+        }
+    });
+    
+    if (migratedCount > 0) {
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        alert(`${migratedCount} Pokémon migrados com sucesso para ${targetGameName}!`);
+        toggleSelectionMode();
+        renderAll();
+    }
+}
+
+function executeMassDelete() {
+    const count = selectedPokemonIds.size;
+    if (count === 0) return;
+    
+    if (!confirm(`PERIGO: Tens a certeza absoluta que queres eliminar permanentemente os ${count} Pokémon selecionados da tua Caixa Negra?`)) {
+        return;
+    }
+    
+    pokemonDatabase = pokemonDatabase.filter(p => !selectedPokemonIds.has(p.id));
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    
+    alert(`${count} Pokémon eliminados da base de dados.`);
+    toggleSelectionMode();
+    renderAll();
 }
 
 window.onload = function() {
