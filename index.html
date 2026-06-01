@@ -74,6 +74,9 @@
                         <button class="btn btn-primary" onclick="openModalForNew()" style="grid-column: span 2;">
                             <span>➕ Registar Espécime</span>
                         </button>
+                        <button class="btn btn-action" onclick="openMatchupModal()" style="grid-column: span 2; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
+                            <span>⚖️ Comparar Pokémon (Matchup)</span>
+                        </button>
                         <button class="btn btn-action" onclick="exportData()">
                             <span>📥 Exportar</span>
                         </button>
@@ -428,6 +431,43 @@
                     <div class="footer-actions">
                         <button class="btn btn-primary" onclick="savePokemon()">💾 Gravar Espécime na Caixa Negra</button>
                         <button class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none;">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Matchup / Comparison Modal -->
+    <div class="modal-overlay" id="matchup-modal">
+        <div class="modal-content" style="max-width: 800px; width: 95%;">
+            <div class="modal-header">
+                <h2>⚖️ Comparação de Espécimes (Matchup)</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeMatchupModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- Dual Selectors -->
+                <div class="matchup-selectors">
+                    <div class="form-group">
+                        <label>👤 Pokémon A (Origem / Referência)</label>
+                        <select id="matchup-select-a" onchange="onMatchupAChange()" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-color);">
+                            <option value="">-- Escolhe o Pokémon A --</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>👥 Pokémon B (Evolução / Destino)</label>
+                        <select id="matchup-select-b" onchange="onMatchupBChange()" style="width: 100%; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-color);" disabled>
+                            <option value="">-- Escolhe o Pokémon A primeiro --</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Comparison Display Area -->
+                <div id="matchup-comparison-area">
+                    <div class="glass-panel" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.01);">
+                        <div style="font-size: 3rem; margin-bottom: 12px; filter: grayscale(1);">⚖️</div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">
+                            Selecione o **Pokémon A** e o **Pokémon B** acima para analisar a sua evolução, mudanças de movimentos, estatísticas e fitas adquiridas ao longo da sua jornada intergeracional.
+                        </p>
                     </div>
                 </div>
             </div>

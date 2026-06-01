@@ -1610,6 +1610,407 @@ function executeMassDelete() {
     renderAll();
 }
 
+// --- SECTION Matchup & Comparison Logic ---
+
+function openMatchupModal() {
+    const modal = document.getElementById("matchup-modal");
+    if (!modal) return;
+    
+    populateMatchupA();
+    
+    // Reset B
+    const selectB = document.getElementById("matchup-select-b");
+    selectB.innerHTML = '<option value="">-- Escolhe o Pokémon A primeiro --</option>';
+    selectB.disabled = true;
+    
+    // Reset comparison area
+    const comparisonArea = document.getElementById("matchup-comparison-area");
+    comparisonArea.innerHTML = `
+        <div class="glass-panel" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.01);">
+            <div style="font-size: 3rem; margin-bottom: 12px; filter: grayscale(1);">⚖️</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+                Selecione o **Pokémon A** e o **Pokémon B** acima para analisar a sua evolução, mudanças de movimentos, estatísticas e fitas adquiridas ao longo da sua jornada intergeracional.
+            </p>
+        </div>
+    `;
+    
+    modal.classList.add("active");
+}
+
+function closeMatchupModal() {
+    const modal = document.getElementById("matchup-modal");
+    if (modal) {
+        modal.classList.remove("active");
+    }
+}
+
+function populateMatchupA() {
+    const selectA = document.getElementById("matchup-select-a");
+    if (!selectA) return;
+    
+    // Sort pokemonDatabase by species name, then nickname
+    const sorted = [...pokemonDatabase].sort((a, b) => {
+        const specA = a.species.toLowerCase();
+        const specB = b.species.toLowerCase();
+        if (specA < specB) return -1;
+        if (specA > specB) return 1;
+        return (a.nickname || "").localeCompare(b.nickname || "");
+    });
+    
+    let html = '<option value="">-- Escolhe o Pokémon A --</option>';
+    sorted.forEach(p => {
+        const gameName = GAMES_DB.find(g => g.id === p.currentGame)?.name || p.currentGame.toUpperCase();
+        const displayName = `${p.nickname ? p.nickname + ' (' + p.species + ')' : p.species} - Nível ${p.level} [${gameName}]`;
+        html += `<option value="${p.id}">${displayName}</option>`;
+    });
+    
+    selectA.innerHTML = html;
+}
+
+function onMatchupAChange() {
+    const selectA = document.getElementById("matchup-select-a");
+    const selectB = document.getElementById("matchup-select-b");
+    const comparisonArea = document.getElementById("matchup-comparison-area");
+    if (!selectA || !selectB) return;
+    
+    const idA = selectA.value;
+    if (!idA) {
+        selectB.innerHTML = '<option value="">-- Escolhe o Pokémon A primeiro --</option>';
+        selectB.disabled = true;
+        comparisonArea.innerHTML = `
+            <div class="glass-panel" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.01);">
+                <div style="font-size: 3rem; margin-bottom: 12px; filter: grayscale(1);">⚖️</div>
+                <p style="color: var(--text-muted); font-size: 0.85rem;">
+                    Selecione o **Pokémon A** e o **Pokémon B** acima para analisar a sua evolução, mudanças de movimentos, estatísticas e fitas adquiridas ao longo da sua jornada intergeracional.
+                </p>
+            </div>
+        `;
+        return;
+    }
+    
+    const pkmnA = pokemonDatabase.find(p => p.id === idA);
+    if (!pkmnA) return;
+    
+    // Filter database for same species (same pokedexId) and different ID
+    const sameSpecies = pokemonDatabase.filter(p => p.pokedexId === pkmnA.pokedexId && p.id !== idA);
+    
+    let html = '<option value="">-- Escolhe o Pokémon B --</option>';
+    if (sameSpecies.length === 0) {
+        html = '<option value="">Sem outros espécimes da mesma espécie</option>';
+        selectB.disabled = true;
+    } else {
+        sameSpecies.sort((a, b) => (a.nickname || "").localeCompare(b.nickname || ""));
+        sameSpecies.forEach(p => {
+            const gameName = GAMES_DB.find(g => g.id === p.currentGame)?.name || p.currentGame.toUpperCase();
+            const displayName = `${p.nickname ? p.nickname + ' (' + p.species + ')' : p.species} - Nível ${p.level} [${gameName}]`;
+            html += `<option value="${p.id}">${displayName}</option>`;
+        });
+        selectB.disabled = false;
+    }
+    
+    selectB.innerHTML = html;
+    
+    // Clear comparison until B is chosen
+    comparisonArea.innerHTML = `
+        <div class="glass-panel" style="text-align: center; padding: 40px 20px; border: 1px dashed var(--border-color); background: rgba(255,255,255,0.01);">
+            <div style="font-size: 3rem; margin-bottom: 12px;">⚖️</div>
+            <p style="color: var(--text-muted); font-size: 0.85rem;">
+                Pokémon A selecionado! Agora escolha outro espécime de **${pkmnA.species}** na lista do Pokémon B para comparar.
+            </p>
+        </div>
+    `;
+}
+
+function onMatchupBChange() {
+    renderMatchupComparison();
+}
+
+function renderMatchupComparison() {
+    const idA = document.getElementById("matchup-select-a").value;
+    const idB = document.getElementById("matchup-select-b").value;
+    const comparisonArea = document.getElementById("matchup-comparison-area");
+    if (!comparisonArea) return;
+    
+    if (!idA || !idB) return;
+    
+    const pkmnA = pokemonDatabase.find(p => p.id === idA);
+    const pkmnB = pokemonDatabase.find(p => p.id === idB);
+    if (!pkmnA || !pkmnB) return;
+    
+    // Get species details & sprites
+    const getSpriteUrl = (p) => {
+        const id = p.pokedexId || 1;
+        const cleanName = p.species.toLowerCase().trim()
+            .replace(/[\s']/g, "-")
+            .replace(/\./g, "")
+            .replace(/-+$/, "");
+        
+        if (currentSpriteStyle === "classic") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        } else if (currentSpriteStyle === "3d-home") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+        } else {
+            // Animated/Showdown
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+        }
+    };
+    
+    const spriteA = getSpriteUrl(pkmnA);
+    const spriteB = getSpriteUrl(pkmnB);
+    
+    const gameA = GAMES_DB.find(g => g.id === pkmnA.currentGame);
+    const gameB = GAMES_DB.find(g => g.id === pkmnB.currentGame);
+    
+    const gameNameA = gameA?.name || pkmnA.currentGame.toUpperCase();
+    const gameNameB = gameB?.name || pkmnB.currentGame.toUpperCase();
+    
+    // Level difference
+    const levelDiff = pkmnB.level - pkmnA.level;
+    let levelDiffText = "";
+    if (levelDiff > 0) {
+        levelDiffText = `<span style="color: var(--accent-success); font-weight:800; font-size: 0.7rem; margin-left: 6px;">📈 +${levelDiff} níveis</span>`;
+    } else if (levelDiff < 0) {
+        levelDiffText = `<span style="color: var(--accent-danger); font-weight:800; font-size: 0.7rem; margin-left: 6px;">📉 ${levelDiff} níveis</span>`;
+    } else {
+        levelDiffText = `<span style="color: var(--text-muted); font-size: 0.7rem; margin-left: 6px;">(Sem alteração)</span>`;
+    }
+    
+    // Compare nature & ability
+    const natureMatch = pkmnA.nature === pkmnB.nature;
+    const abilityMatch = pkmnA.ability === pkmnB.ability;
+    
+    const natureHTML = natureMatch
+        ? `<span style="color: var(--accent-success); font-weight: 700;">${pkmnA.nature}</span>`
+        : `<div style="display:flex; flex-direction:column; gap:2px;">
+             <span style="color: var(--text-muted); text-decoration: line-through; font-size: 0.75rem;">${pkmnA.nature || "Sem Nature"}</span>
+             <span style="color: var(--game-color); font-weight: 700;">${pkmnB.nature || "Sem Nature"}</span>
+           </div>`;
+           
+    const abilityHTML = abilityMatch
+        ? `<span style="color: var(--accent-success); font-weight: 700;">${pkmnA.ability}</span>`
+        : `<div style="display:flex; flex-direction:column; gap:2px;">
+             <span style="color: var(--text-muted); text-decoration: line-through; font-size: 0.75rem;">${pkmnA.ability || "Sem Habilidade"}</span>
+             <span style="color: var(--game-color); font-weight: 700;">${pkmnB.ability || "Sem Habilidade"}</span>
+           </div>`;
+           
+    // Moveset evolution
+    const movesA = pkmnA.moves || [];
+    const movesB = pkmnB.moves || [];
+    
+    // Identify signature moves (moves present in both A and B)
+    const signatureMoves = movesA.filter(m => movesB.includes(m));
+    
+    let movesHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+            <div>
+                <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Anterior [${gameA?.id.toUpperCase() || ""}]</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+    `;
+    
+    // Render Moves A
+    if (movesA.length === 0) {
+        movesHTML += `<span style="font-style: italic; font-size: 0.8rem; color: var(--text-muted);">Sem movimentos</span>`;
+    } else {
+        movesA.forEach(m => {
+            const isSig = signatureMoves.includes(m);
+            movesHTML += `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; background: ${isSig ? 'rgba(16,185,129,0.1)' : 'rgba(255,255,255,0.03)'}; border: 1px solid ${isSig ? 'rgba(16,185,129,0.3)' : 'rgba(255,255,255,0.05)'};">
+                    <span>${m}</span>
+                    ${isSig ? '<span style="color: var(--accent-success); font-size: 0.65rem; font-weight: 800;">⭐ Assinatura</span>' : ''}
+                </div>
+            `;
+        });
+    }
+    
+    movesHTML += `
+                </div>
+            </div>
+            <div>
+                <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Atual [${gameB?.id.toUpperCase() || ""}]</div>
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+    `;
+    
+    // Render Moves B
+    if (movesB.length === 0) {
+        movesHTML += `<span style="font-style: italic; font-size: 0.8rem; color: var(--text-muted);">Sem movimentos</span>`;
+    } else {
+        movesB.forEach(m => {
+            const isSig = signatureMoves.includes(m);
+            movesHTML += `
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 8px; border-radius: 6px; font-size: 0.8rem; background: ${isSig ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)'}; border: 1px solid ${isSig ? 'rgba(16,185,129,0.3)' : 'rgba(99,102,241,0.3)'};">
+                    <span>${m}</span>
+                    ${isSig 
+                        ? '<span style="color: var(--accent-success); font-size: 0.65rem; font-weight: 800;">⭐ Assinatura</span>' 
+                        : '<span style="color: var(--game-color); font-size: 0.65rem; font-weight: 800;">🆕 Novo</span>'}
+                </div>
+            `;
+        });
+    }
+    
+    movesHTML += `
+                </div>
+            </div>
+        </div>
+    `;
+
+    // Compare Ribbons
+    const ribbonsA = pkmnA.ribbons || [];
+    const ribbonsB = pkmnB.ribbons || [];
+    
+    const sharedRibbons = ribbonsA.filter(r => ribbonsB.includes(r));
+    const newRibbons = ribbonsB.filter(r => !ribbonsA.includes(r));
+    const lostRibbons = ribbonsA.filter(r => !ribbonsB.includes(r));
+
+    let ribbonsHTML = "";
+    if (ribbonsA.length === 0 && ribbonsB.length === 0) {
+        ribbonsHTML = `<span style="font-style: italic; font-size: 0.8rem; color: var(--text-muted);">Sem fitas registadas em nenhum dos espécimes.</span>`;
+    } else {
+        ribbonsHTML += `
+            <div style="font-size: 0.8rem; display: flex; flex-wrap: wrap; gap: 6px;">
+        `;
+        sharedRibbons.forEach(r => {
+            ribbonsHTML += `<span class="badge" style="background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.3); color: #fff; padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight:700;">🏅 ${r}</span>`;
+        });
+        newRibbons.forEach(r => {
+            ribbonsHTML += `<span class="badge" style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.4); color: var(--game-color); padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; font-weight:800;">✨ ${r} (Adquirida)</span>`;
+        });
+        lostRibbons.forEach(r => {
+            ribbonsHTML += `<span class="badge" style="background: rgba(239,68,68,0.05); border: 1px solid rgba(239,68,68,0.2); color: var(--text-muted); padding: 4px 8px; border-radius: 6px; font-size: 0.7rem; text-decoration: line-through;">🏅 ${r}</span>`;
+        });
+        ribbonsHTML += `</div>`;
+        
+        if (newRibbons.length > 0) {
+            ribbonsHTML += `<div style="font-size: 0.75rem; color: var(--accent-success); font-weight:700; margin-top: 8px;">🎉 Adquiriu +${newRibbons.length} fitas nesta transição!</div>`;
+        }
+    }
+
+    // Individual stat comparison helper
+    const renderStatComparison = (statName, valA, valB) => {
+        const diff = valB - valA;
+        let diffHTML = "";
+        if (diff > 0) {
+            diffHTML = `<span style="color: var(--accent-success); font-weight:700;">+${diff}</span>`;
+        } else if (diff < 0) {
+            diffHTML = `<span style="color: var(--accent-danger); font-weight:700;">${diff}</span>`;
+        } else {
+            diffHTML = `<span style="color: var(--text-muted);">0</span>`;
+        }
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                <td style="padding: 6px 0; font-weight:700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">${statName}</td>
+                <td style="padding: 6px 0; text-align: center; font-size: 0.8rem;">${valA}</td>
+                <td style="padding: 6px 0; text-align: center; font-size: 0.8rem;">${valB}</td>
+                <td style="padding: 6px 0; text-align: center; font-size: 0.8rem; font-weight: 800;">${diffHTML}</td>
+            </tr>
+        `;
+    };
+
+    // Calculate total IVs & EVs
+    const totalIvA = Object.values(pkmnA.ivs || {}).reduce((x, y) => x + y, 0);
+    const totalIvB = Object.values(pkmnB.ivs || {}).reduce((x, y) => x + y, 0);
+    const totalEvA = Object.values(pkmnA.evs || {}).reduce((x, y) => x + y, 0);
+    const totalEvB = Object.values(pkmnB.evs || {}).reduce((x, y) => x + y, 0);
+
+    // Build the full HTML structure
+    comparisonArea.innerHTML = `
+        <div style="display:flex; flex-direction:column; gap:20px;">
+            <!-- Header visual Cards -->
+            <div class="matchup-grid">
+                <!-- Card A -->
+                <div class="glass-panel" style="width: 100%; text-align: center; padding: 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(${pkmnA.currentGame === 'red' || pkmnA.currentGame === 'firered' ? '239,68,68' : '99,102,241'}, 0.05);">
+                    <div class="game-badge-mini" style="background: var(--game-color-${pkmnA.currentGame}); border-radius: 4px; padding: 2px 6px; font-size: 0.65rem; font-weight:800; display: inline-block; margin-bottom: 6px; border:1px solid rgba(255,255,255,0.1);">
+                        ${gameNameA}
+                    </div>
+                    <div style="width: 90px; height: 90px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                        <img src="${spriteA}" alt="${pkmnA.species}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pkmnA.pokedexId}.png'">
+                    </div>
+                    <h3 style="margin: 6px 0 2px 0; font-size: 0.95rem; font-weight:800; color:#fff;">${pkmnA.nickname || pkmnA.species}</h3>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${pkmnA.species}</div>
+                </div>
+
+                <!-- Versus Arrow -->
+                <div class="matchup-vs">
+                    ➡️
+                </div>
+
+                <!-- Card B -->
+                <div class="glass-panel" style="width: 100%; text-align: center; padding: 14px; border: 1px solid rgba(255,255,255,0.08); background: rgba(${pkmnB.currentGame === 'red' || pkmnB.currentGame === 'firered' ? '239,68,68' : '99,102,241'}, 0.05);">
+                    <div class="game-badge-mini" style="background: var(--game-color-${pkmnB.currentGame}); border-radius: 4px; padding: 2px 6px; font-size: 0.65rem; font-weight:800; display: inline-block; margin-bottom: 6px; border:1px solid rgba(255,255,255,0.1);">
+                        ${gameNameB}
+                    </div>
+                    <div style="width: 90px; height: 90px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                        <img src="${spriteB}" alt="${pkmnB.species}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pkmnB.pokedexId}.png'">
+                    </div>
+                    <h3 style="margin: 6px 0 2px 0; font-size: 0.95rem; font-weight:800; color:#fff;">${pkmnB.nickname || pkmnB.species}</h3>
+                    <div style="font-size: 0.75rem; color: var(--text-muted);">${pkmnB.species}</div>
+                </div>
+            </div>
+
+            <!-- Comparison Table -->
+            <div class="glass-panel" style="padding: 16px;">
+                <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                    🧬 Perfil e Evolução de Atributos
+                </div>
+                
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+                            <th style="padding: 6px 0; font-size: 0.75rem; color: var(--text-muted); width: 40%;">Parâmetro</th>
+                            <th style="padding: 6px 0; font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 20%;">Pokémon A</th>
+                            <th style="padding: 6px 0; font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 20%;">Pokémon B</th>
+                            <th style="padding: 6px 0; font-size: 0.75rem; color: var(--text-muted); text-align: center; width: 20%;">Diferença</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 8px 0; font-weight:700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Nível</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.85rem; font-weight: 800;">Lv. ${pkmnA.level}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.85rem; font-weight: 800;">Lv. ${pkmnB.level}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.85rem;">${levelDiffText}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 8px 0; font-weight:700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Natureza</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${pkmnA.nature || "Sem Nature"}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${pkmnB.nature || "Sem Nature"}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${natureHTML}</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                            <td style="padding: 8px 0; font-weight:700; font-size: 0.75rem; text-transform: uppercase; color: var(--text-muted);">Habilidade</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${pkmnA.ability || "Sem Habilidade"}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${pkmnB.ability || "Sem Habilidade"}</td>
+                            <td style="padding: 8px 0; text-align: center; font-size: 0.8rem;">${abilityHTML}</td>
+                        </tr>
+                        ${renderStatComparison("Total IVs", totalIvA, totalIvB)}
+                        ${renderStatComparison("Total EVs", totalEvA, totalEvB)}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Moveset section -->
+            <div class="glass-panel" style="padding: 16px;">
+                <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                    ⚔️ Evolução do Moveset
+                </div>
+                ${movesHTML}
+            </div>
+
+            <!-- Ribbons comparison -->
+            <div class="glass-panel" style="padding: 16px;">
+                <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                    🏅 Fitas Adquiridas
+                </div>
+                ${ribbonsHTML}
+            </div>
+        </div>
+    `;
+}
+
 window.onload = function() {
     initDB().then(() => {
         cleanupDuplicates();
