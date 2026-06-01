@@ -274,9 +274,8 @@ function renderAll() {
     const teamContainer = document.getElementById("team-container");
     const boxContainer = document.getElementById("box-container");
     
-    // Filters based on multiversal travel:
-    const regionalPokemon = pokemonDatabase.filter(p => (p.originGame ? p.originGame === currentGameId : p.currentGame === currentGameId));
-    const boxSlots = regionalPokemon.filter(p => p.slotType === "box");
+    // Filters based on current game location:
+    const boxSlots = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "box");
 
     // Render Active Team Slots (Exactly 6 slots)
     teamContainer.innerHTML = "";
@@ -468,7 +467,7 @@ function createSlotHTML(p, index, type) {
     const badgeLabel = p.currentGame ? p.currentGame.toUpperCase() : '??';
 
     return `
-        <div class="slot ${typeClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')">
+        <div class="slot ${typeClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
                 <img class="slot-sprite" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
