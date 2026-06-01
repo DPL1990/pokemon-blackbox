@@ -168,30 +168,179 @@ function generateHofFromActiveTeam() {
     }
     activeTeam.sort((a, b) => a.slotIndex - b.slotIndex);
     
-    const record = {
-        id: "hof_gen_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
-        type: "generated",
-        team: activeTeam.map(p => ({
-            species: p.species,
-            nickname: p.nickname || "",
-            level: p.level || 50,
-            isShiny: p.isShiny || false,
-            pokedexId: p.pokedexId || 1,
-            ball: p.ball || "poke",
-            gender: p.gender || "⚲"
-        })),
-        title: `${GAMES_DB.find(g => g.id === currentGameId)?.name || 'Pokémon BlackBox'}`,
-        date: new Date().toLocaleDateString('pt-PT')
-    };
+    // Alerta de carregamento
+    const btn = window.event ? (window.event.target || window.event.srcElement) : null;
+    const originalText = btn ? btn.innerText : "";
+    if (btn && btn.tagName === "BUTTON") {
+        btn.disabled = true;
+        btn.innerText = "A Gerar...";
+    }
+    
+    const loadPromises = activeTeam.map(p => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            const pokedexId = p.pokedexId || 1;
+            const isShiny = p.isShiny || false;
+            
+            // Usar o sprite Home por defeito para alta qualidade no canvas estático
+            let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+            
+            img.onload = () => resolve({ p, img, success: true });
+            img.onerror = () => {
+                // Se falhar o do home, tenta o clássico 2D
+                const fallbackImg = new Image();
+                fallbackImg.crossOrigin = "anonymous";
+                fallbackImg.onload = () => resolve({ p, img: fallbackImg, success: true });
+                fallbackImg.onerror = () => resolve({ p, img: null, success: false });
+                fallbackImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+            };
+            img.crossOrigin = "anonymous";
+            img.src = spriteUrl;
+        });
+    });
 
-    saveHofRecord(currentGameId, record).then(() => {
-        getHofRecords(currentGameId).then(records => {
-            activeHofIndex = records.length - 1;
-            renderAll();
+    Promise.all(loadPromises).then(loadedMembers => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 800;
+        canvas.height = 480;
+        const ctx = canvas.getContext("2d");
+        
+        // Cores temáticas para gradiente de fundo
+        const gameThemeColors = {
+            red: ["#3b0712", "#090b0e"], blue: ["#071e3b", "#090b0e"], yellow: ["#3b3007", "#090b0e"],
+            gold: ["#3b2007", "#090b0e"], silver: ["#27272a", "#090b0e"], crystal: ["#07353b", "#090b0e"],
+            ruby: ["#3b0707", "#090b0e"], sapphire: ["#07113b", "#090b0e"], emerald: ["#042f1a", "#090b0e"],
+            firered: ["#3b1707", "#090b0e"], leafgreen: ["#073b14", "#090b0e"], diamond: ["#0a1f3b", "#090b0e"],
+            pearl: ["#3b0a24", "#090b0e"], platinum: ["#1e293b", "#090b0e"], heartgold: ["#3b1707", "#090b0e"],
+            soulsilver: ["#071e3b", "#090b0e"], black: ["#111827", "#090b0e"], white: ["#374151", "#090b0e"],
+            black2: ["#091330", "#090b0e"], white2: ["#302005", "#090b0e"], x: ["#071e3b", "#090b0e"],
+            y: ["#3b0712", "#090b0e"], omegaruby: ["#3b1707", "#090b0e"], alphasapphire: ["#05213a", "#090b0e"],
+            sun: ["#302005", "#090b0e"], moon: ["#071e3b", "#090b0e"], ultrasun: ["#3b1707", "#090b0e"],
+            ultramoon: ["#07353b", "#090b0e"], sword: ["#07353b", "#090b0e"], shield: ["#3d0510", "#090b0e"],
+            brilliantdiamond: ["#0a1f3b", "#090b0e"], shiningpearl: ["#3b0a24", "#090b0e"], legendsarceus: ["#1e293b", "#090b0e"],
+            scarlet: ["#3b0712", "#090b0e"], violet: ["#230f3f", "#090b0e"]
+        };
+        const colors = gameThemeColors[currentGameId] || ["#111827", "#090b0e"];
+        
+        const grad = ctx.createRadialGradient(400, 240, 50, 400, 240, 400);
+        grad.addColorStop(0, colors[0]);
+        grad.addColorStop(1, colors[1]);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, 800, 480);
+        
+        // Cor de realce (borda)
+        const borderColors = {
+            red: "#ef4444", blue: "#3b82f6", yellow: "#eab308", gold: "#d97706", silver: "#9ca3af", crystal: "#06b6d4",
+            ruby: "#b91c1c", sapphire: "#1d4ed8", emerald: "#10b981", firered: "#f97316", leafgreen: "#22c55e",
+            diamond: "#60a5fa", pearl: "#f472b6", platinum: "#94a3b8", heartgold: "#ea580c", soulsilver: "#3b82f6",
+            black: "#4b5563", white: "#f9fafb", black2: "#2563eb", white2: "#f59e0b", x: "#3b82f6", y: "#ef4444",
+            omegaruby: "#ea580c", alphasapphire: "#0284c7", sun: "#f59e0b", moon: "#3b82f6", ultrasun: "#ea580c",
+            ultramoon: "#06b6d4", sword: "#06b6d4", shield: "#e11d48", brilliantdiamond: "#60a5fa", shiningpearl: "#f472b6",
+            legendsarceus: "#475569", scarlet: "#dc2626", violet: "#7c3aed"
+        };
+        const accentColor = borderColors[currentGameId] || "#6366f1";
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth = 10;
+        ctx.strokeRect(0, 0, 800, 480);
+        
+        // Título principal
+        ctx.fillStyle = "#ffffff";
+        ctx.font = "bold 26px 'Outfit', system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("🏆 HALL OF FAME 🏆", 400, 60);
+        
+        // Nome do jogo campeão
+        ctx.fillStyle = accentColor;
+        ctx.font = "900 15px 'Outfit', system-ui, -apple-system, sans-serif";
+        const gameName = GAMES_DB.find(g => g.id === currentGameId)?.name || "Pokémon";
+        ctx.fillText(gameName.toUpperCase(), 400, 92);
+        
+        // Grelha de Pokémon (3 colunas, 2 linhas)
+        const colWidth = 230;
+        const rowHeight = 150;
+        const startX = 400 - (1.5 * colWidth);
+        const startY = 120;
+        
+        loadedMembers.forEach((member, index) => {
+            const col = index % 3;
+            const row = Math.floor(index / 3);
+            const x = startX + col * colWidth;
+            const y = startY + row * rowHeight;
+            
+            // Fundo de cada caixa
+            ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.1)";
+            ctx.lineWidth = 1;
+            
+            ctx.fillRect(x + 10, y + 10, colWidth - 20, rowHeight - 20);
+            ctx.strokeRect(x + 10, y + 10, colWidth - 20, rowHeight - 20);
+            
+            const pInfo = member.p;
+            
+            // Desenhar Sprite
+            if (member.img) {
+                ctx.drawImage(member.img, x + (colWidth/2) - 45, y + 18, 90, 90);
+            }
+            
+            // Nome
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "bold 13px 'Outfit', system-ui, -apple-system, sans-serif";
+            ctx.textAlign = "center";
+            const name = pInfo.nickname ? pInfo.nickname : pInfo.species;
+            ctx.fillText(name, x + (colWidth/2), y + 115);
+            
+            // Nível e Espécie
+            ctx.fillStyle = "#9ca3af";
+            ctx.font = "600 10px 'Outfit', system-ui, -apple-system, sans-serif";
+            const subtitle = pInfo.nickname ? `${pInfo.species} (Lv. ${pInfo.level})` : `Lv. ${pInfo.level}`;
+            ctx.fillText(subtitle, x + (colWidth/2), y + 130);
+        });
+        
+        // Rodapé
+        ctx.fillStyle = "#9ca3af";
+        ctx.font = "bold 11px 'Outfit', system-ui, -apple-system, sans-serif";
+        ctx.textAlign = "right";
+        ctx.fillText(new Date().toLocaleDateString('pt-PT'), 770, 452);
+        
+        ctx.textAlign = "left";
+        ctx.fillText("MURAL DE HONRA", 30, 452);
+        
+        // Converter para imagem base64
+        const base64Data = canvas.toDataURL("image/jpeg", 0.85);
+        
+        const record = {
+            id: "hof_gen_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+            type: "upload", // Salvo diretamente como upload para renderizar como imagem estática
+            data: base64Data,
+            title: `Campeão: ${gameName}`,
+            date: new Date().toLocaleDateString('pt-PT')
+        };
+        
+        saveHofRecord(currentGameId, record).then(() => {
+            getHofRecords(currentGameId).then(records => {
+                activeHofIndex = records.length - 1;
+                renderAll();
+                if (btn && btn.tagName === "BUTTON") {
+                    btn.disabled = false;
+                    btn.innerText = originalText;
+                }
+            });
+        }).catch(err => {
+            console.error("Erro ao guardar Mural no IndexedDB:", err);
+            alert("Erro ao gravar o Mural de Honra.");
+            if (btn && btn.tagName === "BUTTON") {
+                btn.disabled = false;
+                btn.innerText = originalText;
+            }
         });
     }).catch(err => {
-        console.error("Erro ao gerar HOF:", err);
-        alert("Erro ao gerar o Mural de Honra.");
+        console.error("Erro ao carregar sprites:", err);
+        alert("Erro ao carregar as imagens dos Pokémon.");
+        if (btn && btn.tagName === "BUTTON") {
+            btn.disabled = false;
+            btn.innerText = originalText;
+        }
     });
 }
 
@@ -470,11 +619,11 @@ function createSlotHTML(p, index, type) {
         <div class="slot ${typeClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
-                <img class="slot-sprite" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
+                <img class="slot-sprite" draggable="false" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
             </div>
             <div class="slot-name">${displayName}</div>
             <div class="slot-meta">
-                <img class="ball-mini" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${p.ball || 'poke'}-ball.png" alt="${p.ball}" onerror="this.style.display='none'">
+                <img class="ball-mini" draggable="false" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${p.ball || 'poke'}-ball.png" alt="${p.ball}" onerror="this.style.display='none'">
                 <span>${subText}</span>
             </div>
         </div>
@@ -1203,6 +1352,7 @@ function importData(e) {
             const d = JSON.parse(evt.target.result);
             if (Array.isArray(d)) { 
                 pokemonDatabase = d; 
+                cleanupDuplicates();
                 localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
                 renderAll(); 
             }
@@ -1296,8 +1446,60 @@ function handleHofUpload(event) {
 }
 // ----------------------------------------------
 
+function cleanupDuplicates() {
+    if (!Array.isArray(pokemonDatabase) || pokemonDatabase.length === 0) return;
+    
+    // 1. Remove entries with duplicate IDs (keeping the first one, or the one in the team)
+    const seenIds = new Set();
+    const uniqueList = [];
+    
+    // Sort team members first to make sure if there is a duplicate ID, we keep the team version
+    const sortedDb = [...pokemonDatabase].sort((a, b) => {
+        const aVal = a.slotType === "team" ? 1 : 0;
+        const bVal = b.slotType === "team" ? 1 : 0;
+        return bVal - aVal;
+    });
+
+    for (const p of sortedDb) {
+        if (!p.id) {
+            p.id = "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+        }
+        if (!seenIds.has(p.id)) {
+            seenIds.add(p.id);
+            uniqueList.push(p);
+        }
+    }
+    
+    pokemonDatabase = uniqueList;
+    
+    // 2. Remove duplicates by same attributes where one is team and one is box
+    const teamPokemon = pokemonDatabase.filter(p => p.slotType === "team");
+    const boxPokemon = pokemonDatabase.filter(p => p.slotType === "box");
+    
+    const idsToRemove = new Set();
+    for (const tp of teamPokemon) {
+        for (const bp of boxPokemon) {
+            if (tp.id !== bp.id &&
+                tp.species === bp.species &&
+                (tp.nickname || "") === (bp.nickname || "") &&
+                tp.level === bp.level &&
+                tp.currentGame === bp.currentGame) {
+                idsToRemove.add(bp.id);
+            }
+        }
+    }
+    
+    if (idsToRemove.size > 0) {
+        pokemonDatabase = pokemonDatabase.filter(p => !idsToRemove.has(p.id));
+        console.log(`blackbox: Removed ${idsToRemove.size} duplicate specimens from the box.`);
+    }
+    
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+}
+
 window.onload = function() {
     initDB().then(() => {
+        cleanupDuplicates();
         setupDatalists(); 
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
@@ -1306,6 +1508,7 @@ window.onload = function() {
         switchGame(currentGameId);
     }).catch(err => {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
+        cleanupDuplicates();
         setupDatalists(); 
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
