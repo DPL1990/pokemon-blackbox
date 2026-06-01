@@ -157,6 +157,7 @@ function deleteHofRecord(gameId, index) {
                 request.onerror = (e) => reject(e.target.error);
             });
         }
+    });
 }
 
 function generateHofFromActiveTeam() {
