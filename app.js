@@ -1756,6 +1756,10 @@ function parseGen1Save(buffer) {
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
+            const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
+            const otOffset = 0x3216 + (i * 11);
+            const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+            
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
             parsedList.push({
@@ -1763,7 +1767,9 @@ function parseGen1Save(buffer) {
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
-                level: level || 5
+                level: level || 5,
+                otName: otName,
+                otId: otId
             });
         }
     }
@@ -1783,6 +1789,10 @@ function parseGen1Save(buffer) {
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
+            const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
+            const otOffset = 0x33A4 + (i * 11);
+            const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+            
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
             parsedList.push({
@@ -1790,7 +1800,9 @@ function parseGen1Save(buffer) {
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
-                level: level || 5
+                level: level || 5,
+                otName: otName,
+                otId: otId
             });
         }
     }
@@ -1833,6 +1845,11 @@ function parseGen2Save(buffer) {
         const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
         const nickname = decodeGen1String(nickBytes);
         
+        const otId = u8[structOffset + 6] * 256 + u8[structOffset + 7];
+        const otStart = isCrystal ? 0x2EAA : 0x2E34;
+        const otOffset = otStart + (i * 11);
+        const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+        
         const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
         
         parsedList.push({
@@ -1840,7 +1857,9 @@ function parseGen2Save(buffer) {
             pokedexId,
             species: speciesName,
             nickname: nickname || speciesName,
-            level: level || 5
+            level: level || 5,
+            otName: otName,
+            otId: otId
         });
     }
     
@@ -1960,12 +1979,18 @@ function parseGen3Save(buffer) {
         const level = section1[structOffset + 84];
         const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
         
+        const otId = otid & 0xFFFF;
+        const otNameBytes = section1.subarray(structOffset + 20, structOffset + 20 + 7);
+        const otName = decodeGen3String(otNameBytes);
+        
         parsedList.push({
             sourceSlot: `Equipa GBA #${i+1}`,
             pokedexId,
             species: speciesName,
             nickname: nickname || speciesName,
-            level: level || 5
+            level: level || 5,
+            otName: otName,
+            otId: otId
         });
     }
     
@@ -2004,12 +2029,14 @@ function parseGen4Gen5Save(buffer) {
             
             const blockA = new Uint16Array(16);
             const blockC = new Uint16Array(16);
+            const blockD = new Uint16Array(16);
             
             for (let b = 0; b < 4; b++) {
                 const targetBlock = order[b];
                 let dest = null;
                 if (targetBlock === 0) dest = blockA;
                 else if (targetBlock === 2) dest = blockC;
+                else if (targetBlock === 3) dest = blockD;
                 
                 if (dest) {
                     for (let w = 0; w < 16; w++) {
@@ -2021,8 +2048,10 @@ function parseGen4Gen5Save(buffer) {
             const pokedexId = blockA[0];
             if (pokedexId === 0 || pokedexId > 649) continue;
             
-            const exp = blockA[2] | (blockA[3] << 16);
-            const nickname = decodeUTF16String(blockC.subarray(0, 11));
+            const exp = blockA[4] | (blockA[5] << 16);
+            const otId = blockA[2];
+            const nickname = decodeUTF16String(blockC.subarray(4, 15));
+            const otName = decodeUTF16String(blockD.subarray(4, 12));
             
             let level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
             let isParty = false;
@@ -2042,7 +2071,9 @@ function parseGen4Gen5Save(buffer) {
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
-                level: level
+                level: level,
+                otName: otName,
+                otId: otId
             });
             
             seenPids.add(pid);
@@ -2063,6 +2094,8 @@ function parseDecryptedPKM(buffer, fileName) {
     let nickname = "";
     let level = 5;
     let sourceSlot = "Ficheiro PKM";
+    let otId = 0;
+    let otName = "";
     
     if (size === 100) {
         // PK3
@@ -2071,12 +2104,20 @@ function parseDecryptedPKM(buffer, fileName) {
         nickname = decodeGen3String(nickBytes);
         level = u8[84] || 5;
         sourceSlot = "Ficheiro PK3 Decifrado";
+        
+        otId = u16[4 / 2];
+        const otNameBytes = u8.subarray(20, 27);
+        otName = decodeGen3String(otNameBytes);
     } else if (size === 136 || size === 220 || size === 236) {
         // PK4 / PK5
         pokedexId = u16[8 / 2];
-        exp = u32[12 / 4];
-        const nickWords = u16.subarray(72 / 2, 72 / 2 + 11);
+        exp = u32[16 / 4];
+        const nickWords = u16.subarray(80 / 2, 80 / 2 + 11);
         nickname = decodeUTF16String(nickWords);
+        
+        otId = u16[12 / 2];
+        const otWords = u16.subarray(112 / 2, 112 / 2 + 8);
+        otName = decodeUTF16String(otWords);
         
         if (size === 236) {
             level = u8[140] || 5;
@@ -2091,6 +2132,10 @@ function parseDecryptedPKM(buffer, fileName) {
         const nickWords = u16.subarray(0x40 / 2, 0x40 / 2 + 12);
         nickname = decodeUTF16String(nickWords);
         
+        otId = u16[0x0C / 2];
+        const otWords = u16.subarray(176 / 2, 176 / 2 + 12);
+        otName = decodeUTF16String(otWords);
+        
         if (size === 260) {
             level = u8[240];
         } else {
@@ -2103,6 +2148,10 @@ function parseDecryptedPKM(buffer, fileName) {
         exp = u32[0x10 / 4];
         const nickWords = u16.subarray(0x58 / 2, 0x58 / 2 + 12);
         nickname = decodeUTF16String(nickWords);
+        
+        otId = u16[0x0C / 2];
+        const otWords = u16.subarray(248 / 2, 248 / 2 + 12);
+        otName = decodeUTF16String(otWords);
         
         level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
         sourceSlot = `Ficheiro PK${size === 328 ? '8' : '9'}`;
@@ -2121,7 +2170,9 @@ function parseDecryptedPKM(buffer, fileName) {
         pokedexId,
         species: speciesName,
         nickname: nickname || speciesName,
-        level: level
+        level: level,
+        otName: otName,
+        otId: otId
     }];
 }
 
@@ -2193,13 +2244,37 @@ function renderSaveImportList() {
     if (!tbody) return;
     
     tbody.innerHTML = tempImportList.map((p, idx) => {
-        const gameOptionsHtml = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === currentGameId ? 'selected' : ''}>${g.name}</option>`).join("");
+        let selectedGameId = currentGameId;
+        let selectedTrainerId = `trainer_${selectedGameId}_default`;
         
-        const initialGameId = currentGameId;
-        const gameTrainers = trainersList.filter(t => t.gameId === initialGameId);
+        if (p.otName) {
+            const cleanOt = p.otName.toLowerCase().trim();
+            let matchedTrainer = null;
+            
+            if (p.otId !== undefined && p.otId !== null) {
+                const formattedOtId = String(p.otId).padStart(5, '0');
+                matchedTrainer = trainersList.find(t => {
+                    if (t.name.toLowerCase().trim() !== cleanOt) return false;
+                    const cleanTid = String(t.tid || "").padStart(5, '0');
+                    return cleanTid === formattedOtId;
+                });
+            }
+            
+            if (!matchedTrainer) {
+                matchedTrainer = trainersList.find(t => t.name.toLowerCase().trim() === cleanOt);
+            }
+            
+            if (matchedTrainer) {
+                selectedGameId = matchedTrainer.gameId;
+                selectedTrainerId = matchedTrainer.id;
+            }
+        }
+        
+        const gameOptionsHtml = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === selectedGameId ? 'selected' : ''}>${g.name}</option>`).join("");
+        const gameTrainers = trainersList.filter(t => t.gameId === selectedGameId);
         const trainerOptionsHtml = gameTrainers.map(t => {
             const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
-            return `<option value="${t.id}" ${t.id === `trainer_${initialGameId}_default` ? 'selected' : ''}>${display}</option>`;
+            return `<option value="${t.id}" ${t.id === selectedTrainerId ? 'selected' : ''}>${display}</option>`;
         }).join("");
         
         let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png`;
@@ -2235,10 +2310,33 @@ function updateImportRowTrainers(idx, gameId) {
     const select = document.getElementById(`import-row-trainer-${idx}`);
     if (!select) return;
     
+    const p = tempImportList[idx];
+    let selectedTrainerId = `trainer_${gameId}_default`;
+    
+    if (p && p.otName) {
+        const cleanOt = p.otName.toLowerCase().trim();
+        let matchedTrainer = null;
+        if (p.otId !== undefined && p.otId !== null) {
+            const formattedOtId = String(p.otId).padStart(5, '0');
+            matchedTrainer = trainersList.find(t => {
+                if (t.gameId !== gameId) return false;
+                if (t.name.toLowerCase().trim() !== cleanOt) return false;
+                const cleanTid = String(t.tid || "").padStart(5, '0');
+                return cleanTid === formattedOtId;
+            });
+        }
+        if (!matchedTrainer) {
+            matchedTrainer = trainersList.find(t => t.gameId === gameId && t.name.toLowerCase().trim() === cleanOt);
+        }
+        if (matchedTrainer) {
+            selectedTrainerId = matchedTrainer.id;
+        }
+    }
+    
     const gameTrainers = trainersList.filter(t => t.gameId === gameId);
     const trainerOptionsHtml = gameTrainers.map(t => {
         const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
-        return `<option value="${t.id}" ${t.id === `trainer_${gameId}_default` ? 'selected' : ''}>${display}</option>`;
+        return `<option value="${t.id}" ${t.id === selectedTrainerId ? 'selected' : ''}>${display}</option>`;
     }).join("");
     
     select.innerHTML = trainerOptionsHtml;
