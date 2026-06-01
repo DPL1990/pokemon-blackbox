@@ -36,6 +36,7 @@ const ALL_RIBBONS = [
 
 let currentGameId = localStorage.getItem("bb_current_game") || "red";
 let pokemonDatabase = JSON.parse(localStorage.getItem("bb_database")) || [];
+let currentSpriteStyle = localStorage.getItem("bb_sprite_style") || "classic";
 
 const SUGGESTIONS = {
     natures: ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"],
@@ -239,8 +240,36 @@ function renderAll() {
     setupDragAndDropEvents();
 }
 
+function setSpriteStyle(style) {
+    currentSpriteStyle = style;
+    localStorage.setItem("bb_sprite_style", style);
+    renderAll();
+}
+
+function handleSpriteError(img, pokedexId, shinyStr) {
+    const isShiny = shinyStr === "shiny";
+    if (img.src.includes("showdown")) {
+        img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    } else if (img.src.includes("home")) {
+        img.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    } else {
+        img.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
+    }
+}
+
 function createSlotHTML(p, index, type) {
-    const spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.isShiny ? 'shiny/' : ''}${p.pokedexId || 1}.png`;
+    let spriteUrl = "";
+    const pokedexId = p.pokedexId || 1;
+    const isShiny = p.isShiny;
+
+    if (currentSpriteStyle === "3d-home") {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    } else if (currentSpriteStyle === "3d-animated") {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${isShiny ? 'shiny/' : ''}${pokedexId}.gif`;
+    } else {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    }
+
     const typeClass = p.type1 ? `occupied t-${p.type1}` : '';
     const displayName = p.nickname ? `${p.nickname}` : p.species;
     const subText = p.nickname ? p.species : `Lv. ${p.level}`;
@@ -250,7 +279,7 @@ function createSlotHTML(p, index, type) {
         <div class="slot ${typeClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
-                <img class="slot-sprite" src="${spriteUrl}" alt="${p.species}" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'">
+                <img class="slot-sprite" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
             </div>
             <div class="slot-name">${displayName}</div>
             <div class="slot-meta">
@@ -1082,6 +1111,7 @@ window.onload = function() {
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
         initTouchDragAndDrop();
+        document.getElementById("sprite-style-select").value = currentSpriteStyle;
         switchGame(currentGameId);
     }).catch(err => {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
@@ -1089,6 +1119,7 @@ window.onload = function() {
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
         initTouchDragAndDrop();
+        document.getElementById("sprite-style-select").value = currentSpriteStyle;
         switchGame(currentGameId);
     });
 };

@@ -55,6 +55,14 @@
                     <div class="form-group">
                         <select id="game-select" onchange="switchGame(this.value)"></select>
                     </div>
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label>👾 Visual dos Sprites</label>
+                        <select id="sprite-style-select" onchange="setSpriteStyle(this.value)">
+                            <option value="classic">Pixel Art 2D (Clássico)</option>
+                            <option value="3d-home">Renders 3D (Home)</option>
+                            <option value="3d-animated">Modelos 3D (Showdown)</option>
+                        </select>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;">
                         <button class="btn btn-primary" onclick="openModalForNew()" style="grid-column: span 2;">
                             <span>➕ Registar Espécime</span>
