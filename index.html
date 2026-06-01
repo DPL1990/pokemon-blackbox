@@ -20,6 +20,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+    <!-- Global Error Catcher -->
+    <script>
+        window.addEventListener('error', function(e) {
+            alert("ERRO BLACKBOX:\n" + e.message + "\nno ficheiro: " + e.filename + "\nlinha: " + e.lineno);
+        });
+    </script>
+
     <!-- Service Worker Cache Inline Script -->
     <script>
         if ('serviceWorker' in navigator) {

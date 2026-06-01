@@ -1456,14 +1456,18 @@ function handleHofUpload(event) {
 function cleanupDuplicates() {
     if (!Array.isArray(pokemonDatabase) || pokemonDatabase.length === 0) return;
     
+    // Filter out null/undefined/invalid items first
+    pokemonDatabase = pokemonDatabase.filter(p => p !== null && p !== undefined && typeof p === 'object');
+    if (pokemonDatabase.length === 0) return;
+    
     // 1. Remove entries with duplicate IDs (keeping the first one, or the one in the team)
     const seenIds = new Set();
     const uniqueList = [];
     
     // Sort team members first to make sure if there is a duplicate ID, we keep the team version
     const sortedDb = [...pokemonDatabase].sort((a, b) => {
-        const aVal = a.slotType === "team" ? 1 : 0;
-        const bVal = b.slotType === "team" ? 1 : 0;
+        const aVal = (a && a.slotType === "team") ? 1 : 0;
+        const bVal = (b && b.slotType === "team") ? 1 : 0;
         return bVal - aVal;
     });
 
