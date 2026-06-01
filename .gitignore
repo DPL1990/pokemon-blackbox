@@ -1,0 +1,6 @@
+# Ignorar cópias de segurança locais e temporários
+index - Cópia.html
+*.log
+.system_generated/
+.tempmediaStorage/
+/brain/

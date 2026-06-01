@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ff4a4a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pokémon BlackBox</title>
+    
+    <!-- SEO Meta Tags -->
+    <meta name="description" content="Rastreador multiversal e passaporte de viagem para fitas e históricos de equipas Pokémon.">
+    <meta property="og:title" content="Pokémon BlackBox">
+    <meta property="og:description" content="Registe e transfira os seus espécimes Pokémon entre cartuchos, monitorize o Dexit e guarde o seu Mural de Honra.">
+    <meta property="og:type" content="website">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <!-- Service Worker Cache Inline Script -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('Caixa Negra operando offline!', reg))
+                    .catch(err => console.log('Erro no Service Worker:', err));
+            });
+        }
+    </script>
+    
+    <!-- External Stylesheet -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Pokémon BlackBox</h1>
+            <div class="stats-bar">
+                <div class="stats-badge" id="stat-total-badge">Total Registado: <span id="stat-total">0</span></div>
+                <div class="stats-badge" id="stat-team-badge">Nesta Região: <span id="stat-team">0/6</span></div>
+            </div>
+        </header>
+
+        <div class="dashboard-layout">
+            <!-- Sidebar Panel (Controls, Stats, Hall of fame) -->
+            <aside>
+                <div class="glass-panel">
+                    <div class="panel-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+                        💿 Cartucho Ativo
+                    </div>
+                    <div class="form-group">
+                        <select id="game-select" onchange="switchGame(this.value)"></select>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;">
+                        <button class="btn btn-primary" onclick="openModalForNew()" style="grid-column: span 2;">
+                            <span>➕ Registar Espécime</span>
+                        </button>
+                        <button class="btn btn-action" onclick="exportData()">
+                            <span>📥 Exportar</span>
+                        </button>
+                        <button class="btn btn-action" onclick="document.getElementById('import-file').click()">
+                            <span>📤 Importar</span>
+                        </button>
+                        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+                    </div>
+                </div>
+
+                <div class="glass-panel">
+                    <div class="panel-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                        📊 Dexit Monitor
+                    </div>
+                    <div class="dexit-grid" id="dexit-stats-box"></div>
+                </div>
+
+                <div class="glass-panel" style="padding: 16px;">
+                    <div class="panel-title">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        🏆 Mural de Honra
+                    </div>
+                    <div id="hof-container" onclick="document.getElementById('hof-input').click()">
+                        <div id="hof-placeholder">
+                            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span>Adicionar foto do campeão</span>
+                        </div>
+                        <img id="hof-img" style="display: none;" alt="Hall of Fame" />
+                        <div class="hof-overlay">Mudar Imagem</div>
+                    </div>
+                    <input type="file" id="hof-input" accept="image/*" style="display: none;" onchange="handleHofUpload(event)" />
+                </div>
+            </aside>
+
+            <!-- Main Content Area (Active Team & Regional Box) -->
+            <main>
+                <!-- Active Team Section -->
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                        🛡️ Equipa Ativa (Nesta Região)
+                    </h2>
+                </div>
+                <div class="team-grid" id="team-container"></div>
+
+                <!-- Box Regional Section -->
+                <div class="section-header">
+                    <h2 class="section-title">
+                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                        📦 Box Regional (Sem Limite)
+                    </h2>
+                </div>
+                
+                <!-- Advanced Box Filter Panel -->
+                <div class="glass-panel" id="filter-panel" style="padding: 14px; margin-bottom: 16px;">
+                    <div class="panel-title" style="margin-bottom: 10px; font-size: 0.75rem;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                        🔍 Filtrar e Pesquisar Coleção
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick...">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <select id="filter-type" onchange="renderAll()">
+                                <option value="">Todos os Tipos</option>
+                                <option value="normal">Normal</option>
+                                <option value="fire">Fire</option>
+                                <option value="water">Water</option>
+                                <option value="grass">Grass</option>
+                                <option value="electric">Electric</option>
+                                <option value="ice">Ice</option>
+                                <option value="fighting">Fighting</option>
+                                <option value="poison">Poison</option>
+                                <option value="ground">Ground</option>
+                                <option value="flying">Flying</option>
+                                <option value="psychic">Psychic</option>
+                                <option value="bug">Bug</option>
+                                <option value="rock">Rock</option>
+                                <option value="ghost">Ghost</option>
+                                <option value="dragon">Dragon</option>
+                                <option value="dark">Dark</option>
+                                <option value="steel">Steel</option>
+                                <option value="fairy">Fairy</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <select id="filter-shiny" onchange="renderAll()">
+                                <option value="all">Shinies & Normais</option>
+                                <option value="shiny">Apenas Shinies</option>
+                                <option value="normal">Apenas Normais</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <select id="filter-ribbon" onchange="renderAll()">
+                                <option value="all">Qualquer Espécime</option>
+                                <option value="ribbon">Apenas Ribbon Masters</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="box-grid" id="box-container"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Edit/New Pokemon Modal -->
+    <div class="modal-overlay" id="editor-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modal-title">Ficha Técnica</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeModal()">✕</button>
+            </div>
+            
+            <div class="modal-body">
+                <!-- Showdown Fast Importer -->
+                <div class="showdown-box">
+                    <h4>📋 Importador Rápido (Showdown / PKHeX Text)</h4>
+                    <div class="showdown-input-row">
+                        <textarea id="pkhex-text" rows="2" class="showdown-textarea" placeholder="Cole aqui o formato Showdown (ex: Pikachu @ Light Ball...)"></textarea>
+                        <button class="btn btn-primary" style="width:auto; white-space:nowrap; padding:0 16px;" onclick="parseShowdownText()">Processar</button>
+                    </div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:14px;">
+                    <input type="hidden" id="form-id">
+                    
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label>Espécie</label>
+                            <input type="text" id="form-species" list="species-list" onchange="fetchPokemonTypes(this.value)" placeholder="ex: Pikachu">
+                        </div>
+                        <div class="form-group">
+                            <label>Nickname</label>
+                            <input type="text" id="form-nickname" placeholder="ex: Sparky">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label>Nível</label>
+                            <input type="number" id="form-level" min="1" max="100" value="50">
+                        </div>
+                        <div class="form-group">
+                            <label>Género</label>
+                            <select id="form-gender">
+                                <option value="⚲">⚲ Nenhum</option>
+                                <option value="♂️">♂️ Macho</option>
+                                <option value="♀️">♀️ Fêmea</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Natureza</label>
+                            <input type="text" id="form-nature" list="natures-list" placeholder="ex: Jolly">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label>Habilidade</label>
+                            <input type="text" id="form-ability" list="ability-list" placeholder="ex: Static">
+                        </div>
+                        <div class="form-group">
+                            <label>Tipo Primário</label>
+                            <select id="form-type1">
+                                <option value="normal">Normal</option>
+                                <option value="fire">Fire</option>
+                                <option value="water">Water</option>
+                                <option value="grass">Grass</option>
+                                <option value="electric">Electric</option>
+                                <option value="ice">Ice</option>
+                                <option value="fighting">Fighting</option>
+                                <option value="poison">Poison</option>
+                                <option value="ground">Ground</option>
+                                <option value="flying">Flying</option>
+                                <option value="psychic">Psychic</option>
+                                <option value="bug">Bug</option>
+                                <option value="rock">Rock</option>
+                                <option value="ghost">Ghost</option>
+                                <option value="dragon">Dragon</option>
+                                <option value="dark">Dark</option>
+                                <option value="steel">Steel</option>
+                                <option value="fairy">Fairy</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label>🎒 Poké Ball</label>
+                            <select id="form-ball">
+                                <option value="poke">Poké Ball</option>
+                                <option value="great">Great Ball</option>
+                                <option value="ultra">Ultra Ball</option>
+                                <option value="master">Master Ball</option>
+                                <option value="premier">Premier Ball</option>
+                                <option value="luxury">Luxury Ball</option>
+                                <option value="nest">Nest Ball</option>
+                                <option value="net">Net Ball</option>
+                                <option value="dive">Dive Ball</option>
+                                <option value="repeat">Repeat Ball</option>
+                                <option value="timer">Timer Ball</option>
+                                <option value="quick">Quick Ball</option>
+                                <option value="dusk">Dusk Ball</option>
+                                <option value="heal">Heal Ball</option>
+                                <option value="cherish">Cherish Ball</option>
+                                <option value="safari">Safari Ball</option>
+                                <option value="sport">Sport Ball</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>📦 Item Equipado</label>
+                            <input type="text" id="form-item" list="items-list" placeholder="ex: Leftovers">
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+                        <div class="form-group">
+                            <label>🏷️ Tipo Secundário</label>
+                            <select id="form-type2">
+                                <option value="">Nenhum</option>
+                                <option value="normal">Normal</option>
+                                <option value="fire">Fire</option>
+                                <option value="water">Water</option>
+                                <option value="grass">Grass</option>
+                                <option value="electric">Electric</option>
+                                <option value="ice">Ice</option>
+                                <option value="fighting">Fighting</option>
+                                <option value="poison">Poison</option>
+                                <option value="ground">Ground</option>
+                                <option value="flying">Flying</option>
+                                <option value="psychic">Psychic</option>
+                                <option value="bug">Bug</option>
+                                <option value="rock">Rock</option>
+                                <option value="ghost">Ghost</option>
+                                <option value="dragon">Dragon</option>
+                                <option value="dark">Dark</option>
+                                <option value="steel">Steel</option>
+                                <option value="fairy">Fairy</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <!-- spacer -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>⚔️ Moveset</label>
+                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <input type="text" id="form-move1" list="moves-list" placeholder="Move 1">
+                            <input type="text" id="form-move2" list="moves-list" placeholder="Move 2">
+                            <input type="text" id="form-move3" list="moves-list" placeholder="Move 3">
+                            <input type="text" id="form-move4" list="moves-list" placeholder="Move 4">
+                        </div>
+                    </div>
+
+                    <!-- IVs and EVs Expandable Section -->
+                    <details class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-top: 4px;">
+                        <summary style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; user-select: none; color: var(--text-muted); outline: none;">
+                            📊 Estatísticas Competitivas (IVs & EVs)
+                        </summary>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
+                            <div>
+                                <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 8px;">Valores Individuais (IVs)</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                    <div class="form-group" style="margin-bottom:6px;"><label>HP</label><input type="number" id="iv-hp" min="0" max="31" value="31"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>ATK</label><input type="number" id="iv-atk" min="0" max="31" value="31"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>DEF</label><input type="number" id="iv-def" min="0" max="31" value="31"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPA</label><input type="number" id="iv-spa" min="0" max="31" value="31"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPD</label><input type="number" id="iv-spd" min="0" max="31" value="31"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPE</label><input type="number" id="iv-spe" min="0" max="31" value="31"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 8px;">Treino de Esforço (EVs)</h4>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                    <div class="form-group" style="margin-bottom:6px;"><label>HP</label><input type="number" id="ev-hp" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>ATK</label><input type="number" id="ev-atk" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>DEF</label><input type="number" id="ev-def" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPA</label><input type="number" id="ev-spa" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPD</label><input type="number" id="ev-spd" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    <div class="form-group" style="margin-bottom:6px;"><label>SPE</label><input type="number" id="ev-spe" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                </div>
+                                <div id="ev-warning" style="font-size: 0.6rem; color: var(--accent-danger); font-weight: 700; margin-top: 4px; display: none;">Soma dos EVs excede o limite de 510! (Atual: <span id="ev-total-span">0</span>)</div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="form-group">
+                        <label>🥚 Jogo de Origem</label>
+                        <select id="form-origin-game"></select>
+                    </div>
+
+                    <!-- Location Stamp Transfer panel -->
+                    <div class="form-group" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); margin-top: 4px;">
+                        <label>✈️ Transferir Localização (Carimbar Viagem)</label>
+                        <div style="display: flex; gap: 8px; margin-top: 6px;">
+                            <select id="form-transfer-game" style="flex: 1;"></select>
+                            <button type="button" class="btn btn-primary" style="width: auto; white-space: nowrap;" onclick="executeTransfer()">Carimbar Viagem</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🗺️ Passaporte de Viagem</label>
+                        <div class="passport-timeline" id="passport-display"></div>
+                    </div>
+
+                    <!-- Interactive Ribbon Checklist & Custom Ribbons -->
+                    <div class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px;">
+                        <label>🏅 Fitas (Ribbon Checklist)</label>
+                        <div id="ribbon-checklist-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 6px;">
+                            <!-- Checkboxes generated dynamically -->
+                        </div>
+                        
+                        <div class="form-group" style="margin-top: 10px; margin-bottom: 0;">
+                            <label style="font-size:0.6rem;">➕ Adicionar Outras Fitas / Fita Personalizada</label>
+                            <div style="display: flex; gap: 8px; margin-top: 4px;">
+                                <input type="text" id="form-custom-ribbon" placeholder="Nome da fita..." style="flex: 1;">
+                                <button type="button" class="btn btn-primary" style="width: auto; padding: 0 16px;" onclick="addCustomRibbon()">Adicionar</button>
+                            </div>
+                            <div id="custom-ribbons-list" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Notas</label>
+                        <textarea id="form-notes" rows="3" placeholder="Insira anotações sobre capturas, batalhas ou conquistas..."></textarea>
+                    </div>
+
+                    <div class="footer-actions">
+                        <button class="btn btn-primary" onclick="savePokemon()">💾 Gravar Espécime na Caixa Negra</button>
+                        <button class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none;">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Datalists for autocomplete suggestions -->
+    <datalist id="species-list"></datalist>
+    <datalist id="natures-list"></datalist>
+    <datalist id="ability-list"></datalist>
+    <datalist id="moves-list"></datalist>
+    
+    <!-- Autocomplete Held Items list -->
+    <datalist id="items-list">
+        <option value="Leftovers"></option>
+        <option value="Life Orb"></option>
+        <option value="Choice Band"></option>
+        <option value="Choice Specs"></option>
+        <option value="Choice Scarf"></option>
+        <option value="Focus Sash"></option>
+        <option value="Assault Vest"></option>
+        <option value="Heavy-Duty Boots"></option>
+        <option value="Rocky Helmet"></option>
+        <option value="Eviolite"></option>
+        <option value="Black Sludge"></option>
+        <option value="Expert Belt"></option>
+        <option value="Light Ball"></option>
+        <option value="Shed Shell"></option>
+        <option value="Smooth Rock"></option>
+        <option value="Damp Rock"></option>
+        <option value="Heat Rock"></option>
+        <option value="Icy Rock"></option>
+        <option value="Sitrus Berry"></option>
+        <option value="Lum Berry"></option>
+    </datalist>
+
+    <!-- External Logic Script -->
+    <script src="app.js" defer></script>
+</body>
+</html>
