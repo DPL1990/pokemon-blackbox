@@ -700,17 +700,17 @@
     <div class="modal-overlay" id="save-import-modal">
         <div class="modal-content" style="max-width: 720px; width: 95%;">
             <div class="modal-header">
-                <h2>💾 Importador de Save (.sav)</h2>
+                <h2>💾 Importador Multigeracional (Save / PKM)</h2>
                 <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeSaveImportModal()">✕</button>
             </div>
             <div class="modal-body">
                 <div style="margin-bottom: 16px;">
                     <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
-                        Carregue um ficheiro de save original (<strong>.sav</strong>) de Pokémon Red/Blue/Yellow. O BlackBox irá ler os dados da equipa e da box ativa. Poderá escolher o destino de cada exemplar individualmente!
+                        Carregue um ficheiro de save original (<strong>.sav / .dsv</strong>) das Gerações 1 a 5, ou ficheiros de Pokémon individuais descodificados (<strong>.pk1 - .pk9, .pkm</strong>) exportados pelo PKHeX. Escolha o jogo e treinador de destino para cada espécime!
                     </p>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <input type="file" id="save-file-input" accept=".sav" style="display: none;" onchange="handleSaveFileSelect(event)">
-                        <button class="btn btn-primary" onclick="document.getElementById('save-file-input').click()" style="width: auto; padding: 8px 16px;">📂 Selecionar Ficheiro .sav</button>
+                        <input type="file" id="save-file-input" accept=".sav,.dsv,.pkm,.pk1,.pk2,.pk3,.pk4,.pk5,.pk6,.pk7,.pk8,.pk9" style="display: none;" onchange="handleSaveFileSelect(event)">
+                        <button class="btn btn-primary" onclick="document.getElementById('save-file-input').click()" style="width: auto; padding: 8px 16px;">📂 Selecionar Ficheiro</button>
                         <span id="save-file-name" style="font-size: 0.75rem; color: var(--text-muted);">Nenhum ficheiro selecionado</span>
                     </div>
                 </div>

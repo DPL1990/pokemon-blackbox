@@ -1585,24 +1585,7 @@ function importData(e) {
 
 let tempImportList = [];
 
-const POKEDEX_151 = [
-    "", "Bulbasaur", "Ivysaur", "Venusaur", "Charmander", "Charmeleon", "Charizard", "Squirtle", "Wartortle", "Blastoise",
-    "Caterpie", "Metapod", "Butterfree", "Weedle", "Kakuna", "Beedrill", "Pidgey", "Pidgeotto", "Pidgeot", "Rattata",
-    "Raticate", "Spearow", "Fearow", "Ekans", "Arbok", "Pikachu", "Raichu", "Sandshrew", "Sandslash", "NidoranF",
-    "Nidorina", "Nidoqueen", "NidoranM", "Nidorino", "Nidoking", "Clefairy", "Clefable", "Vulpix", "Ninetales", "Jigglypuff",
-    "Wigglytuff", "Zubat", "Golbat", "Oddish", "Gloom", "Vileplume", "Paras", "Parasect", "Venonat", "Venomoth",
-    "Diglett", "Dugtrio", "Meowth", "Persian", "Psyduck", "Golduck", "Mankey", "Primeape", "Growlithe", "Arcanine",
-    "Poliwag", "Poliwhirl", "Poliwrath", "Abra", "Kadabra", "Alakazam", "Machop", "Machoke", "Machamp", "Bellsprout",
-    "Weepinbell", "Victreebel", "Tentacool", "Tentacruel", "Geodude", "Graveler", "Golem", "Ponyta", "Rapidash", "Slowpoke",
-    "Slowbro", "Magnemite", "Magneton", "Farfetch'd", "Doduo", "Dodrio", "Seel", "Dewgong", "Grimer", "Muk",
-    "Shellder", "Cloyster", "Gastly", "Haunter", "Gengar", "Onix", "Drowzee", "Hypno", "Krabby", "Kingler",
-    "Voltorb", "Electrode", "Exeggcute", "Exeggutor", "Cubone", "Marowak", "Hitmonlee", "Hitmonchan", "Lickitung", "Koffing",
-    "Weezing", "Rhyhorn", "Rhydon", "Chansey", "Tangela", "Kangaskhan", "Horsea", "Seadra", "Goldeen", "Seaking",
-    "Staryu", "Starmie", "Mr. Mime", "Scyther", "Jynx", "Electabuzz", "Magmar", "Pinsir", "Tauros", "Magikarp",
-    "Gyarados", "Lapras", "Ditto", "Eevee", "Vaporeon", "Jolteon", "Flareon", "Porygon", "Omanyte", "Omastar",
-    "Kabuto", "Kabutops", "Aerodactyl", "Snorlax", "Articuno", "Zapdos", "Moltres", "Dratini", "Dragonair", "Dragonite",
-    "Mewtwo", "Mew"
-];
+const POKEMON_NAMES_ALL = ["","Bulbasaur","Ivysaur","Venusaur","Charmander","Charmeleon","Charizard","Squirtle","Wartortle","Blastoise","Caterpie","Metapod","Butterfree","Weedle","Kakuna","Beedrill","Pidgey","Pidgeotto","Pidgeot","Rattata","Raticate","Spearow","Fearow","Ekans","Arbok","Pikachu","Raichu","Sandshrew","Sandslash","NidoranF","Nidorina","Nidoqueen","NidoranM","Nidorino","Nidoking","Clefairy","Clefable","Vulpix","Ninetales","Jigglypuff","Wigglytuff","Zubat","Golbat","Oddish","Gloom","Vileplume","Paras","Parasect","Venonat","Venomoth","Diglett","Dugtrio","Meowth","Persian","Psyduck","Golduck","Mankey","Primeape","Growlithe","Arcanine","Poliwag","Poliwhirl","Poliwrath","Abra","Kadabra","Alakazam","Machop","Machoke","Machamp","Bellsprout","Weepinbell","Victreebel","Tentacool","Tentacruel","Geodude","Graveler","Golem","Ponyta","Rapidash","Slowpoke","Slowbro","Magnemite","Magneton","Farfetch\u0027d","Doduo","Dodrio","Seel","Dewgong","Grimer","Muk","Shellder","Cloyster","Gastly","Haunter","Gengar","Onix","Drowzee","Hypno","Krabby","Kingler","Voltorb","Electrode","Exeggcute","Exeggutor","Cubone","Marowak","Hitmonlee","Hitmonchan","Lickitung","Koffing","Weezing","Rhyhorn","Rhydon","Chansey","Tangela","Kangaskhan","Horsea","Seadra","Goldeen","Seaking","Staryu","Starmie","Mr. Mime","Scyther","Jynx","Electabuzz","Magmar","Pinsir","Tauros","Magikarp","Gyarados","Lapras","Ditto","Eevee","Vaporeon","Jolteon","Flareon","Porygon","Omanyte","Omastar","Kabuto","Kabutops","Aerodactyl","Snorlax","Articuno","Zapdos","Moltres","Dratini","Dragonair","Dragonite","Mewtwo","Mew","Chikorita","Bayleef","Meganium","Cyndaquil","Quilava","Typhlosion","Totodile","Croconaw","Feraligatr","Sentret","Furret","Hoothoot","Noctowl","Ledyba","Ledian","Spinarak","Ariados","Crobat","Chinchou","Lanturn","Pichu","Cleffa","Igglybuff","Togepi","Togetic","Natu","Xatu","Mareep","Flaaffy","Ampharos","Bellossom","Marill","Azumarill","Sudowoodo","Politoed","Hoppip","Skiploom","Jumpluff","Aipom","Sunkern","Sunflora","Yanma","Wooper","Quagsire","Espeon","Umbreon","Murkrow","Slowking","Misdreavus","Unown","Wobbuffet","Girafarig","Pineco","Forretress","Dunsparce","Gligar","Steelix","Snubbull","Granbull","Qwilfish","Scizor","Shuckle","Heracross","Sneasel","Teddiursa","Ursaring","Slugma","Magcargo","Swinub","Piloswine","Corsola","Remoraid","Octillery","Delibird","Mantine","Skarmory","Houndour","Houndoom","Kingdra","Phanpy","Donphan","Porygon2","Stantler","Smeargle","Tyrogue","Hitmontop","Smoochum","Elekid","Magby","Miltank","Blissey","Raikou","Entei","Suicune","Larvitar","Pupitar","Tyranitar","Lugia","Ho-Oh","Celebi","Treecko","Grovyle","Sceptile","Torchic","Combusken","Blaziken","Mudkip","Marshtomp","Swampert","Poochyena","Mightyena","Zigzagoon","Linoone","Wurmple","Silcoon","Beautifly","Cascoon","Dustox","Lotad","Lombre","Ludicolo","Seedot","Nuzleaf","Shiftry","Taillow","Swellow","Wingull","Pelipper","Ralts","Kirlia","Gardevoir","Surskit","Masquerain","Shroomish","Breloom","Slakoth","Vigoroth","Slaking","Nincada","Ninjask","Shedinja","Whismur","Loudred","Exploud","Makuhita","Hariyama","Azurill","Nosepass","Skitty","Delcatty","Sableye","Mawile","Aron","Lairon","Aggron","Meditite","Medicham","Electrike","Manectric","Plusle","Minun","Volbeat","Illumise","Roselia","Gulpin","Swalot","Carvanha","Sharpedo","Wailmer","Wailord","Numel","Camerupt","Torkoal","Spoink","Grumpig","Spinda","Trapinch","Vibrava","Flygon","Cacnea","Cacturne","Swablu","Altaria","Zangoose","Seviper","Lunatone","Solrock","Barboach","Whiscash","Corphish","Crawdaunt","Baltoy","Claydol","Lileep","Cradily","Anorith","Armaldo","Feebas","Milotic","Castform","Kecleon","Shuppet","Banette","Duskull","Dusclops","Tropius","Chimecho","Absol","Wynaut","Snorunt","Glalie","Spheal","Sealeo","Walrein","Clamperl","Huntail","Gorebyss","Relicanth","Luvdisc","Bagon","Shelgon","Salamence","Beldum","Metang","Metagross","Regirock","Regice","Registeel","Latias","Latios","Kyogre","Groudon","Rayquaza","Jirachi","Deoxys Normal","Turtwig","Grotle","Torterra","Chimchar","Monferno","Infernape","Piplup","Prinplup","Empoleon","Starly","Staravia","Staraptor","Bidoof","Bibarel","Kricketot","Kricketune","Shinx","Luxio","Luxray","Budew","Roserade","Cranidos","Rampardos","Shieldon","Bastiodon","Burmy","Wormadam Plant","Mothim","Combee","Vespiquen","Pachirisu","Buizel","Floatzel","Cherubi","Cherrim","Shellos","Gastrodon","Ambipom","Drifloon","Drifblim","Buneary","Lopunny","Mismagius","Honchkrow","Glameow","Purugly","Chingling","Stunky","Skuntank","Bronzor","Bronzong","Bonsly","Mime Jr.","Happiny","Chatot","Spiritomb","Gible","Gabite","Garchomp","Munchlax","Riolu","Lucario","Hippopotas","Hippowdon","Skorupi","Drapion","Croagunk","Toxicroak","Carnivine","Finneon","Lumineon","Mantyke","Snover","Abomasnow","Weavile","Magnezone","Lickilicky","Rhyperior","Tangrowth","Electivire","Magmortar","Togekiss","Yanmega","Leafeon","Glaceon","Gliscor","Mamoswine","Porygon-Z","Gallade","Probopass","Dusknoir","Froslass","Rotom","Uxie","Mesprit","Azelf","Dialga","Palkia","Heatran","Regigigas","Giratina Altered","Cresselia","Phione","Manaphy","Darkrai","Shaymin Land","Arceus","Victini","Snivy","Servine","Serperior","Tepig","Pignite","Emboar","Oshawott","Dewott","Samurott","Patrat","Watchog","Lillipup","Herdier","Stoutland","Purrloin","Liepard","Pansage","Simisage","Pansear","Simisear","Panpour","Simipour","Munna","Musharna","Pidove","Tranquill","Unfezant","Blitzle","Zebstrika","Roggenrola","Boldore","Gigalith","Woobat","Swoobat","Drilbur","Excadrill","Audino","Timburr","Gurdurr","Conkeldurr","Tympole","Palpitoad","Seismitoad","Throh","Sawk","Sewaddle","Swadloon","Leavanny","Venipede","Whirlipede","Scolipede","Cottonee","Whimsicott","Petilil","Lilligant","Basculin Red Striped","Sandile","Krokorok","Krookodile","Darumaka","Darmanitan Standard","Maractus","Dwebble","Crustle","Scraggy","Scrafty","Sigilyph","Yamask","Cofagrigus","Tirtouga","Carracosta","Archen","Archeops","Trubbish","Garbodor","Zorua","Zoroark","Minccino","Cinccino","Gothita","Gothorita","Gothitelle","Solosis","Duosion","Reuniclus","Ducklett","Swanna","Vanillite","Vanillish","Vanilluxe","Deerling","Sawsbuck","Emolga","Karrablast","Escavalier","Foongus","Amoonguss","Frillish Male","Jellicent Male","Alomomola","Joltik","Galvantula","Ferroseed","Ferrothorn","Klink","Klang","Klinklang","Tynamo","Eelektrik","Eelektross","Elgyem","Beheeyem","Litwick","Lampent","Chandelure","Axew","Fraxure","Haxorus","Cubchoo","Beartic","Cryogonal","Shelmet","Accelgor","Stunfisk","Mienfoo","Mienshao","Druddigon","Golett","Golurk","Pawniard","Bisharp","Bouffalant","Rufflet","Braviary","Vullaby","Mandibuzz","Heatmor","Durant","Deino","Zweilous","Hydreigon","Larvesta","Volcarona","Cobalion","Terrakion","Virizion","Tornadus Incarnate","Thundurus Incarnate","Reshiram","Zekrom","Landorus Incarnate","Kyurem","Keldeo Ordinary","Meloetta Aria","Genesect","Chespin","Quilladin","Chesnaught","Fennekin","Braixen","Delphox","Froakie","Frogadier","Greninja","Bunnelby","Diggersby","Fletchling","Fletchinder","Talonflame","Scatterbug","Spewpa","Vivillon","Litleo","Pyroar Male","Flabebe","Floette","Florges","Skiddo","Gogoat","Pancham","Pangoro","Furfrou","Espurr","Meowstic Male","Honedge","Doublade","Aegislash Shield","Spritzee","Aromatisse","Swirlix","Slurpuff","Inkay","Malamar","Binacle","Barbaracle","Skrelp","Dragalge","Clauncher","Clawitzer","Helioptile","Heliolisk","Tyrunt","Tyrantrum","Amaura","Aurorus","Sylveon","Hawlucha","Dedenne","Carbink","Goomy","Sliggoo","Goodra","Klefki","Phantump","Trevenant","Pumpkaboo Average","Gourgeist Average","Bergmite","Avalugg","Noibat","Noivern","Xerneas","Yveltal","Zygarde 50","Diancie","Hoopa","Volcanion","Rowlet","Dartrix","Decidueye","Litten","Torracat","Incineroar","Popplio","Brionne","Primarina","Pikipek","Trumbeak","Toucannon","Yungoos","Gumshoos","Grubbin","Charjabug","Vikavolt","Crabrawler","Crabominable","Oricorio Baile","Cutiefly","Ribombee","Rockruff","Lycanroc Midday","Wishiwashi Solo","Mareanie","Toxapex","Mudbray","Mudsdale","Dewpider","Araquanid","Fomantis","Lurantis","Morelull","Shiinotic","Salandit","Salazzle","Stufful","Bewear","Bounsweet","Steenee","Tsareena","Comfey","Oranguru","Passimian","Wimpod","Golisopod","Sandygast","Palossand","Pyukumuku","Type Null","Silvally","Minior Red Meteor","Komala","Turtonator","Togedemaru","Mimikyu Disguised","Bruxish","Drampa","Dhelmise","Jangmo O","Hakamo O","Kommo O","Tapu Koko","Tapu Lele","Tapu Bulu","Tapu Fini","Cosmog","Cosmoem","Solgaleo","Lunala","Nihilego","Buzzwole","Pheromosa","Xurkitree","Celesteela","Kartana","Guzzlord","Necrozma","Magearna","Marshadow","Poipole","Naganadel","Stakataka","Blacephalon","Zeraora","Meltan","Melmetal","Grookey","Thwackey","Rillaboom","Scorbunny","Raboot","Cinderace","Sobble","Drizzile","Inteleon","Skwovet","Greedent","Rookidee","Corvisquire","Corviknight","Blipbug","Dottler","Orbeetle","Nickit","Thievul","Gossifleur","Eldegoss","Wooloo","Dubwool","Chewtle","Drednaw","Yamper","Boltund","Rolycoly","Carkol","Coalossal","Applin","Flapple","Appletun","Silicobra","Sandaconda","Cramorant","Arrokuda","Barraskewda","Toxel","Toxtricity Amped","Sizzlipede","Centiskorch","Clobbopus","Grapploct","Sinistea","Polteageist","Hatenna","Hattrem","Hatterene","Impidimp","Morgrem","Grimmsnarl","Obstagoon","Perrserker","Cursola","Sirfetchd","Mr Rime","Runerigus","Milcery","Alcremie","Falinks","Pincurchin","Snom","Frosmoth","Stonjourner","Eiscue Ice","Indeedee Male","Morpeko Full Belly","Cufant","Copperajah","Dracozolt","Arctozolt","Dracovish","Arctovish","Duraludon","Dreepy","Drakloak","Dragapult","Zacian","Zamazenta","Eternatus","Kubfu","Urshifu Single Strike","Zarude","Regieleki","Regidrago","Glastrier","Spectrier","Calyrex","Wyrdeer","Kleavor","Ursaluna","Basculegion Male","Sneasler","Overqwil","Enamorus Incarnate","Sprigatito","Floragato","Meowscarada","Fuecoco","Crocalor","Skeledirge","Quaxly","Quaxwell","Quaquaval","Lechonk","Oinkologne Male","Tarountula","Spidops","Nymble","Lokix","Pawmi","Pawmo","Pawmot","Tandemaus","Maushold Family Of Four","Fidough","Dachsbun","Smoliv","Dolliv","Arboliva","Squawkabilly Green Plumage","Nacli","Naclstack","Garganacl","Charcadet","Armarouge","Ceruledge","Tadbulb","Bellibolt","Wattrel","Kilowattrel","Maschiff","Mabosstiff","Shroodle","Grafaiai","Bramblin","Brambleghast","Toedscool","Toedscruel","Klawf","Capsakid","Scovillain","Rellor","Rabsca","Flittle","Espathra","Tinkatink","Tinkatuff","Tinkaton","Wiglett","Wugtrio","Bombirdier","Finizen","Palafin Zero","Varoom","Revavroom","Cyclizar","Orthworm","Glimmet","Glimmora","Greavard","Houndstone","Flamigo","Cetoddle","Cetitan","Veluza","Dondozo","Tatsugiri Curly","Annihilape","Clodsire","Farigiraf","Dudunsparce Two Segment","Kingambit","Great Tusk","Scream Tail","Brute Bonnet","Flutter Mane","Slither Wing","Sandy Shocks","Iron Treads","Iron Bundle","Iron Hands","Iron Jugulis","Iron Moth","Iron Thorns","Frigibax","Arctibax","Baxcalibur","Gimmighoul","Gholdengo","Wo Chien","Chien Pao","Ting Lu","Chi Yu","Roaring Moon","Iron Valiant","Koraidon","Miraidon","Walking Wake","Iron Leaves","Dipplin","Poltchageist","Sinistcha","Okidogi","Munkidori","Fezandipiti","Ogerpon","Archaludon","Hydrapple","Gouging Fire","Raging Bolt","Iron Boulder","Iron Crown","Terapagos","Pecharunt"];
 
 const GEN1_INTERNAL_TO_DEX = {
     0x01: 112, 0x02: 115, 0x03: 32, 0x04: 35, 0x05: 21, 0x06: 100, 0x07: 34, 0x08: 80, 0x09: 2, 0x0A: 103,
@@ -1621,6 +1604,58 @@ const GEN1_INTERNAL_TO_DEX = {
     0xA3: 77, 0xA4: 78, 0xA5: 19, 0xA6: 20, 0xA7: 33, 0xA8: 30, 0xA9: 74, 0xAA: 137, 0xAB: 142, 0xAD: 81,
     0xB0: 4, 0xB1: 7, 0xB2: 5, 0xB3: 8, 0xB4: 6, 0xB9: 43, 0xBA: 44, 0xBB: 45, 0xBC: 69, 0xBD: 70, 0xBE: 71
 };
+
+const blockOrders = [
+    [0, 1, 2, 3], [0, 1, 3, 2], [0, 2, 1, 3], [0, 2, 3, 1], [0, 3, 1, 2], [0, 3, 2, 1],
+    [1, 0, 2, 3], [1, 0, 3, 2], [1, 2, 0, 3], [1, 2, 3, 0], [1, 3, 0, 2], [1, 3, 2, 0],
+    [2, 0, 1, 3], [2, 0, 3, 1], [2, 1, 0, 3], [2, 1, 3, 0], [2, 3, 0, 1], [2, 3, 1, 0],
+    [3, 0, 1, 2], [3, 0, 2, 1], [3, 1, 0, 2], [3, 1, 2, 0], [3, 2, 0, 1], [3, 2, 1, 0]
+];
+
+function cleanSpeciesName(name) {
+    if (!name) return "";
+    return name
+        .replace(/^[-\s]+|[-\s]+$/g, "")
+        .replace(" Deoxys Normal", "Deoxys")
+        .replace("Deoxys Normal", "Deoxys")
+        .replace("Wormadam Plant", "Wormadam")
+        .replace("Giratina Altered", "Giratina")
+        .replace("Shaymin Land", "Shaymin")
+        .replace("Basculin Red Striped", "Basculin")
+        .replace("Darmanitan Standard", "Darmanitan")
+        .replace("Frillish Male", "Frillish")
+        .replace("Jellicent Male", "Jellicent")
+        .replace("Tornadus Incarnate", "Tornadus")
+        .replace("Thundurus Incarnate", "Thundurus")
+        .replace("Landorus Incarnate", "Landorus")
+        .replace("Keldeo Ordinary", "Keldeo")
+        .replace("Meloetta Aria", "Meloetta")
+        .replace("Pyroar Male", "Pyroar")
+        .replace("Meowstic Male", "Meowstic")
+        .replace("Aegislash Shield", "Aegislash")
+        .replace("Pumpkaboo Average", "Pumpkaboo")
+        .replace("Gourgeist Average", "Gourgeist")
+        .replace("Zygarde 50", "Zygarde")
+        .replace("Wishiwashi Solo", "Wishiwashi")
+        .replace("Lycanroc Midday", "Lycanroc")
+        .replace("Mimikyu Disguised", "Mimikyu")
+        .replace("Minior Red Meteor", "Minior")
+        .replace("Toxtricity Amped", "Toxtricity")
+        .replace("Indeedee Male", "Indeedee")
+        .replace("Morpeko Full Belly", "Morpeko")
+        .replace("Urshifu Single Strike", "Urshifu")
+        .replace("Eimscue Ice", "Eiscue")
+        .replace("Eiscue Ice", "Eiscue")
+        .replace("Enamorus Incarnate", "Enamorus")
+        .replace("Oinkologne Male", "Oinkologne")
+        .replace("Dudunsparce Two Segment", "Dudunsparce")
+        .replace("Palafin Zero", "Palafin")
+        .replace("Tatsugiri Curly", "Tatsugiri")
+        .replace("Maushold Family Of Four", "Maushold")
+        .replace("Squawkabilly Green Plumage", "Squawkabilly")
+        .replace("Sirfetchd", "Sirfetch'd")
+        .trim();
+}
 
 function decodeGen1String(bytes) {
     let str = "";
@@ -1652,6 +1687,56 @@ function decodeGen1String(bytes) {
     return str.trim();
 }
 
+function decodeGen3String(bytes) {
+    let str = "";
+    for (let i = 0; i < bytes.length; i++) {
+        const b = bytes[i];
+        if (b === 0xFF) break;
+        if (b === 0x00) {
+            str += " ";
+        } else if (b >= 0xBB && b <= 0xD4) {
+            str += String.fromCharCode("A".charCodeAt(0) + (b - 0xBB));
+        } else if (b >= 0xD5 && b <= 0xEE) {
+            str += String.fromCharCode("a".charCodeAt(0) + (b - 0xD5));
+        } else if (b >= 0xA1 && b <= 0xAA) {
+            str += String.fromCharCode("0".charCodeAt(0) + (b - 0xA1));
+        } else if (b === 0x5A) {
+            str += "♂";
+        } else if (b === 0x5B) {
+            str += "♀";
+        } else if (b === 0xF0) {
+            str += ":";
+        } else if (b === 0xE1) {
+            str += "PK";
+        } else if (b === 0xE2) {
+            str += "MN";
+        } else if (b === 0xB5) {
+            str += "e";
+        } else if (b === 0x1B || b === 0x1C) {
+            str += "é";
+        } else if (b === 0x7F) {
+            str += " ";
+        }
+    }
+    return str.trim();
+}
+
+function decodeUTF16String(uint16Array) {
+    let str = "";
+    for (let i = 0; i < uint16Array.length; i++) {
+        const val = uint16Array[i];
+        if (val === 0xFFFF || val === 0x0000) break;
+        if (val === 0x2642) {
+            str += "♂";
+        } else if (val === 0x2640) {
+            str += "♀";
+        } else {
+            str += String.fromCharCode(val);
+        }
+    }
+    return str.trim();
+}
+
 function parseGen1Save(buffer) {
     const u8 = new Uint8Array(buffer);
     const parsedList = [];
@@ -1671,10 +1756,10 @@ function parseGen1Save(buffer) {
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
-            const speciesName = POKEDEX_151[pokedexId] || "Desconhecido";
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
             parsedList.push({
-                sourceSlot: `Equipa #${i+1}`,
+                sourceSlot: `Equipa Gen 1 #${i+1}`,
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
@@ -1698,10 +1783,10 @@ function parseGen1Save(buffer) {
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
-            const speciesName = POKEDEX_151[pokedexId] || "Desconhecido";
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
             parsedList.push({
-                sourceSlot: `Box Ativa #${i+1}`,
+                sourceSlot: `Box Ativa Gen 1 #${i+1}`,
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
@@ -1711,6 +1796,333 @@ function parseGen1Save(buffer) {
     }
 
     return parsedList;
+}
+
+function parseGen2Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    const parsedList = [];
+    
+    let count = 0;
+    let isCrystal = false;
+    
+    const countGS = u8[0x2D0C];
+    const countCrystal = u8[0x2D82];
+    
+    if (countCrystal >= 1 && countCrystal <= 6) {
+        count = countCrystal;
+        isCrystal = true;
+    } else if (countGS >= 1 && countGS <= 6) {
+        count = countGS;
+        isCrystal = false;
+    } else {
+        return [];
+    }
+    
+    const listOffset = isCrystal ? 0x2D83 : 0x2D0D;
+    const structStart = isCrystal ? 0x2D8A : 0x2D14;
+    const nickStart = isCrystal ? 0x2EEC : 0x2E76;
+    
+    for (let i = 0; i < count; i++) {
+        const pokedexId = u8[listOffset + i];
+        if (pokedexId === 0 || pokedexId > 251) continue;
+        
+        const structOffset = structStart + (i * 48);
+        const level = u8[structOffset + 32];
+        
+        const nickOffset = nickStart + (i * 11);
+        const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
+        const nickname = decodeGen1String(nickBytes);
+        
+        const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+        
+        parsedList.push({
+            sourceSlot: isCrystal ? `Equipa Crystal #${i+1}` : `Equipa Gold/Silver #${i+1}`,
+            pokedexId,
+            species: speciesName,
+            nickname: nickname || speciesName,
+            level: level || 5
+        });
+    }
+    
+    return parsedList;
+}
+
+function parseGen3Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    
+    let maxSaveIndex0 = -1;
+    let maxSaveIndex1 = -1;
+    
+    for (let i = 0; i < 14; i++) {
+        const offset = i * 4096;
+        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+        if (sig === 0x08012025) {
+            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
+            if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
+        }
+    }
+    for (let i = 14; i < 28; i++) {
+        const offset = i * 4096;
+        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+        if (sig === 0x08012025) {
+            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
+            if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
+        }
+    }
+    
+    let activeSlotStartSector = 0;
+    if (maxSaveIndex1 > maxSaveIndex0) {
+        activeSlotStartSector = 14;
+    }
+    
+    const activeSectors = {};
+    for (let i = 0; i < 14; i++) {
+        const sectorIndex = activeSlotStartSector + i;
+        const offset = sectorIndex * 4096;
+        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+        if (sig === 0x08012025) {
+            const sectionId = u8[offset + 0x0FF4];
+            activeSectors[sectionId] = u8.subarray(offset, offset + 4096);
+        }
+    }
+    
+    if (!activeSectors[1]) {
+        return [];
+    }
+    
+    const section1 = activeSectors[1];
+    
+    let teamCount = 0;
+    let listOffset = 0;
+    
+    const countRSE = section1[0x0234] | (section1[0x0235] << 8) | (section1[0x0236] << 16) | (section1[0x0237] << 24);
+    const countFRLG = section1[0x0034] | (section1[0x0035] << 8) | (section1[0x0036] << 16) | (section1[0x0037] << 24);
+    
+    if (countRSE >= 1 && countRSE <= 6) {
+        teamCount = countRSE;
+        listOffset = 0x0238;
+    } else if (countFRLG >= 1 && countFRLG <= 6) {
+        teamCount = countFRLG;
+        listOffset = 0x0038;
+    } else {
+        teamCount = countRSE;
+        listOffset = 0x0238;
+    }
+    
+    const parsedList = [];
+    
+    for (let i = 0; i < teamCount; i++) {
+        const structOffset = listOffset + (i * 100);
+        if (structOffset + 100 > section1.length) break;
+        
+        const pid = section1[structOffset] |
+                    (section1[structOffset + 1] << 8) |
+                    (section1[structOffset + 2] << 16) |
+                    (section1[structOffset + 3] << 24);
+                    
+        const otid = section1[structOffset + 4] |
+                     (section1[structOffset + 5] << 8) |
+                     (section1[structOffset + 6] << 16) |
+                     (section1[structOffset + 7] << 24);
+                     
+        const nickBytes = section1.subarray(structOffset + 8, structOffset + 18);
+        const nickname = decodeGen3String(nickBytes);
+        
+        const key = pid ^ otid;
+        const decryptedWords = new Uint32Array(12);
+        for (let j = 0; j < 12; j++) {
+            const wordOffset = structOffset + 0x20 + j * 4;
+            const encryptedWord = section1[wordOffset] |
+                                  (section1[wordOffset + 1] << 8) |
+                                  (section1[wordOffset + 2] << 16) |
+                                  (section1[wordOffset + 3] << 24);
+            decryptedWords[j] = encryptedWord ^ key;
+        }
+        
+        const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+        const shuffleIndex = pid % 24;
+        const order = blockOrders[shuffleIndex];
+        
+        let blockG = null;
+        for (let b = 0; b < 4; b++) {
+            const blockType = order[b];
+            if (blockType === 0) {
+                blockG = decryptedBytes.subarray(b * 12, b * 12 + 12);
+                break;
+            }
+        }
+        
+        if (!blockG) continue;
+        
+        const pokedexId = blockG[0] | (blockG[1] << 8);
+        if (pokedexId === 0 || pokedexId > 386) continue;
+        
+        const level = section1[structOffset + 84];
+        const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+        
+        parsedList.push({
+            sourceSlot: `Equipa GBA #${i+1}`,
+            pokedexId,
+            species: speciesName,
+            nickname: nickname || speciesName,
+            level: level || 5
+        });
+    }
+    
+    return parsedList;
+}
+
+function parseGen4Gen5Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    const parsedList = [];
+    const seenPids = new Set();
+    
+    const limit = u8.length - 136;
+    for (let offset = 0; offset <= limit; offset += 2) {
+        const pid = u8[offset] | (u8[offset + 1] << 8) | (u8[offset + 2] << 16) | (u8[offset + 3] << 24);
+        if (pid === 0) continue;
+        if (seenPids.has(pid)) continue;
+        
+        const checksum = u8[offset + 6] | (u8[offset + 7] << 8);
+        if (checksum === 0 || checksum === 0xFFFF) continue;
+        
+        let seed = checksum;
+        const decryptedWords = new Uint16Array(64);
+        let sum = 0;
+        for (let j = 0; j < 64; j++) {
+            const encryptedWord = u8[offset + 8 + j * 2] | (u8[offset + 9 + j * 2] << 8);
+            seed = (Math.imul(seed, 1103515245) + 24691) | 0;
+            const key = (seed >>> 16) & 0xFFFF;
+            const dec = encryptedWord ^ key;
+            decryptedWords[j] = dec;
+            sum = (sum + dec) & 0xFFFF;
+        }
+        
+        if (sum === checksum) {
+            const shuffleIndex = ((pid & 0x3E0000) >>> 17) % 24;
+            const order = blockOrders[shuffleIndex];
+            
+            const blockA = new Uint16Array(16);
+            const blockC = new Uint16Array(16);
+            
+            for (let b = 0; b < 4; b++) {
+                const targetBlock = order[b];
+                let dest = null;
+                if (targetBlock === 0) dest = blockA;
+                else if (targetBlock === 2) dest = blockC;
+                
+                if (dest) {
+                    for (let w = 0; w < 16; w++) {
+                        dest[w] = decryptedWords[b * 16 + w];
+                    }
+                }
+            }
+            
+            const pokedexId = blockA[0];
+            if (pokedexId === 0 || pokedexId > 649) continue;
+            
+            const exp = blockA[2] | (blockA[3] << 16);
+            const nickname = decodeUTF16String(blockC.subarray(0, 11));
+            
+            let level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
+            let isParty = false;
+            
+            if (offset + 236 <= u8.length) {
+                const l = u8[offset + 140];
+                if (l >= 1 && l <= 100) {
+                    level = l;
+                    isParty = true;
+                }
+            }
+            
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+            
+            parsedList.push({
+                sourceSlot: isParty ? `Equipa (Gen 4/5)` : `Box (Gen 4/5)`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level
+            });
+            
+            seenPids.add(pid);
+        }
+    }
+    
+    return parsedList;
+}
+
+function parseDecryptedPKM(buffer, fileName) {
+    const size = buffer.byteLength;
+    const u8 = new Uint8Array(buffer);
+    const u16 = new Uint16Array(buffer);
+    const u32 = new Uint32Array(buffer);
+    
+    let pokedexId = 0;
+    let exp = 0;
+    let nickname = "";
+    let level = 5;
+    let sourceSlot = "Ficheiro PKM";
+    
+    if (size === 100) {
+        // PK3
+        pokedexId = u16[32 / 2];
+        const nickBytes = u8.subarray(8, 18);
+        nickname = decodeGen3String(nickBytes);
+        level = u8[84] || 5;
+        sourceSlot = "Ficheiro PK3 Decifrado";
+    } else if (size === 136 || size === 220 || size === 236) {
+        // PK4 / PK5
+        pokedexId = u16[8 / 2];
+        exp = u32[12 / 4];
+        const nickWords = u16.subarray(72 / 2, 72 / 2 + 11);
+        nickname = decodeUTF16String(nickWords);
+        
+        if (size === 236) {
+            level = u8[140] || 5;
+        } else {
+            level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
+        }
+        sourceSlot = `Ficheiro PK${size === 236 ? '4/5 Party' : '4/5 Box'}`;
+    } else if (size === 232 || size === 260) {
+        // PK6 / PK7
+        pokedexId = u16[0x08 / 2];
+        exp = u32[0x10 / 4];
+        const nickWords = u16.subarray(0x40 / 2, 0x40 / 2 + 12);
+        nickname = decodeUTF16String(nickWords);
+        
+        if (size === 260) {
+            level = u8[240];
+        } else {
+            level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
+        }
+        sourceSlot = `Ficheiro PK${size === 232 ? '6/7 Box' : '6/7 Party'}`;
+    } else if (size === 328 || size === 344) {
+        // PK8 / PK9
+        pokedexId = u16[0x08 / 2];
+        exp = u32[0x10 / 4];
+        const nickWords = u16.subarray(0x58 / 2, 0x58 / 2 + 12);
+        nickname = decodeUTF16String(nickWords);
+        
+        level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
+        sourceSlot = `Ficheiro PK${size === 328 ? '8' : '9'}`;
+    } else {
+        return null;
+    }
+    
+    if (pokedexId === 0 || pokedexId > 1025) {
+        return null;
+    }
+    
+    const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+    
+    return [{
+        sourceSlot: sourceSlot,
+        pokedexId,
+        species: speciesName,
+        nickname: nickname || speciesName,
+        level: level
+    }];
 }
 
 function openSaveImportModal() {
@@ -1741,9 +2153,28 @@ function handleSaveFileSelect(e) {
     r.onload = function(evt) {
         try {
             const buffer = evt.target.result;
-            const parsed = parseGen1Save(buffer);
-            if (parsed.length === 0) {
-                alert("Não foi possível encontrar nenhum Pokémon no ficheiro de save ou o formato não é suportado (apenas saves de Gen 1 de 32KB são suportados no momento).");
+            const size = buffer.byteLength;
+            let parsed = [];
+            
+            // Check individual files (PK3/4/5/6/7/8/9) first
+            if (size === 100 || size === 136 || size === 220 || size === 232 || size === 236 || size === 260 || size === 328 || size === 344) {
+                parsed = parseDecryptedPKM(buffer, file.name);
+            } else if (size >= 32000 && size <= 35000) {
+                parsed = parseGen1Save(buffer);
+                if (parsed.length === 0) {
+                    parsed = parseGen2Save(buffer);
+                }
+            } else if (size >= 120000 && size <= 140000) {
+                parsed = parseGen3Save(buffer);
+            } else if (size >= 500000 && size <= 550000) {
+                parsed = parseGen4Gen5Save(buffer);
+            } else {
+                alert(`Tamanho de ficheiro não reconhecido (${size} bytes). Apenas saves de cartucho (~32KB, ~128KB, ~512KB) ou ficheiros individuais descodificados (PKM) são suportados.`);
+                return;
+            }
+            
+            if (!parsed || parsed.length === 0) {
+                alert("Não foi possível encontrar nenhum Pokémon no ficheiro de save ou o formato não é suportado.");
                 return;
             }
             
