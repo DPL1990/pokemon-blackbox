@@ -883,3 +883,41 @@ select {
     z-index: 10;
 }
 
+/* Responsividade da Barra Flutuante de Ações no Telemóvel */
+@media (max-width: 600px) {
+    .floating-action-bar {
+        width: 95% !important;
+        padding: 12px 14px !important;
+        bottom: -150px;
+    }
+    
+    .floating-action-bar.active {
+        bottom: 16px !important;
+    }
+    
+    .fab-content {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    
+    .fab-counter {
+        font-size: 0.75rem !important;
+    }
+    
+    .fab-actions {
+        width: 100% !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+    
+    .fab-actions select, 
+    .fab-actions button {
+        font-size: 0.7rem !important;
+        padding: 6px 10px !important;
+        margin: 0 !important;
+    }
+}
+
+
