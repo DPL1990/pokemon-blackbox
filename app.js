@@ -41,6 +41,53 @@ let activeHofIndex = 0;
 let selectionMode = false;
 let selectedPokemonIds = new Set();
 
+let trainersList = JSON.parse(localStorage.getItem("bb_trainers")) || [];
+let activeTrainerId = localStorage.getItem(`bb_active_trainer_${currentGameId}`) || `trainer_${currentGameId}_default`;
+let activeTab = "boxes";
+let challengesList = JSON.parse(localStorage.getItem("bb_challenges")) || [];
+let globalBoxMode = localStorage.getItem("bb_global_box_mode") === "true";
+
+function migrateTrainerIds() {
+    let trainersChanged = false;
+    GAMES_DB.forEach(g => {
+        const hasTrainer = trainersList.some(t => t.gameId === g.id);
+        if (!hasTrainer) {
+            trainersList.push({
+                id: `trainer_${g.id}_default`,
+                gameId: g.id,
+                name: "Treinador Padrão",
+                tid: "00000",
+                sid: "00000"
+            });
+            trainersChanged = true;
+        }
+    });
+    if (trainersChanged) {
+        localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+    }
+    
+    let dbChanged = false;
+    pokemonDatabase.forEach(p => {
+        if (!p.trainerId) {
+            p.trainerId = `trainer_${p.currentGame}_default`;
+            dbChanged = true;
+        }
+    });
+    if (dbChanged) {
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    }
+
+    const trainerExists = trainersList.some(t => t.id === activeTrainerId && t.gameId === currentGameId);
+    if (!trainerExists) {
+        const defaultTrainer = trainersList.find(t => t.gameId === currentGameId);
+        if (defaultTrainer) {
+            activeTrainerId = defaultTrainer.id;
+            localStorage.setItem(`bb_active_trainer_${currentGameId}`, activeTrainerId);
+        }
+    }
+}
+migrateTrainerIds();
+
 const SUGGESTIONS = {
     natures: ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"],
     abilities: ["Adaptability", "Blaze", "Bulletproof", "Chlorophyll", "Clear Body", "Contrary", "Drizzle", "Drought", "Flame Body", "Flash Fire", "Guts", "Huge Power", "Illusion", "Infiltrator", "Inner Focus", "Insomnia", "Intimidate", "Levitate", "Magic Guard", "Moxie", "Natural Cure", "Overgrow", "Prankster", "Pressure", "Regenerator", "Rock Head", "Rough Skin", "Sand Stream", "Serene Grace", "Shadow Tag", "Shed Skin", "Sheer Force", "Sturdy", "Swift Swim", "Synchronize", "Technician", "Thick Fat", "Torrent", "Trace", "Unaware", "Water Absorb", "Wonder Guard"]
@@ -73,7 +120,7 @@ function initDB() {
     });
 }
 
-function getHofRecords(gameId) {
+function getHofRecords(gameId, trainerId = activeTrainerId) {
     return new Promise((resolve, reject) => {
         if (!dbInstance) {
             resolve([]);
@@ -81,40 +128,59 @@ function getHofRecords(gameId) {
         }
         const tx = dbInstance.transaction("hall_of_fame", "readonly");
         const store = tx.objectStore("hall_of_fame");
-        const request = store.get(gameId);
+        const key = gameId + "_" + trainerId;
+        const request = store.get(key);
         
         request.onsuccess = (e) => {
             const data = e.target.result;
-            if (!data) {
-                resolve([]);
-            } else if (typeof data === "string") {
-                // Migração de dados legados (imagem base64 única)
-                const legacyRecord = {
-                    id: "hof_legacy_" + Date.now(),
-                    type: "upload",
-                    data: data,
-                    title: "Mural de Honra (Legado)",
-                    date: new Date().toLocaleDateString('pt-PT')
-                };
-                const migratedList = [legacyRecord];
-                
-                // Grava a lista migrada em segundo plano de forma silenciosa
-                const writeTx = dbInstance.transaction("hall_of_fame", "readwrite");
-                writeTx.objectStore("hall_of_fame").put(migratedList, gameId);
-                
-                resolve(migratedList);
-            } else if (Array.isArray(data)) {
-                resolve(data);
+            if (data) {
+                if (typeof data === "string") {
+                    // Migração de dados legados (caso estranho)
+                    const legacyRecord = {
+                        id: "hof_legacy_" + Date.now(),
+                        type: "upload",
+                        data: data,
+                        title: "Mural de Honra (Legado)",
+                        date: new Date().toLocaleDateString('pt-PT')
+                    };
+                    const migratedList = [legacyRecord];
+                    const writeTx = dbInstance.transaction("hall_of_fame", "readwrite");
+                    writeTx.objectStore("hall_of_fame").put(migratedList, key);
+                    resolve(migratedList);
+                } else if (Array.isArray(data)) {
+                    resolve(data);
+                } else {
+                    resolve([]);
+                }
             } else {
-                resolve([]);
+                // Se não há dados sob a chave combinada, verifica se existem dados legados sem ID de treinador
+                // apenas para o Treinador Padrão do respetivo jogo
+                if (trainerId === "trainer_" + gameId + "_default") {
+                    const legacyReq = store.get(gameId);
+                    legacyReq.onsuccess = (le) => {
+                        const legacyData = le.target.result;
+                        if (legacyData) {
+                            const migratedList = Array.isArray(legacyData) ? legacyData : [];
+                            const writeTx = dbInstance.transaction("hall_of_fame", "readwrite");
+                            writeTx.objectStore("hall_of_fame").put(migratedList, key);
+                            writeTx.objectStore("hall_of_fame").delete(gameId); // Limpa chave antiga
+                            resolve(migratedList);
+                        } else {
+                            resolve([]);
+                        }
+                    };
+                    legacyReq.onerror = () => resolve([]);
+                } else {
+                    resolve([]);
+                }
             }
         };
         request.onerror = (e) => reject(e.target.error);
     });
 }
 
-function saveHofRecord(gameId, record) {
-    return getHofRecords(gameId).then(records => {
+function saveHofRecord(gameId, record, trainerId = activeTrainerId) {
+    return getHofRecords(gameId, trainerId).then(records => {
         records.push(record);
         return new Promise((resolve, reject) => {
             if (!dbInstance) {
@@ -123,7 +189,8 @@ function saveHofRecord(gameId, record) {
             }
             const tx = dbInstance.transaction("hall_of_fame", "readwrite");
             const store = tx.objectStore("hall_of_fame");
-            const request = store.put(records, gameId);
+            const key = gameId + "_" + trainerId;
+            const request = store.put(records, key);
             
             request.onsuccess = () => resolve();
             request.onerror = (e) => reject(e.target.error);
@@ -131,7 +198,7 @@ function saveHofRecord(gameId, record) {
     });
 }
 
-function saveHofImage(gameId, base64Data) {
+function saveHofImage(gameId, base64Data, trainerId = activeTrainerId) {
     const record = {
         id: "hof_upload_" + Date.now(),
         type: "upload",
@@ -139,11 +206,11 @@ function saveHofImage(gameId, base64Data) {
         title: "Mural Carregado",
         date: new Date().toLocaleDateString('pt-PT')
     };
-    return saveHofRecord(gameId, record);
+    return saveHofRecord(gameId, record, trainerId);
 }
 
-function deleteHofRecord(gameId, index) {
-    return getHofRecords(gameId).then(records => {
+function deleteHofRecord(gameId, index, trainerId = activeTrainerId) {
+    return getHofRecords(gameId, trainerId).then(records => {
         if (index >= 0 && index < records.length) {
             records.splice(index, 1);
             return new Promise((resolve, reject) => {
@@ -153,7 +220,8 @@ function deleteHofRecord(gameId, index) {
                 }
                 const tx = dbInstance.transaction("hall_of_fame", "readwrite");
                 const store = tx.objectStore("hall_of_fame");
-                const request = store.put(records, gameId);
+                const key = gameId + "_" + trainerId;
+                const request = store.put(records, key);
                 
                 request.onsuccess = () => resolve();
                 request.onerror = (e) => reject(e.target.error);
@@ -163,7 +231,7 @@ function deleteHofRecord(gameId, index) {
 }
 
 function generateHofFromActiveTeam() {
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team");
     if (activeTeam.length === 0) {
         alert("A tua equipa ativa para este cartucho está vazia! Adiciona Pokémon à equipa primeiro.");
         return;
@@ -371,6 +439,11 @@ function setupDatalists() {
     document.getElementById("form-origin-game").innerHTML = gameOptions;
     document.getElementById("form-transfer-game").innerHTML = gameOptions;
     document.getElementById("game-select").innerHTML = gameOptions;
+
+    const chGameSelect = document.getElementById("challenge-game");
+    if (chGameSelect) {
+        chGameSelect.innerHTML = gameOptions;
+    }
 }
 
 function switchGame(gameId) {
@@ -394,12 +467,101 @@ function switchGame(gameId) {
         };
         metaTheme.setAttribute("content", colors[gameId] || "#ff4a4a");
     }
+    
+    // Alterna o Treinador Ativo para o respetivo cartucho
+    activeTrainerId = localStorage.getItem("bb_active_trainer_" + gameId) || "trainer_" + gameId + "_default";
+    const trainerExists = trainersList.some(t => t.id === activeTrainerId && t.gameId === gameId);
+    if (!trainerExists) {
+        const defaultTrainer = trainersList.find(t => t.gameId === gameId);
+        if (defaultTrainer) {
+            activeTrainerId = defaultTrainer.id;
+            localStorage.setItem("bb_active_trainer_" + gameId, activeTrainerId);
+        }
+    }
+    
+    updateTrainerSelect();
     renderAll();
+}
+
+function updateTrainerSelect() {
+    const select = document.getElementById("trainer-select");
+    if (!select) return;
+    
+    const gameTrainers = trainersList.filter(t => t.gameId === currentGameId);
+    let html = "";
+    gameTrainers.forEach(t => {
+        const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
+        html += `<option value="${t.id}">${display}</option>`;
+    });
+    select.innerHTML = html;
+    select.value = activeTrainerId;
+}
+
+function toggleGlobalBoxMode() {
+    globalBoxMode = !globalBoxMode;
+    localStorage.setItem("bb_global_box_mode", globalBoxMode);
+    
+    const btn = document.getElementById("btn-toggle-global-box");
+    const headerTitle = document.getElementById("box-header-title");
+    
+    if (globalBoxMode) {
+        if (btn) {
+            btn.innerText = "📦 Ver Box Regional";
+            btn.style.background = "rgba(16, 185, 129, 0.08)";
+            btn.style.borderColor = "rgba(16, 185, 129, 0.25)";
+        }
+        if (headerTitle) {
+            headerTitle.innerHTML = `
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                🌐 Box Global (Todos os Cartuchos)
+            `;
+        }
+    } else {
+        if (btn) {
+            btn.innerText = "🌐 Ver Box Global";
+            btn.style.background = "rgba(99, 102, 241, 0.08)";
+            btn.style.borderColor = "rgba(99, 102, 241, 0.25)";
+        }
+        if (headerTitle) {
+            headerTitle.innerHTML = `
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                📦 Box Regional (Sem Limite)
+            `;
+        }
+    }
+    renderAll();
+}
+
+function initGlobalBoxUI() {
+    const btn = document.getElementById("btn-toggle-global-box");
+    const headerTitle = document.getElementById("box-header-title");
+    if (!btn) return;
+    if (globalBoxMode) {
+        btn.innerText = "📦 Ver Box Regional";
+        btn.style.background = "rgba(16, 185, 129, 0.08)";
+        btn.style.borderColor = "rgba(16, 185, 129, 0.25)";
+        if (headerTitle) {
+            headerTitle.innerHTML = `
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg>
+                🌐 Box Global (Todos os Cartuchos)
+            `;
+        }
+    } else {
+        btn.innerText = "🌐 Ver Box Global";
+        btn.style.background = "rgba(99, 102, 241, 0.08)";
+        btn.style.borderColor = "rgba(99, 102, 241, 0.25)";
+        if (headerTitle) {
+            headerTitle.innerHTML = `
+                <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                📦 Box Regional (Sem Limite)
+            `;
+        }
+    }
 }
 
 function updateDexitMonitor() {
     const statsBox = document.getElementById("dexit-stats-box");
-    const regionalPokemon = pokemonDatabase.filter(p => p.currentGame === currentGameId);
+    const regionalPokemon = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId);
     const typeCounts = {};
     
     regionalPokemon.forEach(p => {
@@ -421,17 +583,20 @@ function updateDexitMonitor() {
 function renderAll() {
     updateStats(); 
     updateDexitMonitor();
+    renderTrainerResume();
     
     const teamContainer = document.getElementById("team-container");
     const boxContainer = document.getElementById("box-container");
     
-    // Filters based on current game location:
-    const boxSlots = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "box");
+    // Filters based on current game location or Global Mode:
+    const boxSlots = globalBoxMode 
+        ? pokemonDatabase.filter(p => p.slotType === "box")
+        : pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "box");
 
     // Render Active Team Slots (Exactly 6 slots)
     teamContainer.innerHTML = "";
     for (let i = 0; i < 6; i++) {
-        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.slotType === "team" && pkmn.slotIndex === i);
+        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.trainerId === activeTrainerId && pkmn.slotType === "team" && pkmn.slotIndex === i);
         if (p) {
             teamContainer.innerHTML += createSlotHTML(p, i, "team");
         } else {
@@ -618,6 +783,10 @@ function createSlotHTML(p, index, type) {
     const badgeLabel = p.currentGame ? p.currentGame.toUpperCase() : '??';
     const selectedClass = (typeof selectedPokemonIds !== 'undefined' && selectedPokemonIds.has(p.id)) ? 'selected-specimen' : '';
 
+    const trainerObj = trainersList.find(t => t.id === p.trainerId);
+    const trainerName = trainerObj ? trainerObj.name : "Padrão";
+    const originBadge = globalBoxMode ? `<span class="global-origin-badge" style="background-color: ${getGameColor(p.currentGame)}">${trainerName}</span>` : '';
+
     return `
         <div class="slot ${typeClass} ${selectedClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
@@ -629,13 +798,14 @@ function createSlotHTML(p, index, type) {
                 <img class="ball-mini" draggable="false" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/${p.ball || 'poke'}-ball.png" alt="${p.ball}" onerror="this.style.display='none'">
                 <span>${subText}</span>
             </div>
+            ${originBadge}
         </div>
     `;
 }
 
 function updateStats() {
     document.getElementById("stat-total").innerText = pokemonDatabase.length;
-    document.getElementById("stat-team").innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team").length}/6`;
+    document.getElementById("stat-team").innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team").length}/6`;
 }
 
 // --- SECTION UNIFIED DRAG & DROP LOGIC ---
@@ -647,16 +817,38 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
     
     const draggedPkmn = pokemonDatabase[pkmnIndex]; 
 
+    // Validate drop to active team from other trainers/games
+    if (targetSlotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
+        alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+        return;
+    }
+
     if (targetId && targetId !== id) {
         // Swapping occupied slots
         const targetPkmnIndex = pokemonDatabase.findIndex(p => p.id === targetId);
         if (targetPkmnIndex !== -1) {
             const targetPkmn = pokemonDatabase[targetPkmnIndex];
             
+            // Validate drops to team for swap operations
+            if (targetPkmn.slotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
+                alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+                return;
+            }
+            if (draggedPkmn.slotType === "team" && (targetPkmn.currentGame !== currentGameId || targetPkmn.trainerId !== activeTrainerId)) {
+                alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+                return;
+            }
+            
             // Synchronize game context when swapping between team and box
             if (draggedPkmn.slotType !== targetPkmn.slotType) {
-                if (targetPkmn.slotType === "team") draggedPkmn.currentGame = currentGameId;
-                if (draggedPkmn.slotType === "team") targetPkmn.currentGame = currentGameId;
+                if (targetPkmn.slotType === "team") {
+                    draggedPkmn.currentGame = currentGameId;
+                    draggedPkmn.trainerId = activeTrainerId;
+                }
+                if (draggedPkmn.slotType === "team") {
+                    targetPkmn.currentGame = currentGameId;
+                    targetPkmn.trainerId = activeTrainerId;
+                }
             }
             
             const tempType = draggedPkmn.slotType; 
@@ -670,11 +862,14 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
         // Placing in empty slot
         if (targetSlotType === "team") {
             draggedPkmn.currentGame = currentGameId; 
-            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
+            draggedPkmn.trainerId = activeTrainerId;
+            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
             if (blocking) { 
                 blocking.slotType = "box"; 
                 blocking.slotIndex = 0; 
             }
+        } else if (targetSlotType === "box") {
+            draggedPkmn.trainerId = activeTrainerId;
         }
         draggedPkmn.slotType = targetSlotType; 
         draggedPkmn.slotIndex = targetSlotIndex;
@@ -955,9 +1150,11 @@ function openModalForNew() {
     activeCustomRibbons = [];
     
     document.getElementById("form-notes").value = ""; 
+    document.getElementById("form-evolution-notes").value = ""; 
     document.getElementById("pkhex-text").value = ""; 
     document.getElementById("form-origin-game").value = currentGameId;
     document.getElementById("btn-delete-pkmn").style.display = "none"; 
+    document.getElementById("btn-owndex-link").style.display = "none";
     document.getElementById("modal-title").innerText = "➕ Registar Novo Espécime";
     document.getElementById("passport-display").innerHTML = `<span>O passaporte será gerado ao gravar.</span>`;
     
@@ -1007,9 +1204,11 @@ function openModalForEdit(id) {
     document.getElementById("form-move4").value = p.moves?.[3] || ""; 
     
     document.getElementById("form-notes").value = p.notes || ""; 
+    document.getElementById("form-evolution-notes").value = p.evolutionNotes || ""; 
     document.getElementById("form-origin-game").value = p.originGame || currentGameId;
     
     document.getElementById("btn-delete-pkmn").style.display = "block"; 
+    document.getElementById("btn-owndex-link").style.display = "block";
     document.getElementById("modal-title").innerText = `Ficha Técnica: ${p.nickname || p.species}`;
     
     // Populate Ribbons checkboxes and tags
@@ -1057,6 +1256,10 @@ function executeTransfer() {
         // Track multiversal timeline stamp
         targetPokemon.history.push(targetPokemon.currentGame);
         targetPokemon.currentGame = nextGameId;
+        
+        // Update trainerId to target game's active trainer
+        const targetActiveTrainer = localStorage.getItem("bb_active_trainer_" + nextGameId) || `trainer_${nextGameId}_default`;
+        targetPokemon.trainerId = targetActiveTrainer;
         
         // When transferred, send back to the destination game Box slots
         targetPokemon.slotType = "box";
@@ -1139,6 +1342,7 @@ async function savePokemon() {
     const ribbons = [...checkedRibbons, ...activeCustomRibbons];
 
     const notes = document.getElementById("form-notes").value;
+    const evolutionNotes = document.getElementById("form-evolution-notes").value;
     const originGame = document.getElementById("form-origin-game").value;
 
     let targetPokemon = null;
@@ -1148,6 +1352,7 @@ async function savePokemon() {
             if (!targetPokemon.history) targetPokemon.history = [];
             targetPokemon.history.push(targetPokemon.currentGame);
             targetPokemon.currentGame = currentGameId;
+            targetPokemon.trainerId = activeTrainerId;
             targetPokemon.slotType = "box"; 
             targetPokemon.slotIndex = 0;
         }
@@ -1158,6 +1363,7 @@ async function savePokemon() {
             id: id || "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5), 
             history: [], 
             currentGame: currentGameId, 
+            trainerId: activeTrainerId,
             slotType: "box", 
             slotIndex: 0 
         };
@@ -1179,6 +1385,7 @@ async function savePokemon() {
     targetPokemon.moves = moves; 
     targetPokemon.ribbons = ribbons; 
     targetPokemon.notes = notes; 
+    targetPokemon.evolutionNotes = evolutionNotes;
     targetPokemon.originGame = originGame;
 
     try {
@@ -1359,13 +1566,303 @@ function importData(e) {
             const d = JSON.parse(evt.target.result);
             if (Array.isArray(d)) { 
                 pokemonDatabase = d; 
+                migrateTrainerIds(); // Run migration immediately so imported data gets trainerId fields assigned!
                 cleanupDuplicates();
                 localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
                 renderAll(); 
+                alert("Importação de cópia de segurança JSON concluída com sucesso!");
+            } else {
+                alert("Ficheiro inválido. O backup do BlackBox deve ser um ficheiro JSON.");
             }
-        } catch (err) {}
+        } catch (err) {
+            alert("Erro ao ler o ficheiro JSON de backup: " + err.message);
+        }
     }; 
     r.readAsText(file);
+}
+
+// --- SECTION Save File Importer Logic ---
+
+let tempImportList = [];
+
+const POKEDEX_151 = [
+    "", "Bulbasaur", "Ivysaur", "Venusaur", "Charmander", "Charmeleon", "Charizard", "Squirtle", "Wartortle", "Blastoise",
+    "Caterpie", "Metapod", "Butterfree", "Weedle", "Kakuna", "Beedrill", "Pidgey", "Pidgeotto", "Pidgeot", "Rattata",
+    "Raticate", "Spearow", "Fearow", "Ekans", "Arbok", "Pikachu", "Raichu", "Sandshrew", "Sandslash", "NidoranF",
+    "Nidorina", "Nidoqueen", "NidoranM", "Nidorino", "Nidoking", "Clefairy", "Clefable", "Vulpix", "Ninetales", "Jigglypuff",
+    "Wigglytuff", "Zubat", "Golbat", "Oddish", "Gloom", "Vileplume", "Paras", "Parasect", "Venonat", "Venomoth",
+    "Diglett", "Dugtrio", "Meowth", "Persian", "Psyduck", "Golduck", "Mankey", "Primeape", "Growlithe", "Arcanine",
+    "Poliwag", "Poliwhirl", "Poliwrath", "Abra", "Kadabra", "Alakazam", "Machop", "Machoke", "Machamp", "Bellsprout",
+    "Weepinbell", "Victreebel", "Tentacool", "Tentacruel", "Geodude", "Graveler", "Golem", "Ponyta", "Rapidash", "Slowpoke",
+    "Slowbro", "Magnemite", "Magneton", "Farfetch'd", "Doduo", "Dodrio", "Seel", "Dewgong", "Grimer", "Muk",
+    "Shellder", "Cloyster", "Gastly", "Haunter", "Gengar", "Onix", "Drowzee", "Hypno", "Krabby", "Kingler",
+    "Voltorb", "Electrode", "Exeggcute", "Exeggutor", "Cubone", "Marowak", "Hitmonlee", "Hitmonchan", "Lickitung", "Koffing",
+    "Weezing", "Rhyhorn", "Rhydon", "Chansey", "Tangela", "Kangaskhan", "Horsea", "Seadra", "Goldeen", "Seaking",
+    "Staryu", "Starmie", "Mr. Mime", "Scyther", "Jynx", "Electabuzz", "Magmar", "Pinsir", "Tauros", "Magikarp",
+    "Gyarados", "Lapras", "Ditto", "Eevee", "Vaporeon", "Jolteon", "Flareon", "Porygon", "Omanyte", "Omastar",
+    "Kabuto", "Kabutops", "Aerodactyl", "Snorlax", "Articuno", "Zapdos", "Moltres", "Dratini", "Dragonair", "Dragonite",
+    "Mewtwo", "Mew"
+];
+
+const GEN1_INTERNAL_TO_DEX = {
+    0x01: 112, 0x02: 115, 0x03: 32, 0x04: 35, 0x05: 21, 0x06: 100, 0x07: 34, 0x08: 80, 0x09: 2, 0x0A: 103,
+    0x0B: 108, 0x0C: 102, 0x0D: 88, 0x0E: 94, 0x0F: 29, 0x10: 31, 0x11: 104, 0x12: 111, 0x13: 131, 0x14: 59,
+    0x15: 151, 0x16: 130, 0x17: 90, 0x18: 72, 0x19: 92, 0x1A: 123, 0x1B: 120, 0x1C: 9, 0x1D: 127, 0x1E: 114,
+    0x21: 58, 0x22: 95, 0x23: 22, 0x24: 16, 0x25: 79, 0x26: 64, 0x27: 75, 0x28: 113, 0x29: 67, 0x2A: 122,
+    0x2B: 106, 0x2C: 107, 0x2D: 24, 0x2E: 47, 0x2F: 54, 0x30: 96, 0x31: 76, 0x33: 126, 0x35: 125, 0x36: 82,
+    0x37: 109, 0x39: 56, 0x3A: 86, 0x3B: 50, 0x3C: 128, 0x40: 83, 0x41: 48, 0x42: 149, 0x46: 84, 0x47: 60,
+    0x48: 124, 0x49: 146, 0x4A: 144, 0x4B: 145, 0x4C: 132, 0x4D: 52, 0x4E: 98, 0x52: 37, 0x53: 38, 0x54: 25,
+    0x55: 26, 0x58: 147, 0x59: 148, 0x5A: 140, 0x5B: 141, 0x5C: 116, 0x5D: 117, 0x60: 27, 0x61: 28, 0x62: 138,
+    0x63: 139, 0x64: 39, 0x65: 40, 0x66: 133, 0x67: 134, 0x68: 135, 0x69: 136, 0x6A: 66, 0x6B: 41, 0x6C: 23,
+    0x6D: 46, 0x6E: 61, 0x6F: 62, 0x70: 13, 0x71: 14, 0x72: 15, 0x74: 85, 0x75: 57, 0x76: 51, 0x77: 49,
+    0x78: 87, 0x7B: 10, 0x7C: 11, 0x7D: 12, 0x7E: 68, 0x80: 55, 0x81: 97, 0x82: 42, 0x83: 150, 0x84: 143,
+    0x85: 129, 0x88: 89, 0x8A: 99, 0x8B: 91, 0x8D: 101, 0x8E: 36, 0x8F: 110, 0x90: 53, 0x91: 105, 0x93: 93,
+    0x94: 63, 0x95: 65, 0x96: 17, 0x97: 18, 0x98: 121, 0x99: 1, 0x9A: 3, 0x9B: 73, 0x9D: 118, 0x9E: 119,
+    0xA3: 77, 0xA4: 78, 0xA5: 19, 0xA6: 20, 0xA7: 33, 0xA8: 30, 0xA9: 74, 0xAA: 137, 0xAB: 142, 0xAD: 81,
+    0xB0: 4, 0xB1: 7, 0xB2: 5, 0xB3: 8, 0xB4: 6, 0xB9: 43, 0xBA: 44, 0xBB: 45, 0xBC: 69, 0xBD: 70, 0xBE: 71
+};
+
+function decodeGen1String(bytes) {
+    let str = "";
+    for (let i = 0; i < bytes.length; i++) {
+        const b = bytes[i];
+        if (b === 0x50 || b === 0x00) break; 
+        if (b >= 0x80 && b <= 0x99) {
+            str += String.fromCharCode("A".charCodeAt(0) + (b - 0x80));
+        } else if (b >= 0xA0 && b <= 0xB9) {
+            str += String.fromCharCode("a".charCodeAt(0) + (b - 0xA0));
+        } else if (b >= 0xF2 && b <= 0xFB) {
+            str += String.fromCharCode("0".charCodeAt(0) + (b - 0xF2));
+        } else if (b === 0xE1) {
+            str += "PK";
+        } else if (b === 0xE2) {
+            str += "MN";
+        } else if (b === 0xE3) {
+            str += "-";
+        } else if (b === 0xE6) {
+            str += "?";
+        } else if (b === 0xE7) {
+            str += "!";
+        } else if (b === 0x7F) {
+            str += " ";
+        } else {
+            str += "";
+        }
+    }
+    return str.trim();
+}
+
+function parseGen1Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    const parsedList = [];
+
+    // Parse Team (offset 0x2F2C)
+    const teamCount = u8[0x2F2C];
+    if (teamCount > 0 && teamCount <= 6) {
+        for (let i = 0; i < teamCount; i++) {
+            const internalId = u8[0x2F2D + i];
+            const pokedexId = GEN1_INTERNAL_TO_DEX[internalId];
+            if (!pokedexId) continue;
+            
+            const structOffset = 0x2F34 + (i * 44);
+            const level = u8[structOffset + 33];
+            
+            const nickOffset = 0x3258 + (i * 11);
+            const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
+            const nickname = decodeGen1String(nickBytes);
+            
+            const speciesName = POKEDEX_151[pokedexId] || "Desconhecido";
+            
+            parsedList.push({
+                sourceSlot: `Equipa #${i+1}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5
+            });
+        }
+    }
+
+    // Parse Active Box (offset 0x30C0)
+    const boxCount = u8[0x30C0];
+    if (boxCount > 0 && boxCount <= 20) {
+        for (let i = 0; i < boxCount; i++) {
+            const internalId = u8[0x30C1 + i];
+            const pokedexId = GEN1_INTERNAL_TO_DEX[internalId];
+            if (!pokedexId) continue;
+            
+            const structOffset = 0x30D6 + (i * 33);
+            const level = u8[structOffset + 3];
+            
+            const nickOffset = 0x33E6 + (i * 11);
+            const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
+            const nickname = decodeGen1String(nickBytes);
+            
+            const speciesName = POKEDEX_151[pokedexId] || "Desconhecido";
+            
+            parsedList.push({
+                sourceSlot: `Box Ativa #${i+1}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5
+            });
+        }
+    }
+
+    return parsedList;
+}
+
+function openSaveImportModal() {
+    const modal = document.getElementById("save-import-modal");
+    if (!modal) return;
+    
+    document.getElementById("save-file-input").value = "";
+    document.getElementById("save-file-name").textContent = "Nenhum ficheiro selecionado";
+    document.getElementById("save-import-results").style.display = "none";
+    document.getElementById("save-import-tbody").innerHTML = "";
+    tempImportList = [];
+    
+    modal.classList.add("active");
+}
+
+function closeSaveImportModal() {
+    const modal = document.getElementById("save-import-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function handleSaveFileSelect(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    document.getElementById("save-file-name").textContent = file.name;
+    
+    const r = new FileReader();
+    r.onload = function(evt) {
+        try {
+            const buffer = evt.target.result;
+            const parsed = parseGen1Save(buffer);
+            if (parsed.length === 0) {
+                alert("Não foi possível encontrar nenhum Pokémon no ficheiro de save ou o formato não é suportado (apenas saves de Gen 1 de 32KB são suportados no momento).");
+                return;
+            }
+            
+            tempImportList = parsed;
+            renderSaveImportList();
+            document.getElementById("save-import-results").style.display = "block";
+        } catch (err) {
+            alert("Erro ao ler ficheiro de save: " + err.message);
+        }
+    };
+    r.readAsArrayBuffer(file);
+}
+
+function renderSaveImportList() {
+    const tbody = document.getElementById("save-import-tbody");
+    if (!tbody) return;
+    
+    tbody.innerHTML = tempImportList.map((p, idx) => {
+        const gameOptionsHtml = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === currentGameId ? 'selected' : ''}>${g.name}</option>`).join("");
+        
+        const initialGameId = currentGameId;
+        const gameTrainers = trainersList.filter(t => t.gameId === initialGameId);
+        const trainerOptionsHtml = gameTrainers.map(t => {
+            const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
+            return `<option value="${t.id}" ${t.id === `trainer_${initialGameId}_default` ? 'selected' : ''}>${display}</option>`;
+        }).join("");
+        
+        let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png`;
+        
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 8px;"><input type="checkbox" class="import-row-checkbox" data-idx="${idx}" checked></td>
+                <td style="padding: 8px; color: var(--text-muted); font-size: 0.7rem;">${p.sourceSlot}</td>
+                <td style="padding: 8px; display: flex; align-items: center; gap: 6px;">
+                    <img src="${spriteUrl}" alt="${p.species}" style="width: 28px; height: 28px;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'">
+                    <div>
+                        <strong style="color: #fff;">${p.nickname}</strong>
+                        <div style="font-size: 0.65rem; color: var(--text-muted);">${p.species}</div>
+                    </div>
+                </td>
+                <td style="padding: 8px; font-weight: bold; color: #fff;">${p.level}</td>
+                <td style="padding: 8px;">
+                    <select class="import-row-game" data-idx="${idx}" onchange="updateImportRowTrainers(${idx}, this.value)" style="padding: 4px; border-radius: 4px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; width: 100%;">
+                        ${gameOptionsHtml}
+                    </select>
+                </td>
+                <td style="padding: 8px;">
+                    <select class="import-row-trainer" id="import-row-trainer-${idx}" style="padding: 4px; border-radius: 4px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; width: 100%;">
+                        ${trainerOptionsHtml}
+                    </select>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function updateImportRowTrainers(idx, gameId) {
+    const select = document.getElementById(`import-row-trainer-${idx}`);
+    if (!select) return;
+    
+    const gameTrainers = trainersList.filter(t => t.gameId === gameId);
+    const trainerOptionsHtml = gameTrainers.map(t => {
+        const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
+        return `<option value="${t.id}" ${t.id === `trainer_${gameId}_default` ? 'selected' : ''}>${display}</option>`;
+    }).join("");
+    
+    select.innerHTML = trainerOptionsHtml;
+}
+
+function toggleSelectAllImport(checked) {
+    const checkboxes = document.querySelectorAll(".import-row-checkbox");
+    checkboxes.forEach(cb => cb.checked = checked);
+}
+
+function executeSaveImport() {
+    const checkboxes = document.querySelectorAll(".import-row-checkbox");
+    let count = 0;
+    
+    checkboxes.forEach(cb => {
+        if (cb.checked) {
+            const idx = parseInt(cb.getAttribute("data-idx"));
+            const p = tempImportList[idx];
+            if (!p) return;
+            
+            const gameSelect = document.querySelector(`.import-row-game[data-idx="${idx}"]`);
+            const trainerSelect = document.getElementById(`import-row-trainer-${idx}`);
+            
+            const targetGameId = gameSelect ? gameSelect.value : currentGameId;
+            const targetTrainerId = trainerSelect ? trainerSelect.value : `trainer_${targetGameId}_default`;
+            
+            const newPokemon = {
+                id: "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+                pokedexId: p.pokedexId,
+                species: p.species,
+                nickname: p.nickname,
+                level: p.level,
+                isShiny: false,
+                currentGame: targetGameId,
+                trainerId: targetTrainerId,
+                slotType: "box",
+                slotIndex: 0,
+                history: [],
+                notes: `Importado do ficheiro de save.`
+            };
+            
+            pokemonDatabase.push(newPokemon);
+            count++;
+        }
+    });
+    
+    if (count > 0) {
+        cleanupDuplicates();
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        renderAll();
+        closeSaveImportModal();
+        alert(`Sucesso! ${count} Pokémon foram importados em massa para os respetivos cartuchos/treinadores.`);
+    } else {
+        alert("Nenhum Pokémon selecionado para importação.");
+    }
 }
 
 async function fetchPokemonTypes(sp) {
@@ -1579,6 +2076,8 @@ function executeMassTransfer() {
                 if (!pkmn.history) pkmn.history = [];
                 pkmn.history.push(pkmn.currentGame);
                 pkmn.currentGame = targetGameId;
+                const targetActiveTrainer = localStorage.getItem("bb_active_trainer_" + targetGameId) || `trainer_${targetGameId}_default`;
+                pkmn.trainerId = targetActiveTrainer;
             }
             pkmn.slotType = "box";
             pkmn.slotIndex = 0;
@@ -2011,6 +2510,1231 @@ function renderMatchupComparison() {
     `;
 }
 
+// --- SECTION Trainer Management Logic ---
+
+function openTrainerManagerModal() {
+    const modal = document.getElementById("trainer-manager-modal");
+    if (!modal) return;
+    
+    // Clear form inputs
+    const nameInput = document.getElementById("new-trainer-name");
+    const tidInput = document.getElementById("new-trainer-tid");
+    const sidInput = document.getElementById("new-trainer-sid");
+    if (nameInput) nameInput.value = "";
+    if (tidInput) tidInput.value = "";
+    if (sidInput) sidInput.value = "";
+    
+    renderTrainerManagerList();
+    modal.classList.add("active");
+}
+
+function closeTrainerManagerModal() {
+    const modal = document.getElementById("trainer-manager-modal");
+    if (modal) {
+        modal.classList.remove("active");
+    }
+}
+
+function renderTrainerManagerList() {
+    const container = document.getElementById("trainer-manager-list");
+    if (!container) return;
+    
+    const gameTrainers = trainersList.filter(t => t.gameId === currentGameId);
+    let html = "";
+    
+    gameTrainers.forEach(t => {
+        const isDefault = t.id === `trainer_${currentGameId}_default`;
+        const tidDisplay = t.tid !== "00000" && t.tid ? `TID: ${t.tid}` : "";
+        const sidDisplay = t.sid !== "00000" && t.sid ? `SID: ${t.sid}` : "";
+        const idBadge = [tidDisplay, sidDisplay].filter(b => b !== "").join(" / ");
+        
+        html += `
+            <div class="trainer-item">
+                <div>
+                    <strong style="color: #fff; font-size: 0.85rem;">${t.name}</strong>
+                    ${idBadge ? `<div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 2px;">${idBadge}</div>` : ""}
+                </div>
+                <div>
+                    ${isDefault 
+                        ? `<span style="font-size: 0.7rem; color: var(--text-muted); font-weight:700; padding: 2px 6px; background: rgba(255,255,255,0.05); border-radius: 4px;">Padrão</span>`
+                        : `<button class="btn btn-danger" onclick="deleteTrainerProfile('${t.id}')" style="width: auto; padding: 4px 8px; font-size: 0.65rem;">🗑️ Apagar</button>`
+                    }
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function addNewTrainer() {
+    const nameInput = document.getElementById("new-trainer-name");
+    const tidInput = document.getElementById("new-trainer-tid");
+    const sidInput = document.getElementById("new-trainer-sid");
+    
+    const name = nameInput.value.trim();
+    const tid = tidInput.value.trim() || "00000";
+    const sid = sidInput.value.trim() || "00000";
+    
+    if (!name) {
+        alert("O nome do treinador é obrigatório!");
+        return;
+    }
+    
+    const newTrainerId = "trainer_" + currentGameId + "_" + Date.now();
+    trainersList.push({
+        id: newTrainerId,
+        gameId: currentGameId,
+        name: name,
+        tid: tid,
+        sid: sid
+    });
+    
+    localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+    
+    // Auto-select new trainer
+    activeTrainerId = newTrainerId;
+    localStorage.setItem(`bb_active_trainer_${currentGameId}`, activeTrainerId);
+    
+    updateTrainerSelect();
+    renderAll();
+    closeTrainerManagerModal();
+}
+
+function deleteTrainerProfile(trainerId) {
+    if (trainerId === `trainer_${currentGameId}_default`) {
+        alert("Não é possível apagar o Treinador Padrão.");
+        return;
+    }
+    
+    if (!confirm("Tem a certeza de que deseja apagar este perfil? Todos os Pokémon e Mural de Honra associados serão movidos para o Treinador Padrão deste cartucho.")) {
+        return;
+    }
+    
+    const defaultTrainerId = `trainer_${currentGameId}_default`;
+    
+    // 1. Reatribuir Pokémon
+    pokemonDatabase.forEach(p => {
+        if (p.currentGame === currentGameId && p.trainerId === trainerId) {
+            p.trainerId = defaultTrainerId;
+        }
+    });
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    
+    // 2. Reatribuir HOFs no IndexedDB
+    if (dbInstance) {
+        const keyOld = currentGameId + "_" + trainerId;
+        const keyNew = currentGameId + "_" + defaultTrainerId;
+        
+        const tx = dbInstance.transaction("hall_of_fame", "readwrite");
+        const store = tx.objectStore("hall_of_fame");
+        
+        store.get(keyOld).onsuccess = (e) => {
+            const oldRecords = e.target.result || [];
+            if (oldRecords.length > 0) {
+                store.get(keyNew).onsuccess = (ne) => {
+                    const newRecords = ne.target.result || [];
+                    const mergedRecords = [...newRecords, ...oldRecords];
+                    
+                    const writeTx = dbInstance.transaction("hall_of_fame", "readwrite");
+                    writeTx.objectStore("hall_of_fame").put(mergedRecords, keyNew);
+                    writeTx.objectStore("hall_of_fame").delete(keyOld);
+                };
+            } else {
+                store.delete(keyOld);
+            }
+        };
+    }
+    
+    // 3. Remover o treinador da lista
+    trainersList = trainersList.filter(t => t.id !== trainerId);
+    localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+    
+    // 4. Se o treinador apagado era o ativo, redefinir para o default
+    if (activeTrainerId === trainerId) {
+        activeTrainerId = defaultTrainerId;
+        localStorage.setItem(`bb_active_trainer_${currentGameId}`, activeTrainerId);
+    }
+    
+    updateTrainerSelect();
+    renderAll();
+    closeTrainerManagerModal();
+}
+
+function switchTrainer(trainerId) {
+    activeTrainerId = trainerId;
+    localStorage.setItem(`bb_active_trainer_${currentGameId}`, activeTrainerId);
+    
+    renderAll();
+}
+
+// --- SECTION Trainer Resume & Challenge Log (Phase 1) ---
+
+function switchTab(tabId) {
+    activeTab = tabId;
+    const btnBoxes = document.getElementById("tab-btn-boxes");
+    const btnResume = document.getElementById("tab-btn-resume");
+    const contentBoxes = document.getElementById("tab-content-boxes");
+    const contentResume = document.getElementById("tab-content-resume");
+
+    if (tabId === "boxes") {
+        if (btnBoxes) btnBoxes.classList.add("active");
+        if (btnResume) btnResume.classList.remove("active");
+        if (contentBoxes) contentBoxes.style.display = "block";
+        if (contentResume) contentResume.style.display = "none";
+    } else if (tabId === "resume") {
+        if (btnBoxes) btnBoxes.classList.remove("active");
+        if (btnResume) btnResume.classList.add("active");
+        if (contentBoxes) contentBoxes.style.display = "none";
+        if (contentResume) contentResume.style.display = "block";
+        renderTrainerResume();
+    }
+}
+
+function countTotalHofRecords() {
+    return new Promise((resolve) => {
+        if (!dbInstance) {
+            resolve(0);
+            return;
+        }
+        const tx = dbInstance.transaction("hall_of_fame", "readonly");
+        const store = tx.objectStore("hall_of_fame");
+        const request = store.openCursor();
+        let total = 0;
+        request.onsuccess = function(e) {
+            const cursor = e.target.result;
+            if (cursor) {
+                const value = cursor.value;
+                if (Array.isArray(value)) {
+                    total += value.length;
+                } else if (value) {
+                    total += 1;
+                }
+                cursor.continue();
+            } else {
+                resolve(total);
+            }
+        };
+        request.onerror = function() {
+            resolve(0);
+        };
+    });
+}
+
+function getHofCountsByGame() {
+    return new Promise((resolve) => {
+        if (!dbInstance) {
+            resolve({});
+            return;
+        }
+        const tx = dbInstance.transaction("hall_of_fame", "readonly");
+        const store = tx.objectStore("hall_of_fame");
+        const request = store.openCursor();
+        const counts = {};
+        request.onsuccess = function(e) {
+            const cursor = e.target.result;
+            if (cursor) {
+                const key = cursor.key; // e.g. "red_trainer_red_default"
+                const value = cursor.value;
+                const gameId = key.split("_")[0];
+                let count = 0;
+                if (Array.isArray(value)) {
+                    count = value.length;
+                } else if (value) {
+                    count = 1;
+                }
+                counts[gameId] = (counts[gameId] || 0) + count;
+                cursor.continue();
+            } else {
+                resolve(counts);
+            }
+        };
+        request.onerror = function() {
+            resolve({});
+        };
+    });
+}
+
+function openChallengeModal(challengeId = null) {
+    const modal = document.getElementById("challenge-modal");
+    if (!modal) return;
+    
+    // Make sure associated game select is populated (fallback)
+    const chGameSelect = document.getElementById("challenge-game");
+    if (chGameSelect && chGameSelect.children.length === 0) {
+        const gameOptions = GAMES_DB.map(g => `<option value="${g.id}">${g.name} (Gen ${g.gen})</option>`).join("");
+        chGameSelect.innerHTML = gameOptions;
+    }
+
+    if (challengeId) {
+        const ch = challengesList.find(c => c.id === challengeId);
+        if (ch) {
+            document.getElementById("challenge-id").value = ch.id;
+            document.getElementById("challenge-title").value = ch.title || "";
+            document.getElementById("challenge-game").value = ch.gameId || currentGameId;
+            document.getElementById("challenge-type").value = ch.type || "nuzlocke";
+            document.getElementById("challenge-status").value = ch.status || "in_progress";
+            document.getElementById("challenge-notes").value = ch.notes || "";
+        }
+    } else {
+        document.getElementById("challenge-id").value = "";
+        document.getElementById("challenge-title").value = "";
+        document.getElementById("challenge-game").value = currentGameId;
+        document.getElementById("challenge-type").value = "nuzlocke";
+        document.getElementById("challenge-status").value = "in_progress";
+        document.getElementById("challenge-notes").value = "";
+    }
+    modal.classList.add("active");
+}
+
+function closeChallengeModal() {
+    const modal = document.getElementById("challenge-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function saveChallenge() {
+    const id = document.getElementById("challenge-id").value;
+    const title = document.getElementById("challenge-title").value.trim();
+    const gameId = document.getElementById("challenge-game").value;
+    const type = document.getElementById("challenge-type").value;
+    const status = document.getElementById("challenge-status").value;
+    const notes = document.getElementById("challenge-notes").value;
+
+    if (!title) {
+        alert("Por favor, introduza um título para o desafio.");
+        return;
+    }
+
+    if (id) {
+        const index = challengesList.findIndex(c => c.id === id);
+        if (index !== -1) {
+            challengesList[index] = { id, title, gameId, type, status, notes };
+        }
+    } else {
+        const newChallenge = {
+            id: "challenge_" + Date.now(),
+            title,
+            gameId,
+            type,
+            status,
+            notes
+        };
+        challengesList.push(newChallenge);
+    }
+
+    localStorage.setItem("bb_challenges", JSON.stringify(challengesList));
+    closeChallengeModal();
+    renderTrainerResume();
+}
+
+function deleteChallenge(challengeId) {
+    if (confirm("Tem a certeza que deseja eliminar este desafio?")) {
+        challengesList = challengesList.filter(c => c.id !== challengeId);
+        localStorage.setItem("bb_challenges", JSON.stringify(challengesList));
+        renderTrainerResume();
+    }
+}
+
+function getGameColor(gameId) {
+    const colors = {
+        red: "#ef4444", blue: "#3b82f6", yellow: "#eab308", gold: "#d97706", silver: "#9ca3af", crystal: "#06b6d4",
+        ruby: "#b91c1c", sapphire: "#1d4ed8", emerald: "#10b981", firered: "#f97316", leafgreen: "#22c55e",
+        diamond: "#60a5fa", pearl: "#f472b6", platinum: "#94a3b8", heartgold: "#ea580c", soulsilver: "#3b82f6",
+        black: "#4b5563", white: "#f9fafb", black2: "#2563eb", white2: "#f59e0b", x: "#3b82f6", y: "#ef4444",
+        omegaruby: "#ea580c", alphasapphire: "#0284c7", sun: "#f59e0b", moon: "#3b82f6", ultrasun: "#ea580c",
+        ultramoon: "#06b6d4", sword: "#06b6d4", shield: "#e11d48", brilliantdiamond: "#60a5fa", shiningpearl: "#f472b6",
+        legendsarceus: "#475569", scarlet: "#dc2626", violet: "#7c3aed"
+    };
+    return colors[gameId] || "#6366f1";
+}
+
+function renderChallengesList() {
+    const container = document.getElementById("challenges-list-container");
+    if (!container) return;
+
+    if (challengesList.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.75rem;">
+                Nenhum desafio registado. Clique em "➕ Registar" para começar!
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = challengesList.map(ch => {
+        const game = GAMES_DB.find(g => g.id === ch.gameId);
+        const gameName = game ? game.name : "Desconhecido";
+        const gameColor = getGameColor(ch.gameId);
+        
+        let statusLabel = "Em Progresso";
+        if (ch.status === "completed") statusLabel = "Vitória";
+        if (ch.status === "failed") statusLabel = "Derrota";
+
+        let typeLabel = "Desafio";
+        if (ch.type === "nuzlocke") typeLabel = "Nuzlocke";
+        if (ch.type === "speedrun") typeLabel = "Speedrun";
+        if (ch.type === "ribbon_quest") typeLabel = "Ribbon Quest";
+        if (ch.type === "custom") typeLabel = "Outro";
+
+        return `
+            <div class="glass-panel" style="padding: 14px; margin-bottom: 0px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.015); border-radius: 12px; display: flex; flex-direction: column; gap: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                        <h4 style="margin: 0; font-size: 0.85rem; font-weight: 700; color: #fff;">${ch.title}</h4>
+                        <div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;">
+                            <span style="font-size: 0.6rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; letter-spacing: 0.5px;">${typeLabel}</span>
+                            <span style="font-size: 0.6rem; color: ${gameColor}; font-weight: 800;">• ${gameName}</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="status-badge status-${ch.status}">${statusLabel}</span>
+                        <button class="btn btn-action" onclick="openChallengeModal('${ch.id}')" style="width: auto; padding: 2px 6px; font-size: 0.6rem; height: 22px;">✏️</button>
+                        <button class="btn btn-danger" onclick="deleteChallenge('${ch.id}')" style="width: auto; padding: 2px 6px; font-size: 0.6rem; height: 22px;">🗑️</button>
+                    </div>
+                </div>
+                ${ch.notes ? `<p style="margin: 0; font-size: 0.75rem; color: var(--text-muted); line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.04); padding-top: 6px; white-space: pre-wrap;">${ch.notes}</p>` : ''}
+            </div>
+        `;
+    }).join("");
+}
+
+function renderTimeline(HofCountsMap) {
+    const container = document.getElementById("timeline-container");
+    if (!container) return;
+
+    const activeGames = GAMES_DB.filter(game => {
+        const gameTrainers = trainersList.filter(t => t.gameId === game.id);
+        const gamePokemon = pokemonDatabase.filter(p => p.currentGame === game.id);
+        const gameHofCount = HofCountsMap[game.id] || 0;
+        const gameChallenges = challengesList.filter(c => c.gameId === game.id);
+        return gameTrainers.length > 0 || gamePokemon.length > 0 || gameHofCount > 0 || gameChallenges.length > 0;
+    });
+
+    if (activeGames.length === 0) {
+        container.innerHTML = `
+            <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.75rem;">
+                A sua jornada está vazia. Adicione treinadores ou registe Pokémon para ver a sua Linha Temporal!
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = activeGames.map(game => {
+        const gameTrainers = trainersList.filter(t => t.gameId === game.id);
+        const gamePokemon = pokemonDatabase.filter(p => p.currentGame === game.id);
+        const gameHofCount = HofCountsMap[game.id] || 0;
+        const gameChallenges = challengesList.filter(c => c.gameId === game.id);
+        const gameColor = getGameColor(game.id);
+
+        return `
+            <div style="position: relative; padding-bottom: 8px; margin-bottom: 12px; cursor: pointer; transition: transform 0.2s, background-color 0.2s; padding: 6px; border-radius: 8px;" 
+                 class="timeline-node-item"
+                 onmouseover="this.style.transform='translateX(4px)'; this.style.backgroundColor='rgba(255,255,255,0.02)';" 
+                 onmouseout="this.style.transform='none'; this.style.backgroundColor='transparent';" 
+                 onclick="selectTimelineGame('${game.id}')">
+                <div class="timeline-dot" style="position: absolute; left: -26px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: ${gameColor}; box-shadow: 0 0 8px ${gameColor}; border: 2px solid var(--bg-main);"></div>
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span class="game-badge" style="background: ${gameColor}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase;">
+                            ${game.name}
+                        </span>
+                        <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 800;">
+                            GERAÇÃO ${game.gen}
+                        </span>
+                    </div>
+                    
+                    <!-- Trainers info -->
+                    <div style="font-size: 0.75rem; color: var(--text-main); font-weight: 600;">
+                        👤 Treinadores: ${gameTrainers.length > 0 ? gameTrainers.map(t => `<span style="color: ${gameColor}; font-weight: 800;">${t.name}</span> (ID: ${t.tid})`).join(", ") : `<span style="color: var(--text-muted);">Nenhum profile ativo</span>`}
+                    </div>
+                    
+                    <!-- Stats row -->
+                    <div style="display: flex; gap: 12px; font-size: 0.7rem; color: var(--text-muted);">
+                        <span>📦 Pokémon na Box: <strong style="color: #fff;">${gamePokemon.length}</strong></span>
+                        <span>🏆 Hall of Fame: <strong style="color: #fff;">${gameHofCount}</strong></span>
+                        <span>🎗️ Desafios: <strong style="color: #fff;">${gameChallenges.length}</strong></span>
+                    </div>
+
+                    <!-- Associated challenges list if any -->
+                    ${gameChallenges.length > 0 ? `
+                        <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 4px;" onclick="event.stopPropagation()">
+                            ${gameChallenges.map(c => `
+                                <div style="background: rgba(0,0,0,0.2); border-left: 3px solid ${c.status === 'completed' ? 'var(--accent-success)' : c.status === 'failed' ? 'var(--accent-danger)' : 'var(--game-color)'}; padding: 4px 8px; border-radius: 0 6px 6px 0; font-size: 0.7rem; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>${c.type.toUpperCase()}: ${c.title}</span>
+                                    <span style="font-weight: 800; color: ${c.status === 'completed' ? 'var(--accent-success)' : c.status === 'failed' ? 'var(--accent-danger)' : '#eab308'}">${c.status === 'completed' ? 'Concluído' : c.status === 'failed' ? 'Falhado' : 'Em Progresso'}</span>
+                                </div>
+                            `).join("")}
+                        </div>
+                    ` : ''}
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
+function selectTimelineGame(gameId) {
+    switchGame(gameId);
+    switchTab('boxes');
+}
+
+function renderTrainerResume() {
+    const totalTrainersBadge = document.getElementById("resume-total-trainers");
+    const completedChallengesBadge = document.getElementById("resume-completed-challenges");
+    const totalHofBadge = document.getElementById("resume-total-hof");
+
+    if (totalTrainersBadge) {
+        totalTrainersBadge.textContent = trainersList.length;
+    }
+    if (completedChallengesBadge) {
+        completedChallengesBadge.textContent = challengesList.filter(c => c.status === "completed").length;
+    }
+
+    countTotalHofRecords().then(totalHofs => {
+        if (totalHofBadge) {
+            totalHofBadge.textContent = totalHofs;
+        }
+    });
+
+    getHofCountsByGame().then(HofCountsMap => {
+        renderTimeline(HofCountsMap);
+        renderChallengesList();
+    });
+}
+
+// --- SECTION Owndex (Species Profile) Logic ---
+
+const NATURE_EFFECTS = {
+    Adamant: { plus: "atk", minus: "spa" },
+    Bold: { plus: "def", minus: "atk" },
+    Brave: { plus: "atk", minus: "spe" },
+    Calm: { plus: "spd", minus: "atk" },
+    Careful: { plus: "spd", minus: "spa" },
+    Hasty: { plus: "spe", minus: "def" },
+    Impish: { plus: "def", minus: "spa" },
+    Jolly: { plus: "spe", minus: "spa" },
+    Lonely: { plus: "atk", minus: "def" },
+    Mild: { plus: "spa", minus: "def" },
+    Modest: { plus: "spa", minus: "atk" },
+    Naive: { plus: "spe", minus: "spd" },
+    Naughty: { plus: "atk", minus: "spd" },
+    Quiet: { plus: "spa", minus: "spe" },
+    Rash: { plus: "spa", minus: "spd" },
+    Relaxed: { plus: "def", minus: "spe" },
+    Sassy: { plus: "spd", minus: "spe" },
+    Timid: { plus: "spe", minus: "atk" }
+};
+
+function calculateFinalStats(p, baseStats) {
+    const level = p.level || 50;
+    const stats = {};
+    const ivs = p.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+    const evs = p.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
+    
+    // HP
+    const baseHP = baseStats.hp || 80;
+    if (p.species.toLowerCase().trim() === "shedinja") {
+        stats.hp = 1;
+    } else {
+        stats.hp = Math.floor(((2 * baseHP + (ivs.hp || 0) + Math.floor((evs.hp || 0) / 4)) * level) / 100) + level + 10;
+    }
+    
+    // Others
+    const keys = ["atk", "def", "spa", "spd", "spe"];
+    keys.forEach(k => {
+        const baseVal = baseStats[k] || 80;
+        let val = Math.floor(((2 * baseVal + (ivs[k] || 0) + Math.floor((evs[k] || 0) / 4)) * level) / 100) + 5;
+        
+        // Nature multiplier
+        if (p.nature && NATURE_EFFECTS[p.nature]) {
+            if (NATURE_EFFECTS[p.nature].plus === k) {
+                val = Math.floor(val * 1.1);
+            } else if (NATURE_EFFECTS[p.nature].minus === k) {
+                val = Math.floor(val * 0.9);
+            }
+        }
+        stats[k] = val;
+    });
+    
+    return stats;
+}
+
+function calculateTacticalAptitude(p, baseStats) {
+    const bStats = baseStats || { hp: 80, atk: 80, def: 80, spa: 80, spd: 80, spe: 80 };
+    const stats = calculateFinalStats(p, bStats);
+    
+    const moves = (p.moves || []).map(m => m.toLowerCase().trim()).filter(Boolean);
+    
+    // 1. Pivot: has pivoting moves
+    const pivotMoves = ["u-turn", "volt switch", "teleport", "flip turn", "parting shot"];
+    const hasPivotMove = moves.some(m => pivotMoves.includes(m));
+    
+    // 2. Support: has setup/entry hazards/defensive utility moves
+    const supportMoves = [
+        "stealth rock", "spikes", "toxic spikes", "sticky web", "defog", "rapid spin",
+        "toxic", "will-o-wisp", "thunder wave", "yawn", "spore", "sleep powder",
+        "wish", "soft-boiled", "recover", "roost", "milk drink", "slack off",
+        "reflect", "light screen", "aurora veil", "tailwind", "trick room", "heal bell", "aromatherapy"
+    ];
+    const supportMoveCount = moves.filter(m => supportMoves.includes(m)).length;
+    
+    // Physical vs Special preference
+    const isPhysical = stats.atk > stats.spa * 1.1;
+    const isSpecial = stats.spa > stats.atk * 1.1;
+    
+    // High Speed? Speed > 100
+    const isFast = stats.spe > 100; 
+    
+    // Bulk values
+    const physicalBulk = stats.hp + stats.def;
+    const specialBulk = stats.hp + stats.spd;
+    const mixedBulk = stats.hp + stats.def + stats.spd;
+    
+    // Let's check highest EV investment
+    const evs = p.evs || {};
+    const maxEVKey = Object.keys(evs).reduce((a, b) => (evs[a] || 0) > (evs[b] || 0) ? a : b, "hp");
+    const maxEVVal = evs[maxEVKey] || 0;
+    
+    if (hasPivotMove && stats.spe > 90) {
+        return "Pivot Tático";
+    }
+    
+    if (supportMoveCount >= 2 || (supportMoveCount >= 1 && (maxEVKey === "hp" || maxEVKey === "def" || maxEVKey === "spd") && maxEVVal >= 128)) {
+        if (physicalBulk > specialBulk * 1.1) return "Defensivo Físico";
+        if (specialBulk > physicalBulk * 1.1) return "Defensivo Especial";
+        return "Suporte Utilitário";
+    }
+    
+    if (isFast) {
+        if (isPhysical && (evs.atk > 120 || bStats.atk > bStats.spa)) return "Physical Sweeper";
+        if (isSpecial && (evs.spa > 120 || bStats.spa > bStats.atk)) return "Special Sweeper";
+        return "Mixed Sweeper";
+    }
+    
+    // If not fast, but has high offense: Tank / Bulky Attacker
+    const isOffensive = stats.atk > 95 || stats.spa > 95 || evs.atk > 120 || evs.spa > 120;
+    if (isOffensive) {
+        if (isPhysical) return "Physical Tank";
+        if (isSpecial) return "Special Tank";
+        return "Bulky Attacker";
+    }
+    
+    // High bulk, low offense
+    if (physicalBulk > specialBulk * 1.15) {
+        return "Barreira Física (Wall)";
+    }
+    if (specialBulk > physicalBulk * 1.15) {
+        return "Barreira Especial (Wall)";
+    }
+    if (mixedBulk > 350) {
+        return "Muralha Mista";
+    }
+    
+    return "Equilibrado";
+}
+
+function openOwndexModal(pokedexId, speciesName) {
+    const modal = document.getElementById("owndex-modal");
+    if (!modal) return;
+    
+    // Set basic info initially
+    document.getElementById("owndex-species-name").innerText = speciesName;
+    document.getElementById("owndex-species-dex").innerText = `#${pokedexId.toString().padStart(3, '0')}`;
+    
+    // Sprite
+    let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokedexId}.png`;
+    document.getElementById("owndex-species-sprite").src = spriteUrl;
+    
+    // Reset types & stats UI
+    document.getElementById("owndex-species-types").innerHTML = "";
+    document.getElementById("owndex-base-stats-container").innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted);">A carregar dados base da PokeAPI...</span>`;
+    
+    // Show modal
+    modal.classList.add("active");
+    
+    // Initial renders with fallback stats
+    renderOwndexSpecimens(pokedexId, null);
+    renderMovesetHeatmap(pokedexId);
+    renderDexitCompatibility(pokedexId, null);
+    
+    // Fetch species details for Dexit-Strategist
+    fetch(`https://pokeapi.co/api/v2/pokemon-species/${pokedexId}`)
+        .then(res => {
+            if (res.ok) return res.json();
+            throw new Error("Erro na rede species");
+        })
+        .then(speciesData => {
+            renderDexitCompatibility(pokedexId, speciesData);
+        })
+        .catch(err => {
+            console.error("Erro ao carregar dados de species da PokeAPI:", err);
+        });
+    
+    // Fetch stats and types from PokeAPI
+    fetch(`https://pokeapi.co/api/v2/pokemon/${pokedexId}`)
+        .then(res => {
+            if (res.ok) return res.json();
+            throw new Error("Erro na rede");
+        })
+        .then(d => {
+            // Render types
+            document.getElementById("owndex-species-types").innerHTML = d.types.map(t => {
+                return `<span class="type-badge t-${t.type.name}" style="font-size: 0.6rem; padding: 2px 6px; text-transform: uppercase;">${t.type.name}</span>`;
+            }).join("");
+            
+            // Build base stats object
+            const baseStats = {};
+            d.stats.forEach(s => {
+                if (s.stat.name === "hp") baseStats.hp = s.base_stat;
+                else if (s.stat.name === "attack") baseStats.atk = s.base_stat;
+                else if (s.stat.name === "defense") baseStats.def = s.base_stat;
+                else if (s.stat.name === "special-attack") baseStats.spa = s.base_stat;
+                else if (s.stat.name === "special-defense") baseStats.spd = s.base_stat;
+                else if (s.stat.name === "speed") baseStats.spe = s.base_stat;
+            });
+            
+            // Render base stats bars
+            const statLabels = {
+                "hp": "HP", "attack": "Ataque", "defense": "Defesa",
+                "special-attack": "Sp. Atk", "special-defense": "Sp. Def", "speed": "Veloc"
+            };
+            const maxStatVal = 255;
+            
+            const statsHtml = d.stats.map(s => {
+                const name = statLabels[s.stat.name] || s.stat.name;
+                const val = s.base_stat;
+                const pct = (val / maxStatVal) * 100;
+                
+                // Color bar depending on value
+                let barColor = "var(--accent-danger)";
+                if (val >= 90) barColor = "var(--accent-success)";
+                else if (val >= 60) barColor = "var(--game-color)";
+                else if (val >= 40) barColor = "#eab308";
+                
+                return `
+                    <div class="base-stat-row">
+                        <span class="base-stat-label">${name}</span>
+                        <span class="base-stat-val">${val}</span>
+                        <div class="base-stat-bar-bg">
+                            <div class="base-stat-bar-fill" style="width: ${pct}%; background-color: ${barColor};"></div>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+            document.getElementById("owndex-base-stats-container").innerHTML = statsHtml;
+            
+            // Re-render list with actual baseStats for highly accurate role calculation
+            renderOwndexSpecimens(pokedexId, baseStats);
+        })
+        .catch(err => {
+            console.error("Erro ao carregar dados da PokeAPI:", err);
+            document.getElementById("owndex-base-stats-container").innerHTML = `<span style="font-size:0.75rem; color:var(--accent-danger);">Erro ao carregar dados da PokeAPI.</span>`;
+        });
+}
+
+function closeOwndexModal() {
+    const modal = document.getElementById("owndex-modal");
+    if (modal) modal.classList.remove("active");
+    closeVoyageModal();
+}
+
+const GAME_GENS = {
+    red: { gen: 1, name: "Pokémon Red" },
+    blue: { gen: 1, name: "Pokémon Blue" },
+    yellow: { gen: 1, name: "Pokémon Yellow" },
+    gold: { gen: 2, name: "Pokémon Gold" },
+    silver: { gen: 2, name: "Pokémon Silver" },
+    crystal: { gen: 2, name: "Pokémon Crystal" },
+    ruby: { gen: 3, name: "Pokémon Ruby" },
+    sapphire: { gen: 3, name: "Pokémon Sapphire" },
+    emerald: { gen: 3, name: "Pokémon Emerald" },
+    firered: { gen: 3, name: "Pokémon FireRed" },
+    leafgreen: { gen: 3, name: "Pokémon LeafGreen" },
+    diamond: { gen: 4, name: "Pokémon Diamond" },
+    pearl: { gen: 4, name: "Pokémon Pearl" },
+    platinum: { gen: 4, name: "Pokémon Platinum" },
+    heartgold: { gen: 4, name: "Pokémon HeartGold" },
+    soulsilver: { gen: 4, name: "Pokémon SoulSilver" },
+    black: { gen: 5, name: "Pokémon Black" },
+    white: { gen: 5, name: "Pokémon White" },
+    black2: { gen: 5, name: "Pokémon Black 2" },
+    white2: { gen: 5, name: "Pokémon White 2" },
+    x: { gen: 6, name: "Pokémon X" },
+    y: { gen: 6, name: "Pokémon Y" },
+    omegaruby: { gen: 6, name: "Pokémon Omega Ruby" },
+    alphasapphire: { gen: 6, name: "Pokémon Alpha Sapphire" },
+    sun: { gen: 7, name: "Pokémon Sun" },
+    moon: { gen: 7, name: "Pokémon Moon" },
+    ultrasun: { gen: 7, name: "Pokémon Ultra Sun" },
+    ultramoon: { gen: 7, name: "Pokémon Ultra Moon" },
+    sword: { gen: 8, name: "Pokémon Sword" },
+    shield: { gen: 8, name: "Pokémon Shield" },
+    brilliantdiamond: { gen: 8, name: "Pokémon Brilliant Diamond" },
+    shiningpearl: { gen: 8, name: "Pokémon Shining Pearl" },
+    legendsarceus: { gen: 8, name: "Pokémon Legends: Arceus" },
+    scarlet: { gen: 9, name: "Pokémon Scarlet" },
+    violet: { gen: 9, name: "Pokémon Violet" }
+};
+
+function renderDexitCompatibility(pokedexId, speciesData = null) {
+    const container = document.getElementById("owndex-dexit-compatibility");
+    if (!container) return;
+    
+    let isSwSh = false;
+    let isBDSP = pokedexId <= 493;
+    let isPLA = false;
+    let isSV = false;
+    
+    if (speciesData && speciesData.pokedex_numbers) {
+        const dns = speciesData.pokedex_numbers.map(dn => dn.pokedex.name);
+        isSwSh = dns.some(name => ["galar", "isle-of-armor", "crown-tundra"].includes(name)) || [25, 133, 150].includes(pokedexId);
+        isPLA = dns.some(name => name === "hisui");
+        isSV = dns.some(name => ["paldea", "kitakami", "blueberry"].includes(name));
+    } else {
+        // Rules base fallback
+        isSwSh = pokedexId <= 151 || (pokedexId >= 252 && pokedexId <= 386 && pokedexId !== 289) || pokedexId >= 800;
+        isPLA = pokedexId <= 151 || (pokedexId >= 387 && pokedexId <= 493) || [722, 723, 724, 501, 502, 503].includes(pokedexId);
+        isSV = pokedexId <= 151 || pokedexId >= 900 || [252, 253, 254, 387, 388, 389].includes(pokedexId);
+    }
+    
+    const badges = [
+        { label: "⚔️🛡️ SwSh", status: isSwSh },
+        { label: "💎✨ BDSP", status: isBDSP },
+        { label: "🏔️ Legends", status: isPLA },
+        { label: "🍊🍇 SV", status: isSV }
+    ];
+    
+    container.innerHTML = badges.map(b => {
+        if (b.status) {
+            return `
+                <span class="game-badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4); padding: 4px 8px; border-radius: 6px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px;">
+                    ✓ ${b.label}
+                </span>
+            `;
+        } else {
+            return `
+                <span class="game-badge" style="background: rgba(239, 68, 68, 0.1); color: var(--text-muted); border: 1px solid rgba(239, 68, 68, 0.25); padding: 4px 8px; border-radius: 6px; font-size: 0.6rem; font-weight: 800; display: inline-flex; align-items: center; gap: 4px; text-decoration: line-through; opacity: 0.6;">
+                    ✕ ${b.label}
+                </span>
+            `;
+        }
+    }).join("");
+    
+    window.currentSpeciesLegality = { swsh: isSwSh, bdsp: isBDSP, pla: isPLA, sv: isSV };
+}
+
+function openVoyageModal(pokemonId) {
+    const p = pokemonDatabase.find(x => x.id === pokemonId);
+    if (!p) return;
+    
+    const modal = document.getElementById("voyage-modal");
+    if (!modal) return;
+    
+    const legality = window.currentSpeciesLegality || { swsh: true, bdsp: true, pla: true, sv: true };
+    
+    document.getElementById("voyage-pkmn-name").innerText = `${p.nickname || p.species} (Nível ${p.level})`;
+    document.getElementById("voyage-pkmn-badge").innerText = p.isShiny ? "⭐" : "📦";
+    
+    const currentGameName = GAME_GENS[p.currentGame]?.name || p.currentGame;
+    const originGameName = GAME_GENS[p.originGame]?.name || p.originGame;
+    document.getElementById("voyage-pkmn-game").innerText = `Origem: ${originGameName} | Local Atual: ${currentGameName}`;
+    
+    const originGen = GAME_GENS[p.originGame]?.gen || 1;
+    const currentGen = GAME_GENS[p.currentGame]?.gen || 1;
+    
+    const historyGens = (p.history || []).map(h => GAME_GENS[h]?.gen).filter(Boolean);
+    historyGens.push(originGen);
+    historyGens.push(currentGen);
+    const crossedGens = [...new Set(historyGens)].sort((a, b) => a - b);
+    
+    let timelineHtml = "";
+    crossedGens.forEach((g, idx) => {
+        let gameForGen = "";
+        if (g === originGen) gameForGen = GAME_GENS[p.originGame]?.name;
+        else if (g === currentGen) gameForGen = GAME_GENS[p.currentGame]?.name;
+        else {
+            const histGame = (p.history || []).find(h => GAME_GENS[h]?.gen === g);
+            gameForGen = histGame ? GAME_GENS[histGame]?.name : `Geração ${g}`;
+        }
+        
+        timelineHtml += `
+            <div style="display: flex; gap: 10px; align-items: flex-start; position: relative;">
+                <div style="width: 20px; height: 20px; border-radius: 50%; background: var(--game-color); border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: bold; color: #fff; z-index: 2;">
+                    ${g}
+                </div>
+                <div style="font-size: 0.75rem; color: #fff; padding-top: 2px;">
+                    Geração ${g} <span style="color: var(--text-muted); font-size: 0.65rem;">(${gameForGen})</span>
+                </div>
+            </div>
+        `;
+    });
+    
+    document.getElementById("voyage-history-timeline").innerHTML = timelineHtml;
+    
+    let guideHtml = "";
+    const isAmbassador = pokemonId === window.currentSpeciesAmbassadorId;
+    if (isAmbassador) {
+        guideHtml += `
+            <div style="display:flex; align-items:center; gap:8px; background: rgba(234, 179, 8, 0.1); border: 1px solid rgba(234, 179, 8, 0.3); border-radius: 8px; padding: 10px; color:#f59e0b; font-weight:bold; margin-bottom:12px; font-size:0.75rem;">
+                👑 Este espécime é o Embaixador Recomendado para migração desta espécie! (${window.currentSpeciesAmbassadorReason})
+            </div>
+        `;
+    }
+    if (currentGen === 9) {
+        guideHtml = `
+            <div style="display:flex; align-items:center; gap:8px; color:var(--accent-success); font-weight:bold; margin-bottom:8px;">
+                🎉 Destino Final Alcançado!
+            </div>
+            Este Pokémon já se encontra na Geração 9 (Scarlet/Violet), a geração mais moderna disponível. Pode transferi-lo livremente entre Scarlet e Violet usando o <strong>Pokémon HOME</strong>.
+        `;
+    } else {
+        guideHtml += `<div style="font-weight:bold; color:var(--game-color); margin-bottom:8px;">Roteiro de Transferência até à Gen 9:</div>`;
+        
+        let steps = [];
+        let tempGen = currentGen;
+        
+        if (tempGen === 1 || tempGen === 2) {
+            steps.push({
+                title: `Geração ${tempGen} ➔ Geração 7 (Consola Virtual 3DS)`,
+                desc: "Se estiver a usar a Consola Virtual da Nintendo 3DS, pode transferir para a Geração 7 usando o **Poké Transporter** e **Banco Pokémon**."
+            });
+            tempGen = 7;
+        }
+        
+        if (tempGen === 3) {
+            steps.push({
+                title: "Geração 3 ➔ Geração 4 (Pal Park)",
+                desc: "Insira o cartucho de GBA e o cartucho de DS (Diamond/Pearl/Platinum/HGSS) na mesma consola Nintendo DS Lite. Aceda ao **Pal Park** no jogo de Gen 4 para capturar e transferir."
+            });
+            tempGen = 4;
+        }
+        
+        if (tempGen === 4) {
+            steps.push({
+                title: "Geração 4 ➔ Geração 5 (Poké Transfer)",
+                desc: "Requer duas consolas Nintendo DS/3DS. Use o **Poké Transfer Lab** na Rota 15 de Black/White/B2W2 para receber os Pokémon do jogo de Gen 4 através de download de jogo DS."
+            });
+            tempGen = 5;
+        }
+        
+        if (tempGen === 5) {
+            steps.push({
+                title: "Geração 5 ➔ Geração 6 / 7 (Banco Pokémon)",
+                desc: "Na Nintendo 3DS, use a aplicação **Poké Transporter** para mover Pokémon da Box 1 de Black/White/B2W2 para a Box de Transferência do **Banco Pokémon**."
+            });
+            tempGen = 7;
+        }
+        
+        if (tempGen === 6 || tempGen === 7) {
+            steps.push({
+                title: `Geração ${tempGen} ➔ HOME (Nintendo Switch)`,
+                desc: "Use a função de transferência do **Banco Pokémon** na 3DS para enviar os seus Pokémon para a sua conta do **Pokémon HOME** na Nintendo Switch."
+            });
+            tempGen = 8;
+        }
+        
+        if (tempGen >= 8) {
+            let compatibleGames = [];
+            if (legality.sv) compatibleGames.push("<strong>Scarlet/Violet (Gen 9)</strong>");
+            if (legality.swsh) compatibleGames.push("<strong>Sword/Shield (Gen 8)</strong>");
+            if (legality.bdsp) compatibleGames.push("<strong>Brilliant Diamond/Shining Pearl (Gen 8)</strong>");
+            if (legality.pla) compatibleGames.push("<strong>Legends: Arceus (Gen 8)</strong>");
+            
+            if (compatibleGames.length > 0) {
+                steps.push({
+                    title: "HOME ➔ Consolas Switch Modernas",
+                    desc: `No Pokémon HOME, pode enviar o seu Pokémon diretamente para as caixas de: ${compatibleGames.join(", ")}.`
+                });
+            } else {
+                steps.push({
+                    title: "⚠️ Dexit: Sem Compatibilidade Switch",
+                    desc: "Infelizmente, esta espécie não está programada em nenhum dos jogos da Nintendo Switch. Terá de aguardar que seja incluída numa Pokédex futura."
+                });
+            }
+        }
+        
+        guideHtml += steps.map((s, idx) => `
+            <div style="margin-bottom:10px;">
+                <div style="font-weight:bold; color:#fff;">${idx+1}. ${s.title}</div>
+                <div style="color:var(--text-muted); margin-top:2px;">${s.desc}</div>
+            </div>
+        `).join("");
+    }
+    
+    document.getElementById("voyage-transfer-guide").innerHTML = guideHtml;
+    modal.classList.add("active");
+}
+
+function closeVoyageModal() {
+    const modal = document.getElementById("voyage-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function openOwndexFromEditor() {
+    const speciesInput = document.getElementById("form-species").value.trim();
+    if (!speciesInput) return;
+    
+    const editId = document.getElementById("form-id").value;
+    const targetPokemon = pokemonDatabase.find(p => p.id === editId);
+    let pokedexId = targetPokemon ? targetPokemon.pokedexId : null;
+    
+    if (!pokedexId) {
+        const match = pokemonDatabase.find(p => p.species.toLowerCase() === speciesInput.toLowerCase());
+        if (match) pokedexId = match.pokedexId;
+    }
+    
+    if (!pokedexId) {
+        pokedexId = 1; // Fallback to Bulbasaur
+    }
+    
+    closeModal(); // Close editor modal
+    openOwndexModal(pokedexId, speciesInput);
+}
+
+function renderOwndexSpecimens(pokedexId, baseStats = null) {
+    const tbody = document.getElementById("owndex-specimens-tbody");
+    const noSpecimens = document.getElementById("owndex-no-specimens");
+    if (!tbody) return;
+    
+    const specimens = pokemonDatabase.filter(p => p.pokedexId === pokedexId);
+    
+    if (specimens.length === 0) {
+        tbody.innerHTML = "";
+        if (noSpecimens) noSpecimens.style.display = "block";
+        return;
+    }
+    
+    if (noSpecimens) noSpecimens.style.display = "none";
+    
+    // Calculate Generation Ambassador (Embaixador de Geração)
+    let ambassadorId = null;
+    let ambassadorReason = "";
+    if (specimens.length > 1) {
+        let bestScore = -1;
+        let bestPkmn = null;
+        let bestReason = "";
+        
+        specimens.forEach(p => {
+            let score = 0;
+            let reasons = [];
+            
+            if (p.ivs) {
+                const totalIv = Object.values(p.ivs).reduce((a, b) => a + b, 0);
+                score += totalIv;
+                if (totalIv >= 180) reasons.push("IVs excelentes");
+            }
+            if (p.evs) {
+                const totalEv = Object.values(p.evs).reduce((a, b) => a + b, 0);
+                score += Math.floor(totalEv / 4);
+                if (totalEv >= 508) reasons.push("EVs maximizados");
+            }
+            if (p.isShiny) {
+                score += 50;
+                reasons.push("Raridade Shiny");
+            }
+            if (p.ribbons && p.ribbons.length > 0) {
+                score += p.ribbons.length * 15;
+                reasons.push(`${p.ribbons.length} Fitas ganhas`);
+            }
+            if (p.level === 100) {
+                score += 15;
+                reasons.push("Nível Máximo");
+            } else if (p.level) {
+                score += Math.floor(p.level / 10);
+            }
+            
+            if (score > bestScore) {
+                bestScore = score;
+                bestPkmn = p;
+                bestReason = reasons.join(", ") || "Melhor conjunto de atributos";
+            }
+        });
+        
+        if (bestPkmn) {
+            ambassadorId = bestPkmn.id;
+            ambassadorReason = bestReason;
+        }
+    }
+    
+    // Save globally so that Voyage Logistics guide can check it
+    window.currentSpeciesAmbassadorId = ambassadorId;
+    window.currentSpeciesAmbassadorReason = ambassadorReason;
+    
+    tbody.innerHTML = specimens.map(p => {
+        const game = GAMES_DB.find(g => g.id === p.currentGame);
+        const gameName = game ? game.name : p.currentGame;
+        const gameColor = getGameColor(p.currentGame);
+        
+        const trainer = trainersList.find(t => t.id === p.trainerId);
+        const trainerName = trainer ? trainer.name : "Padrão";
+        const trainerTid = trainer && trainer.tid !== "00000" ? `(TID: ${trainer.tid})` : "";
+        
+        const ivs = p.ivs ? `HP:${p.ivs.hp||0} A:${p.ivs.atk||0} D:${p.ivs.def||0} S:${p.ivs.spa||0} SD:${p.ivs.spd||0} SP:${p.ivs.spe||0}` : "N/A";
+        const evs = p.evs ? `HP:${p.evs.hp||0} A:${p.evs.atk||0} D:${p.evs.def||0} S:${p.evs.spa||0} SD:${p.evs.spd||0} SP:${p.evs.spe||0}` : "N/A";
+        
+        const tacticalRole = calculateTacticalAptitude(p, baseStats);
+        
+        const moves = (p.moves || []).filter(m => m !== "").join(", ") || "Nenhum";
+        const ribbonsCount = p.ribbons ? p.ribbons.length : 0;
+        
+        const isAmbassador = p.id === ambassadorId;
+        const ambassadorBadge = isAmbassador ? `<span style="background: rgba(234, 179, 8, 0.15); color: #f59e0b; border: 1px solid rgba(234, 179, 8, 0.4); padding: 1px 4px; border-radius: 4px; font-size: 0.55rem; font-weight: 800; margin-left: 6px; display: inline-flex; align-items: center; gap: 2px;">👑 Embaixador</span>` : "";
+        const nicknameDisplay = p.isShiny ? `⭐ ${p.nickname || p.species}` : (p.nickname || p.species);
+        
+        const evolutionNotes = p.evolutionNotes || "";
+        const generalNotes = p.notes || "";
+        
+        let notesDisplay = `<span style="color:var(--text-muted); font-style:italic;">Sem notas</span>`;
+        if (evolutionNotes && generalNotes) {
+            notesDisplay = `
+                <div><strong style="color: var(--game-color);">Evolução:</strong> ${evolutionNotes}</div>
+                <div style="margin-top: 4px;"><strong style="color: var(--text-muted);">Geral:</strong> ${generalNotes}</div>
+            `;
+        } else if (evolutionNotes) {
+            notesDisplay = `<div><strong style="color: var(--game-color);">Evolução:</strong> ${evolutionNotes}</div>`;
+        } else if (generalNotes) {
+            notesDisplay = `<div><strong style="color: var(--text-muted);">Geral:</strong> ${generalNotes}</div>`;
+        }
+        
+        return `
+            <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                <td style="padding: 10px; font-weight: bold;">
+                    <div style="color: ${p.isShiny ? 'var(--color-electric)' : '#fff'}; display: flex; align-items: center; flex-wrap: wrap; gap: 4px;">
+                        ${nicknameDisplay} ${ambassadorBadge}
+                    </div>
+                    <div style="font-size: 0.65rem; color: var(--text-muted); font-weight: normal; margin-top: 2px;">Nível ${p.level}</div>
+                </td>
+                <td style="padding: 10px;">
+                    <span class="game-badge" style="background: ${gameColor}; color: #fff; padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800; text-transform: uppercase;">
+                        ${gameName}
+                    </span>
+                    <div style="font-size: 0.65rem; color: var(--text-muted); margin-top: 4px;">Treinador: <strong>${trainerName}</strong> ${trainerTid}</div>
+                </td>
+                <td style="padding: 10px; font-size: 0.65rem; line-height: 1.4;">
+                    <div><strong style="color: var(--text-muted);">IVs:</strong> <span style="color: #fff;">${ivs}</span></div>
+                    <div style="margin-top: 2px;"><strong style="color: var(--text-muted);">EVs:</strong> <span style="color: #fff;">${evs}</span></div>
+                </td>
+                <td style="padding: 10px;">
+                    <span style="background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-size: 0.65rem; font-weight: 800;">
+                        ${tacticalRole}
+                    </span>
+                </td>
+                <td style="padding: 10px; color: var(--text-muted); font-style: italic;">
+                    ${moves}
+                </td>
+                <td style="padding: 10px; font-weight: 800; color: var(--color-electric);">
+                    ${ribbonsCount > 0 ? `🎗️ ${ribbonsCount} Fitas` : `<span style="color:var(--text-muted); font-weight:normal;">Nenhuma</span>`}
+                </td>
+                <td style="padding: 10px; max-width: 220px; font-size: 0.7rem; line-height: 1.4; color: #fff; word-break: break-word;">
+                    ${notesDisplay}
+                </td>
+                <td style="padding: 10px; text-align: center;">
+                    <button class="btn btn-action" style="width:auto; padding: 4px 8px; font-size: 0.6rem; height: auto; line-height: 1; background: rgba(59, 130, 246, 0.15); border-color: rgba(59, 130, 246, 0.35);" onclick="openVoyageModal('${p.id}')">
+                        ✈️ Viagem
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join("");
+}
+
+function renderMovesetHeatmap(pokedexId) {
+    const container = document.getElementById("owndex-heatmap-container");
+    if (!container) return;
+    
+    const specimens = pokemonDatabase
+        .filter(p => p.pokedexId === pokedexId)
+        .sort((a, b) => {
+            const genA = GAMES_DB.find(g => g.id === a.currentGame)?.gen || 1;
+            const genB = GAMES_DB.find(g => g.id === b.currentGame)?.gen || 1;
+            if (genA !== genB) return genA - genB;
+            return (a.level || 0) - (b.level || 0);
+        });
+        
+    if (specimens.length === 0) {
+        container.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted);">Adicione exemplares a este ecrã para ver a evolução de movesets.</span>`;
+        return;
+    }
+    
+    // Extract unique moves
+    const allUniqueMoves = [];
+    specimens.forEach(p => {
+        (p.moves || []).forEach(m => {
+            const cleanMove = m.trim();
+            if (cleanMove && !allUniqueMoves.includes(cleanMove)) {
+                allUniqueMoves.push(cleanMove);
+            }
+        });
+    });
+    
+    if (allUniqueMoves.length === 0) {
+        container.innerHTML = `<span style="font-size:0.75rem; color:var(--text-muted);">Nenhum dos exemplares tem movimentos registados.</span>`;
+        return;
+    }
+    
+    // Sort moves alphabetically
+    allUniqueMoves.sort();
+    
+    // Build table header (columns = specimens)
+    let headerHtml = `<th style="text-align: left; padding: 6px 10px; color: var(--text-muted);">Movimento</th>`;
+    specimens.forEach(p => {
+        const game = GAMES_DB.find(g => g.id === p.currentGame);
+        const gameName = game ? game.name : p.currentGame;
+        const genText = game ? `Gen ${game.gen}` : "";
+        headerHtml += `
+            <th style="padding: 6px 10px; text-align: center; font-size: 0.65rem; min-width: 100px;">
+                <div style="font-weight: 900; color: #fff;">${p.nickname || p.species}</div>
+                <div style="font-size: 0.55rem; color: var(--text-muted); margin-top: 2px;">Nível ${p.level} (${genText})</div>
+            </th>
+        `;
+    });
+    
+    // Build table rows (rows = moves)
+    let rowsHtml = "";
+    allUniqueMoves.forEach(move => {
+        rowsHtml += `<tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">`;
+        rowsHtml += `<td class="move-name">${move}</td>`;
+        
+        specimens.forEach((p, idx) => {
+            const currentHas = (p.moves || []).includes(move);
+            const prevHas = idx > 0 && (specimens[idx - 1].moves || []).includes(move);
+            
+            let cellClass = "heatmap-cell-none";
+            let cellText = "·";
+            
+            if (currentHas && !prevHas) {
+                cellClass = "heatmap-cell-new";
+                cellText = "+ NOVO";
+            } else if (currentHas && prevHas) {
+                cellClass = "heatmap-cell-retained";
+                cellText = "✓";
+            } else if (!currentHas && prevHas) {
+                cellClass = "heatmap-cell-deleted";
+                cellText = "✕ DEL";
+            }
+            
+            rowsHtml += `
+                <td style="padding: 4px; text-align: center;">
+                    <div class="heatmap-cell ${cellClass}">${cellText}</div>
+                </td>
+            `;
+        });
+        rowsHtml += `</tr>`;
+    });
+    
+    container.innerHTML = `
+        <table class="heatmap-table">
+            <thead>
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1);">
+                    ${headerHtml}
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+    `;
+}
+
 window.onload = function() {
     initDB().then(() => {
         cleanupDuplicates();
@@ -2018,6 +3742,7 @@ window.onload = function() {
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
         initTouchDragAndDrop();
+        initGlobalBoxUI();
         document.getElementById("sprite-style-select").value = currentSpriteStyle;
         switchGame(currentGameId);
     }).catch(err => {
@@ -2027,6 +3752,7 @@ window.onload = function() {
         loadSpeciesDatalist(); 
         renderRibbonChecklist();
         initTouchDragAndDrop();
+        initGlobalBoxUI();
         document.getElementById("sprite-style-select").value = currentSpriteStyle;
         switchGame(currentGameId);
     });

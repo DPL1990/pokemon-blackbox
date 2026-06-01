@@ -13,6 +13,9 @@
     --game-color-glow: rgba(99, 102, 241, 0.2);
     --accent-danger: #ef4444;
     --accent-danger-glow: rgba(239, 68, 68, 0.2);
+    --accent-success: #10b981;
+    --accent-success-glow: rgba(16, 185, 129, 0.2);
+    
     
     /* Type Colors (Curadas & Harmoniosas) */
     --color-normal: #9ca3af;
@@ -961,5 +964,370 @@ select {
     }
 }
 
+/* Trainer Manager Item */
+.trainer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+.trainer-item:hover {
+    background: rgba(255,255,255,0.06);
+}
 
+/* Tab Navigation Styles */
+.btn-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 6px 16px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    border-radius: 0 !important;
+}
+.btn-tab:hover {
+    color: #fff;
+}
+.btn-tab.active {
+    color: #fff;
+    border-bottom-color: var(--game-color) !important;
+}
 
+/* Challenge Status Badges */
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.status-in_progress {
+    background: rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+.status-completed {
+    background: var(--accent-success-glow);
+    color: var(--accent-success);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-failed {
+    background: var(--accent-danger-glow);
+    color: var(--accent-danger);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+/* Global Box Origin Badge in slots */
+.global-origin-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    max-width: 65px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Base Stat bars for Owndex */
+.base-stat-row {
+    display: grid;
+    grid-template-columns: 70px 30px 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+}
+.base-stat-label {
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+.base-stat-val {
+    font-weight: bold;
+    color: #fff;
+    text-align: right;
+}
+.base-stat-bar-bg {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--game-color, #6366f1);
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+
+/* Responsividade da Barra Flutuante de Ações no Telemóvel */
+@media (max-width: 600px) {
+    .floating-action-bar {
+        width: 95% !important;
+        padding: 12px 14px !important;
+        bottom: -150px;
+    }
+    
+    .floating-action-bar.active {
+        bottom: 16px !important;
+    }
+    
+    .fab-content {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    
+    .fab-counter {
+        font-size: 0.75rem !important;
+    }
+    
+    .fab-actions {
+        width: 100% !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+    
+    .fab-actions select, 
+    .fab-actions button {
+        font-size: 0.7rem !important;
+        padding: 6px 10px !important;
+        margin: 0 !important;
+    }
+}
+
+/* Matchup UI Responsive Adjustments */
+.matchup-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    justify-items: center;
+    margin-bottom: 10px;
+}
+
+.matchup-vs {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    opacity: 0.6;
+    text-shadow: 0 0 10px rgba(255,255,255,0.1);
+    transition: transform 0.3s ease;
+}
+
+.matchup-selectors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 580px) {
+    .matchup-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    .matchup-vs {
+        transform: rotate(90deg) !important;
+        margin: 6px 0 !important;
+    }
+    .matchup-selectors {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
+
+/* Trainer Manager Item */
+.trainer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+.trainer-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+/* Tab Navigation Styles */
+.btn-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 6px 16px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    border-radius: 0 !important;
+}
+.btn-tab:hover {
+    color: #fff;
+}
+.btn-tab.active {
+    color: #fff;
+    border-bottom-color: var(--game-color) !important;
+}
+
+/* Challenge Status Badges */
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.status-in_progress {
+    background: rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+.status-completed {
+    background: var(--accent-success-glow);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-failed {
+    background: var(--accent-danger-glow);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+/* Global Box Origin Badge in slots */
+.global-origin-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    max-width: 65px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Base Stat bars for Owndex */
+.base-stat-row {
+    display: grid;
+    grid-template-columns: 70px 30px 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+}
+.base-stat-label {
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+.base-stat-val {
+    font-weight: bold;
+    color: #fff;
+    text-align: right;
+}
+.base-stat-bar-bg {
+    height: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.base-stat-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+}
+
+/* Moveset Heatmap Table Styling */
+.heatmap-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.7rem;
+    text-align: left;
+    min-width: 600px;
+    margin-top: 8px;
+}
+
+.heatmap-table th, .heatmap-table td {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.heatmap-table th {
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text-muted);
+    font-weight: 800;
+    text-align: center;
+}
+
+.heatmap-table td.move-name {
+    font-weight: 700;
+    color: #fff;
+    text-align: left;
+    background: rgba(255, 255, 255, 0.02);
+    min-width: 140px;
+}
+
+.heatmap-cell {
+    text-align: center;
+    font-weight: 800;
+    font-size: 0.65rem;
+    padding: 6px;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.heatmap-cell-new {
+    background: rgba(34, 197, 94, 0.15);
+    border: 1px solid rgba(34, 197, 94, 0.5) !important;
+    color: #4ade80;
+    text-shadow: 0 0 4px rgba(34, 197, 94, 0.4);
+}
+
+.heatmap-cell-retained {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.4) !important;
+    color: #60a5fa;
+}
+
+.heatmap-cell-deleted {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3) !important;
+    color: #f87171;
+}
+
+.heatmap-cell-none {
+    color: rgba(255, 255, 255, 0.1);
+    font-size: 0.8rem;
+}

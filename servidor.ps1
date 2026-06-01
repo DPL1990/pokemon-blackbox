@@ -1,12 +1,20 @@
 # Servidor HTTP Local para Pokemon BlackBox
 $port = 8000
 $listener = New-Object System.Net.HttpListener
-$listener.Prefixes.Add("http://localhost:$port/")
 
-try {
-    $listener.Start()
-} catch {
-    Write-Host "Erro: Nao foi possivel iniciar o servidor no porto $port. A porta podera estar em uso." -ForegroundColor Red
+while ($port -lt 8010) {
+    try {
+        $listener.Prefixes.Clear()
+        $listener.Prefixes.Add("http://localhost:$port/")
+        $listener.Start()
+        break
+    } catch {
+        $port++
+    }
+}
+
+if (-not $listener.IsListening) {
+    Write-Host "Erro: Nao foi possivel iniciar o servidor em nenhuma porta entre 8000 e 8009." -ForegroundColor Red
     pause
     exit
 }

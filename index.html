@@ -62,6 +62,13 @@
                     <div class="form-group">
                         <select id="game-select" onchange="switchGame(this.value)"></select>
                     </div>
+                    <div class="form-group" style="margin-top: 10px; margin-bottom: 10px;">
+                        <label>👤 Treinador Ativo</label>
+                        <div style="display: flex; gap: 6px; align-items: center;">
+                            <select id="trainer-select" onchange="switchTrainer(this.value)" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-color);"></select>
+                            <button class="btn btn-action" onclick="openTrainerManagerModal()" style="width: auto; padding: 8px 12px; font-size: 0.75rem;" title="Gerir Treinadores">⚙️</button>
+                        </div>
+                    </div>
                     <div class="form-group" style="margin-top: 10px;">
                         <label>👾 Visual dos Sprites</label>
                         <select id="sprite-style-select" onchange="setSpriteStyle(this.value)">
@@ -84,6 +91,9 @@
                             <span>📤 Importar</span>
                         </button>
                         <input type="file" id="import-file" style="display:none" onchange="importData(event)">
+                        <button class="btn btn-action" onclick="openSaveImportModal()" style="grid-column: span 2; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
+                            <span>💾 Importar de Save (.sav)</span>
+                        </button>
                     </div>
                 </div>
 
@@ -131,76 +141,139 @@
 
             <!-- Main Content Area (Active Team & Regional Box) -->
             <main>
-                <!-- Active Team Section -->
-                <div class="section-header">
-                    <h2 class="section-title">
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                        🛡️ Equipa Ativa (Nesta Região)
-                    </h2>
-                </div>
-                <div class="team-grid" id="team-container"></div>
-
-                <!-- Box Regional Section -->
-                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h2 class="section-title">
-                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                        📦 Box Regional (Sem Limite)
-                    </h2>
-                    <button class="btn btn-action" id="btn-toggle-select-mode" onclick="toggleSelectionMode()" style="width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 800;">
-                        ✅ Seleção Múltipla
-                    </button>
-                </div>
-                
-                <!-- Advanced Box Filter Panel -->
-                <div class="glass-panel" id="filter-panel" style="padding: 14px; margin-bottom: 16px;">
-                    <div class="panel-title" style="margin-bottom: 10px; font-size: 0.75rem;">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
-                        🔍 Filtrar e Pesquisar Coleção
-                    </div>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick...">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <select id="filter-type" onchange="renderAll()">
-                                <option value="">Todos os Tipos</option>
-                                <option value="normal">Normal</option>
-                                <option value="fire">Fire</option>
-                                <option value="water">Water</option>
-                                <option value="grass">Grass</option>
-                                <option value="electric">Electric</option>
-                                <option value="ice">Ice</option>
-                                <option value="fighting">Fighting</option>
-                                <option value="poison">Poison</option>
-                                <option value="ground">Ground</option>
-                                <option value="flying">Flying</option>
-                                <option value="psychic">Psychic</option>
-                                <option value="bug">Bug</option>
-                                <option value="rock">Rock</option>
-                                <option value="ghost">Ghost</option>
-                                <option value="dragon">Dragon</option>
-                                <option value="dark">Dark</option>
-                                <option value="steel">Steel</option>
-                                <option value="fairy">Fairy</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <select id="filter-shiny" onchange="renderAll()">
-                                <option value="all">Shinies & Normais</option>
-                                <option value="shiny">Apenas Shinies</option>
-                                <option value="normal">Apenas Normais</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <select id="filter-ribbon" onchange="renderAll()">
-                                <option value="all">Qualquer Espécime</option>
-                                <option value="ribbon">Apenas Ribbon Masters</option>
-                            </select>
-                        </div>
-                    </div>
+                <!-- Tabs Header -->
+                <div class="tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                    <button class="btn-tab active" id="tab-btn-boxes" onclick="switchTab('boxes')">Boxes & Equipa</button>
+                    <button class="btn-tab" id="tab-btn-resume" onclick="switchTab('resume')">🏆 Currículo & Desafios</button>
                 </div>
 
-                <div class="box-grid" id="box-container"></div>
+                <!-- Boxes & Active Team Tab Content -->
+                <div id="tab-content-boxes">
+                    <!-- Active Team Section -->
+                    <div class="section-header">
+                        <h2 class="section-title">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                            🛡️ Equipa Ativa (Nesta Região)
+                        </h2>
+                    </div>
+                    <div class="team-grid" id="team-container"></div>
+
+                    <!-- Box Regional Section -->
+                    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 class="section-title" id="box-header-title">
+                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                            📦 Box Regional (Sem Limite)
+                        </h2>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-action" id="btn-toggle-global-box" onclick="toggleGlobalBoxMode()" style="width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25);">
+                                🌐 Ver Box Global
+                            </button>
+                            <button class="btn btn-action" id="btn-toggle-select-mode" onclick="toggleSelectionMode()" style="width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 800;">
+                                ✅ Seleção Múltipla
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Advanced Box Filter Panel -->
+                    <div class="glass-panel" id="filter-panel" style="padding: 14px; margin-bottom: 16px;">
+                        <div class="panel-title" style="margin-bottom: 10px; font-size: 0.75rem;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+                            🔍 Filtrar e Pesquisar Coleção
+                        </div>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick...">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="filter-type" onchange="renderAll()">
+                                    <option value="">Todos os Tipos</option>
+                                    <option value="normal">Normal</option>
+                                    <option value="fire">Fire</option>
+                                    <option value="water">Water</option>
+                                    <option value="grass">Grass</option>
+                                    <option value="electric">Electric</option>
+                                    <option value="ice">Ice</option>
+                                    <option value="fighting">Fighting</option>
+                                    <option value="poison">Poison</option>
+                                    <option value="ground">Ground</option>
+                                    <option value="flying">Flying</option>
+                                    <option value="psychic">Psychic</option>
+                                    <option value="bug">Bug</option>
+                                    <option value="rock">Rock</option>
+                                    <option value="ghost">Ghost</option>
+                                    <option value="dragon">Dragon</option>
+                                    <option value="dark">Dark</option>
+                                    <option value="steel">Steel</option>
+                                    <option value="fairy">Fairy</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="filter-shiny" onchange="renderAll()">
+                                    <option value="all">Shinies & Normais</option>
+                                    <option value="shiny">Apenas Shinies</option>
+                                    <option value="normal">Apenas Normais</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <select id="filter-ribbon" onchange="renderAll()">
+                                    <option value="all">Qualquer Espécime</option>
+                                    <option value="ribbon">Apenas Ribbon Masters</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="box-grid" id="box-container"></div>
+                </div>
+
+                <!-- Trainer Resume Tab Content -->
+                <div id="tab-content-resume" style="display: none; padding-top: 10px;">
+                    <!-- Stats Badges -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
+                            <div style="font-size: 2rem; margin-bottom: 6px;">🏆</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Conquistas de Liga (HOF)</div>
+                            <div id="resume-total-hof" style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-top: 4px;">0</div>
+                        </div>
+                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
+                            <div style="font-size: 2rem; margin-bottom: 6px;">🎗️</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Desafios Concluídos</div>
+                            <div id="resume-completed-challenges" style="font-size: 1.8rem; font-weight: 900; color: var(--accent-success); margin-top: 4px;">0</div>
+                        </div>
+                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
+                            <div style="font-size: 2rem; margin-bottom: 6px;">👥</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Total de Treinadores</div>
+                            <div id="resume-total-trainers" style="font-size: 1.8rem; font-weight: 900; color: var(--game-color); margin-top: 4px;">0</div>
+                        </div>
+                    </div>
+
+                    <!-- Side by Side Layout for Timeline & Challenges -->
+                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start;">
+                        <!-- Timeline Panel -->
+                        <div class="glass-panel" style="padding: 20px;">
+                            <div class="panel-title" style="margin-bottom: 16px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                📜 Jornada de Eras (Linha Temporal)
+                            </div>
+                            <div id="timeline-container" style="display: flex; flex-direction: column; gap: 20px; position: relative; padding-left: 20px; border-left: 2px solid rgba(255,255,255,0.05);">
+                                <!-- Dynamic timeline nodes -->
+                            </div>
+                        </div>
+
+                        <!-- Challenges Panel -->
+                        <div class="glass-panel" style="padding: 20px;">
+                            <div class="panel-title" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                                    🎗️ Registo de Desafios (Challenge Log)
+                                </div>
+                                <button class="btn btn-primary" onclick="openChallengeModal()" style="width: auto; padding: 4px 10px; font-size: 0.65rem;">➕ Registar</button>
+                            </div>
+                            
+                            <div id="challenges-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
+                                <!-- Dynamic challenge items -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>
@@ -228,7 +301,10 @@
                     
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
                         <div class="form-group">
-                            <label>Espécie</label>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                                <label style="margin-bottom: 0;">Espécie</label>
+                                <button class="btn btn-action" id="btn-owndex-link" onclick="openOwndexFromEditor()" style="width: auto; font-size: 0.6rem; padding: 2px 6px; display: none; height: 18px; line-height: 14px; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25);">📋 Histórico (Owndex)</button>
+                            </div>
                             <input type="text" id="form-species" list="species-list" onchange="fetchPokemonTypes(this.value)" placeholder="ex: Pikachu">
                         </div>
                         <div class="form-group">
@@ -424,13 +500,59 @@
                     </div>
 
                     <div class="form-group">
-                        <label>📝 Notas</label>
-                        <textarea id="form-notes" rows="3" placeholder="Insira anotações sobre capturas, batalhas ou conquistas..."></textarea>
+                        <label>📝 Notas Gerais</label>
+                        <textarea id="form-notes" rows="2" placeholder="Insira anotações sobre capturas, batalhas ou conquistas..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🌱 Notas de Evolução (Meta / Planeamento)</label>
+                        <textarea id="form-evolution-notes" rows="2" placeholder="Registe ideias de evolução, planeamento de moveset ou notas competitivas..."></textarea>
                     </div>
 
                     <div class="footer-actions">
                         <button class="btn btn-primary" onclick="savePokemon()">💾 Gravar Espécime na Caixa Negra</button>
                         <button class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none;">🗑️ Eliminar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Trainer Manager Modal -->
+    <div class="modal-overlay" id="trainer-manager-modal">
+        <div class="modal-content" style="max-width: 480px; width: 90%;">
+            <div class="modal-header">
+                <h2>👤 Gestão de Treinadores</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeTrainerManagerModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- List of existing trainers for this game -->
+                <div style="margin-bottom: 20px;">
+                    <label style="font-weight: 800; font-size: 0.75rem; color: var(--text-muted); display: block; margin-bottom: 8px;">Treinadores neste Cartucho</label>
+                    <div id="trainer-manager-list" style="display:flex; flex-direction:column; gap:8px; max-height: 200px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <!-- Dynamic content -->
+                    </div>
+                </div>
+
+                <!-- Add New Trainer form -->
+                <div class="glass-panel" style="padding: 12px; border: 1px solid rgba(255,255,255,0.05); background: rgba(255,255,255,0.01);">
+                    <h3 style="font-size: 0.85rem; color: #fff; margin-bottom: 10px;">➕ Adicionar Novo Treinador</h3>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label style="font-size: 0.7rem;">Nome do Treinador</label>
+                            <input type="text" id="new-trainer-name" placeholder="Ex: Ash, Red, May">
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.7rem;">Trainer ID (TID)</label>
+                                <input type="text" id="new-trainer-tid" placeholder="Ex: 12345" maxlength="6">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.7rem;">Secret ID (SID)</label>
+                                <input type="text" id="new-trainer-sid" placeholder="Ex: 67890" maxlength="6">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" onclick="addNewTrainer()" style="margin-top: 6px;">Adicionar Treinador</button>
                     </div>
                 </div>
             </div>
@@ -521,6 +643,219 @@
                 <button class="btn btn-action" onclick="toggleSelectionMode()" style="width: auto; padding: 6px 14px; font-size: 0.75rem; border: 1px solid rgba(255,255,255,0.2);">
                     Cancelar
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Challenge Modal -->
+    <div class="modal-overlay" id="challenge-modal">
+        <div class="modal-content" style="max-width: 460px; width: 90%;">
+            <div class="modal-header">
+                <h2>🏆 Registar Desafio (Log)</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeChallengeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <input type="hidden" id="challenge-id">
+                    <div class="form-group">
+                        <label>Título do Desafio</label>
+                        <input type="text" id="challenge-title" placeholder="Ex: Nuzlocke Crystal, Speedrun Red, etc.">
+                    </div>
+                    <div class="form-group">
+                        <label>Jogo Associado</label>
+                        <select id="challenge-game">
+                            <!-- Populated dynamically from GAMES_DB in app.js -->
+                        </select>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <div class="form-group">
+                            <label>Tipo de Desafio</label>
+                            <select id="challenge-type">
+                                <option value="nuzlocke">Nuzlocke</option>
+                                <option value="speedrun">Speedrun</option>
+                                <option value="ribbon_quest">Ribbon Quest</option>
+                                <option value="custom">Outro Desafio</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Estado</label>
+                            <select id="challenge-status">
+                                <option value="in_progress">Em Progresso</option>
+                                <option value="completed">Concluído (Vitória)</option>
+                                <option value="failed">Falhado (Derrota)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>📝 Notas e Progresso</label>
+                        <textarea id="challenge-notes" rows="4" placeholder="Registe mortes importantes, regras aplicadas ou tempos de progresso..."></textarea>
+                    </div>
+                    <button class="btn btn-primary" onclick="saveChallenge()" style="margin-top: 6px;">💾 Gravar no Currículo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save File Import Modal -->
+    <div class="modal-overlay" id="save-import-modal">
+        <div class="modal-content" style="max-width: 720px; width: 95%;">
+            <div class="modal-header">
+                <h2>💾 Importador de Save (.sav)</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeSaveImportModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="margin-bottom: 16px;">
+                    <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 10px;">
+                        Carregue um ficheiro de save original (<strong>.sav</strong>) de Pokémon Red/Blue/Yellow. O BlackBox irá ler os dados da equipa e da box ativa. Poderá escolher o destino de cada exemplar individualmente!
+                    </p>
+                    <div style="display: flex; gap: 10px; align-items: center;">
+                        <input type="file" id="save-file-input" accept=".sav" style="display: none;" onchange="handleSaveFileSelect(event)">
+                        <button class="btn btn-primary" onclick="document.getElementById('save-file-input').click()" style="width: auto; padding: 8px 16px;">📂 Selecionar Ficheiro .sav</button>
+                        <span id="save-file-name" style="font-size: 0.75rem; color: var(--text-muted);">Nenhum ficheiro selecionado</span>
+                    </div>
+                </div>
+
+                <!-- Parsed Results -->
+                <div id="save-import-results" style="display: none;">
+                    <div style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; margin-bottom: 16px;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.65rem;">
+                                    <th style="padding: 6px; width: 40px;"><input type="checkbox" id="import-select-all" checked onchange="toggleSelectAllImport(this.checked)"></th>
+                                    <th style="padding: 6px;">Origem</th>
+                                    <th style="padding: 6px;">Pokémon</th>
+                                    <th style="padding: 6px; width: 60px;">Nível</th>
+                                    <th style="padding: 6px;">Jogo Destino</th>
+                                    <th style="padding: 6px;">Treinador Destino</th>
+                                </tr>
+                            </thead>
+                            <tbody id="save-import-tbody">
+                                <!-- Dynamic rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <button class="btn btn-primary" onclick="executeSaveImport()" style="width: 100%;">📥 Importar Pokémon Selecionados em Massa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Owndex Modal -->
+    <div class="modal-overlay" id="owndex-modal">
+        <div class="modal-content" style="max-width: 900px; width: 95%;">
+            <div class="modal-header">
+                <h2>📋 Perfil de Espécie (Owndex Multiversal)</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeOwndexModal()">✕</button>
+            </div>
+            <div class="modal-body" style="max-height: 80vh; overflow-y: auto;">
+                <!-- Species Stats and Info -->
+                <div class="glass-panel" style="padding: 16px; margin-bottom: 16px; display: grid; grid-template-columns: 1fr 1.5fr; gap: 20px; align-items: start;">
+                    <div>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <img id="owndex-species-sprite" src="" alt="Sprite" style="width: 80px; height: 80px; background: rgba(0,0,0,0.2); border-radius: 50%; border: 1px solid var(--border-color);">
+                            <div>
+                                <h3 id="owndex-species-name" style="margin: 0; font-size: 1.4rem; font-weight: 900; color: #fff;">Species</h3>
+                                <div id="owndex-species-types" style="display: flex; gap: 6px; margin-top: 4px;"></div>
+                            </div>
+                        </div>
+                        <div style="margin-top: 14px; font-size: 0.75rem; color: var(--text-muted);">
+                            <span>Nº Nacional: </span><strong id="owndex-species-dex" style="color: #fff;">#000</strong>
+                        </div>
+                        <div style="margin-top: 12px;">
+                            <div style="font-size: 0.6rem; text-transform: uppercase; color: var(--text-muted); font-weight: 800; margin-bottom: 6px;">🛡️ Compatibilidade Moderna (Dexit)</div>
+                            <div id="owndex-dexit-compatibility" style="display: flex; gap: 6px; flex-wrap: wrap;"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--game-color); margin-bottom: 8px; font-weight: 800;">Estatísticas Base</h4>
+                        <div id="owndex-base-stats-container" style="display: flex; flex-direction: column; gap: 6px;">
+                            <!-- Dynamic stats rows with progress bars -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Comparison list -->
+                <div class="glass-panel" style="padding: 16px;">
+                    <div class="panel-title" style="margin-bottom: 12px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                        👥 Exemplares na Coleção (Multiverso)
+                    </div>
+                    <div style="overflow-x: auto;">
+                        <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left; min-width: 700px;">
+                            <thead>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.65rem;">
+                                    <th style="padding: 8px;">Nick / Nível</th>
+                                    <th style="padding: 8px;">Localização Atual (Jogo / Treinador)</th>
+                                    <th style="padding: 8px;">Atributos Competitivos (IVs/EVs)</th>
+                                    <th style="padding: 8px;">Perfil Tático</th>
+                                    <th style="padding: 8px;">Movimentos</th>
+                                    <th style="padding: 8px;">Fitas</th>
+                                    <th style="padding: 8px;">Notas / Evolução</th>
+                                    <th style="padding: 8px;">Logística</th>
+                                </tr>
+                            </thead>
+                            <tbody id="owndex-specimens-tbody">
+                                <!-- Dynamic rows of specimens -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="owndex-no-specimens" style="display: none; text-align: center; padding: 20px; color: var(--text-muted);">
+                        Nenhum exemplar desta espécie encontrado na coleção.
+                    </div>
+                </div>
+
+                <!-- Moveset Heatmap panel -->
+                <div class="glass-panel" id="owndex-heatmap-panel" style="padding: 16px; margin-top: 16px;">
+                    <div class="panel-title" style="margin-bottom: 12px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; display: flex; align-items: center; gap: 8px;">
+                        🔥 Mapa de Calor de Movesets (Transição de Ataques)
+                    </div>
+                    <div id="owndex-heatmap-container" style="overflow-x: auto;">
+                        <!-- Dynamic Heatmap Table -->
+                    </div>
+                    <!-- Heatmap Legend -->
+                    <div style="display: flex; gap: 16px; font-size: 0.65rem; margin-top: 12px; flex-wrap: wrap; color: var(--text-muted);">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgba(34, 197, 94, 0.7); border: 1px solid rgb(34, 197, 94);"></span>
+                            <strong>Novo (+):</strong> Ataque aprendido/introduzido
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgba(59, 130, 246, 0.5); border: 1px solid rgb(59, 130, 246);"></span>
+                            <strong>Mantido (✓):</strong> Ataque persistido do exemplar anterior
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span style="display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: rgba(239, 68, 68, 0.4); border: 1px solid rgb(239, 68, 68);"></span>
+                            <strong>Esquecido (✕):</strong> Ataque removido do exemplar anterior
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voyage Logistics Modal -->
+    <div class="modal-overlay" id="voyage-modal">
+        <div class="modal-content" style="max-width: 520px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="voyage-modal-title" style="margin: 0; font-size: 1.1rem; font-weight: 900; color: #fff;">✈️ Guia de Viagem Multiversal</h3>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeVoyageModal()">✕</button>
+            </div>
+            <div class="modal-body" style="padding-top: 10px; max-height: 75vh; overflow-y: auto;">
+                <div class="glass-panel" style="padding: 12px; margin-bottom: 16px; display: flex; align-items: center; gap: 12px;">
+                    <div id="voyage-pkmn-badge" style="font-size: 1.4rem;"></div>
+                    <div>
+                        <div id="voyage-pkmn-name" style="font-weight: 900; color: #fff; font-size: 1rem;"></div>
+                        <div id="voyage-pkmn-game" style="font-size: 0.75rem; color: var(--text-muted);"></div>
+                    </div>
+                </div>
+                
+                <h4 style="font-size: 0.7rem; text-transform: uppercase; color: var(--game-color); font-weight: 800; margin-bottom: 8px;">Histórico de Viagem</h4>
+                <div id="voyage-history-timeline" style="margin-bottom: 20px; padding-left: 10px; display: flex; flex-direction: column; gap: 10px; position: relative;">
+                    <!-- Visual timeline nodes -->
+                </div>
+
+                <h4 style="font-size: 0.7rem; text-transform: uppercase; color: var(--game-color); font-weight: 800; margin-bottom: 8px;">Guia de Transferência Passo-a-Passo</h4>
+                <div id="voyage-transfer-guide" class="glass-panel" style="padding: 12px; font-size: 0.75rem; line-height: 1.5; color: #e2e8f0; border-radius: 8px;">
+                    <!-- Transfer instructions -->
+                </div>
             </div>
         </div>
     </div>
