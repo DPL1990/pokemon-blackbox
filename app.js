@@ -5656,141 +5656,163 @@ function renderWeaknessAnalysis(team, gen) {
         const hasRockMove = moves.some(m => guessMoveType(m) === "rock");
         
         if (isWater && !hasIceMove) {
-            suggestions.push({
-                pkmn: p,
-                move: "Raio Gelo (Ice Beam) / Nevasca",
-                movesList: [
-                    { display: "Raio Gelo (Ice Beam)", english: "Ice Beam" },
-                    { display: "Nevasca (Blizzard)", english: "Blizzard" }
-                ],
-                reason: "Fornece cobertura super eficaz crucial contra os tipos Planta e Dragão que ameaçam Pokémon de Água."
-            });
+            const list = [
+                { display: "Raio Gelo (Ice Beam)", english: "Ice Beam" },
+                { display: "Nevasca (Blizzard)", english: "Blizzard" }
+            ].filter(m => canPokemonLearnMove(p, m.english, gen));
+            
+            if (list.length > 0) {
+                const moveDesc = list.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: list,
+                    reason: "Fornece cobertura super eficaz crucial contra os tipos Planta e Dragão que ameaçam Pokémon de Água."
+                });
+            }
         }
         
         if (isFire && !hasGroundMove && !hasRockMove) {
-            suggestions.push({
-                pkmn: p,
-                move: "Terramoto (Earthquake) / Deslize de Rocha",
-                movesList: [
-                    { display: "Terramoto (Earthquake)", english: "Earthquake" },
-                    { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" }
-                ],
-                reason: "Permite atacar outros Pokémon de Fogo, Rocha e Aço de forma super eficaz."
-            });
+            const list = [
+                { display: "Terramoto (Earthquake)", english: "Earthquake" },
+                { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" }
+            ].filter(m => canPokemonLearnMove(p, m.english, gen));
+            
+            if (list.length > 0) {
+                const moveDesc = list.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: list,
+                    reason: "Permite atacar outros Pokémon de Fogo, Rocha e Aço de forma super eficaz."
+                });
+            }
         }
         
         if (isNormal && !hasFightingMove && !hasGroundMove) {
-            let recommendedMove = "Combate Próximo (Close Combat) / Terramoto";
             let list = [
                 { display: "Combate Próximo (Close Combat)", english: "Close Combat" },
                 { display: "Terramoto (Earthquake)", english: "Earthquake" }
             ];
             if (gen === 1) {
-                recommendedMove = "Submissão (Submission) / Terramoto";
                 list = [
                     { display: "Submissão (Submission)", english: "Submission" },
                     { display: "Terramoto (Earthquake)", english: "Earthquake" }
                 ];
             } else if (gen === 2) {
-                recommendedMove = "Soco Dinâmico (Dynamic Punch) / Terramoto";
                 list = [
                     { display: "Soco Dinâmico (Dynamic Punch)", english: "Dynamic Punch" },
                     { display: "Terramoto (Earthquake)", english: "Earthquake" }
                 ];
             } else if (gen === 3) {
-                recommendedMove = "Quebra Tijolo (Brick Break) / Terramoto";
                 list = [
                     { display: "Quebra Tijolo (Brick Break)", english: "Brick Break" },
                     { display: "Terramoto (Earthquake)", english: "Earthquake" }
                 ];
             }
-            suggestions.push({
-                pkmn: p,
-                move: recommendedMove,
-                movesList: list,
-                reason: "Normal precisa de movimentos de Luta/Terra para passar por adversários de Rocha e Aço."
-            });
+            const filteredList = list.filter(m => canPokemonLearnMove(p, m.english, gen));
+            if (filteredList.length > 0) {
+                const moveDesc = filteredList.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: filteredList,
+                    reason: "Normal precisa de movimentos de Luta/Terra para passar por adversários de Rocha e Aço."
+                });
+            }
         }
         
         if (isFighting && !hasRockMove && !hasIceMove) {
-            suggestions.push({
-                pkmn: p,
-                move: "Deslize de Rocha (Rock Slide) / Soco Gelo",
-                movesList: [
-                    { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" },
-                    { display: "Soco Gelo (Ice Punch)", english: "Ice Punch" }
-                ],
-                reason: "Excelente cobertura para abater as ameaças dos tipos Voador e Psíquico."
-            });
+            const list = [
+                { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" },
+                { display: "Soco Gelo (Ice Punch)", english: "Ice Punch" }
+            ].filter(m => canPokemonLearnMove(p, m.english, gen));
+            
+            if (list.length > 0) {
+                const moveDesc = list.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: list,
+                    reason: "Excelente cobertura para abater as ameaças dos tipos Voador e Psíquico."
+                });
+            }
         }
         
         if (isElectric) {
             const hasGrass = moves.some(m => guessMoveType(m) === "grass");
             if (!hasIceMove && !hasGrass) {
-                let recommendedMove = "Poder Oculto (Planta/Gelo) / Sinal Luminoso";
                 let list = [
                     { display: "Poder Oculto (Planta/Gelo)", english: "Hidden Power" },
                     { display: "Sinal Luminoso (Signal Beam)", english: "Signal Beam" }
                 ];
                 if (gen === 1) {
-                    recommendedMove = "Golpe de Corpo (Body Slam) / Submissão";
                     list = [
                         { display: "Golpe de Corpo (Body Slam)", english: "Body Slam" },
                         { display: "Submissão (Submission)", english: "Submission" }
                     ];
                 } else if (gen === 2) {
-                    recommendedMove = "Poder Oculto (Planta/Gelo) / Swift";
                     list = [
                         { display: "Poder Oculto (Planta/Gelo)", english: "Hidden Power" },
                         { display: "Swift", english: "Swift" }
                     ];
                 }
-                suggestions.push({
-                    pkmn: p,
-                    move: recommendedMove,
-                    movesList: list,
-                    reason: "Evita ser completamente parado por Pokémon do tipo Terra imunes a Elétrico."
-                });
+                const filteredList = list.filter(m => canPokemonLearnMove(p, m.english, gen));
+                if (filteredList.length > 0) {
+                    const moveDesc = filteredList.map(m => m.display).join(" / ");
+                    suggestions.push({
+                        pkmn: p,
+                        move: moveDesc,
+                        movesList: filteredList,
+                        reason: "Evita ser completamente parado por Pokémon do tipo Terra imunes a Elétrico."
+                    });
+                }
             }
         }
         
         if (isPsychic && !hasGhostDarkMove) {
-            let recommendedMove = "Bola Sombra (Shadow Ball) / Pulso Sombrio";
             let list = [
                 { display: "Bola Sombra (Shadow Ball)", english: "Shadow Ball" },
                 { display: "Pulso Sombrio (Dark Pulse)", english: "Dark Pulse" }
             ];
             if (gen === 1) {
-                recommendedMove = "Relâmpago (Thunderbolt) / Raio Gelo (Ice Beam)";
                 list = [
                     { display: "Relâmpago (Thunderbolt)", english: "Thunderbolt" },
                     { display: "Raio Gelo (Ice Beam)", english: "Ice Beam" }
                 ];
             } else if (gen === 2 || gen === 3) {
-                recommendedMove = "Bola Sombra (Shadow Ball) / Mordida (Bite)";
                 list = [
                     { display: "Bola Sombra (Shadow Ball)", english: "Shadow Ball" },
                     { display: "Mordida (Bite)", english: "Bite" }
                 ];
             }
-            suggestions.push({
-                pkmn: p,
-                move: recommendedMove,
-                movesList: list,
-                reason: "Crucial para revidar contra outros Psíquicos e contra o tipo Fantasma."
-            });
+            const filteredList = list.filter(m => canPokemonLearnMove(p, m.english, gen));
+            if (filteredList.length > 0) {
+                const moveDesc = filteredList.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: filteredList,
+                    reason: "Crucial para revidar contra outros Psíquicos e contra o tipo Fantasma."
+                });
+            }
         }
         
         if (isDragon && !hasFireMove && !hasGroundMove) {
-            suggestions.push({
-                pkmn: p,
-                move: "Lança-Chamas (Flamethrower) / Terramoto",
-                movesList: [
-                    { display: "Lança-Chamas (Flamethrower)", english: "Flamethrower" },
-                    { display: "Terramoto (Earthquake)", english: "Earthquake" }
-                ],
-                reason: "Impede que Pokémon do tipo Aço resistam aos teus ataques de Dragão."
-            });
+            const list = [
+                { display: "Lança-Chamas (Flamethrower)", english: "Flamethrower" },
+                { display: "Terramoto (Earthquake)", english: "Earthquake" }
+            ].filter(m => canPokemonLearnMove(p, m.english, gen));
+            
+            if (list.length > 0) {
+                const moveDesc = list.map(m => m.display).join(" / ");
+                suggestions.push({
+                    pkmn: p,
+                    move: moveDesc,
+                    movesList: list,
+                    reason: "Impede que Pokémon do tipo Aço resistam aos teus ataques de Dragão."
+                });
+            }
         }
         
         if (moves.length < 4 && moves.length > 0) {
@@ -6646,5 +6668,267 @@ function exportModifiedSave() {
     document.body.removeChild(link);
     
     alert(`Sucesso! Save modificado gravado com ${modifyCount} alterações.`);
+}
+
+// --- SECTION MOVESET LEARNSET VALIDATION ---
+const LEARNSET_CACHE = {};
+const FETCHING_LEARNSETS = new Set();
+
+function normalizeSpeciesNameForApi(name) {
+    if (!name) return "";
+    return name.toLowerCase()
+        .replace(/♀/g, "-f")
+        .replace(/♂/g, "-m")
+        .replace(/\./g, "")
+        .replace(/'/g, "")
+        .replace(/\s+/g, "-")
+        .trim();
+}
+
+async function fetchPokemonLearnset(species) {
+    const apiName = normalizeSpeciesNameForApi(species);
+    if (!apiName) return;
+    if (LEARNSET_CACHE[apiName] || FETCHING_LEARNSETS.has(apiName)) return;
+    
+    FETCHING_LEARNSETS.add(apiName);
+    try {
+        const url = `https://pokeapi.co/api/v2/pokemon/${apiName}`;
+        const response = await fetch(url);
+        if (response.ok) {
+            const data = await response.json();
+            const learnedMoves = new Set();
+            if (data.moves && Array.isArray(data.moves)) {
+                data.moves.forEach(m => {
+                    if (m.move && m.move.name) {
+                        const normMove = m.move.name.toLowerCase().replace(/-/g, " ");
+                        learnedMoves.add(normMove);
+                    }
+                });
+            }
+            LEARNSET_CACHE[apiName] = learnedMoves;
+            
+            // Re-render recommendations since we now have the accurate learnset
+            const game = GAMES_DB.find(g => g.id === currentGameId);
+            const gen = game ? game.gen : 9;
+            const recommendations = getRecommendedAllocation();
+            const activeTeam = recommendations.map(rec => rec.pokemon);
+            renderWeaknessAnalysis(activeTeam, gen);
+        }
+    } catch (e) {
+        console.error("Erro ao procurar learnset para " + species, e);
+    } finally {
+        FETCHING_LEARNSETS.delete(apiName);
+    }
+}
+
+function checkHardcodedLearnsetRules(species, move, gen) {
+    if (move === "close combat") {
+        if (gen < 4) return false;
+        const canLearn = [
+            "staraptor", "infernape", "lucario", "gallade", "heracross", "machamp", "primeape", "sneasler", "ursaring", "ursaluna",
+            "blaziken", "hariyama", "hitmonlee", "hitmonchan", "hitmontop", "pangoro", "hawlucha", "bewear", "obstagoon",
+            "mew", "zacian", "arceus"
+        ];
+        return canLearn.includes(species);
+    }
+    
+    if (move === "earthquake") {
+        const canLearn = [
+            "charizard", "typhlosion", "blaziken", "camerupt", "torkoal", "infernape", "emboar", "skeledirge", "coalossal", "centiskorch",
+            "snorlax", "tauros", "kangaskhan", "ursaring", "slaking", "zangoose", "miltank", "exploud", "kecleon", "dunsparce", "bouffalant", "ursaluna",
+            "dragonite", "salamence", "flygon", "garchomp", "rayquaza", "hydreigon", "haxorus", "druddigon", "kommo-o", "goodra", "drampa", "baxcalibur", "archaludon",
+            "nidoking", "nidoqueen", "golem", "rhydon", "rhyperior", "donphan", "swampert", "steelix", "aggron", "metagross", "mamoswine", "hippowdon", "excadrill", "landorus",
+            "mew", "mewtwo", "arceus", "groudon", "tyranitar"
+        ];
+        if (canLearn.includes(species)) return true;
+        
+        const cannotLearn = [
+            "altaria", "kingdra", "latias", "latios", "appletun", "flapple",
+            "ninetales", "arcanine", "rapidash", "magmar", "flareon", "houndoom", "magcargo", "magmortar",
+            "togetic", "togekiss", "wigglytuff", "clefable", "chansey", "blissey", "raticate", "furret", "linoone",
+            "pidgeot", "fearow", "swellow", "noctowl", "staraptor", "noivern", "dragonair", "dratini"
+        ];
+        if (cannotLearn.includes(species)) return false;
+    }
+    
+    if (move === "rock slide") {
+        const canLearn = [
+            "charizard", "typhlosion", "blaziken", "camerupt", "torkoal", "magcargo", "infernape", "emboar", "darmanitan", "coalossal", "centiskorch", "skeledirge",
+            "machamp", "hariyama", "breloom", "heracross", "hitmonlee", "hitmonchan", "hitmontop", "primeape", "lucario", "toxicroak", "gallade", "conkeldurr", "scrafty",
+            "mew", "mewtwo", "arceus", "groudon", "tyranitar", "golem", "rhydon", "rhyperior", "sudowoodo", "steelix", "aggron", "armaldo", "cradily", "relicanth"
+        ];
+        if (canLearn.includes(species)) return true;
+        
+        const cannotLearn = [
+            "arcanine", "ninetales", "rapidash", "magmar", "flareon", "houndoom"
+        ];
+        if (cannotLearn.includes(species)) return false;
+    }
+    
+    if (move === "ice beam" || move === "blizzard") {
+        const canLearnPsychic = ["slowbro", "starmie", "mew", "mewtwo", "jynx", "celebi"];
+        const cannotLearnPsychic = ["alakazam", "kadabra", "drowzee", "hypno", "exeggutor", "mr-mime", "espeon"];
+        if (canLearnPsychic.includes(species)) return true;
+        if (cannotLearnPsychic.includes(species)) return false;
+        
+        const cannotLearnWater = ["magikarp", "feebas"];
+        if (cannotLearnWater.includes(species)) return false;
+    }
+
+    if (move === "thunderbolt") {
+        const canLearnPsychic = ["mew", "mewtwo", "slowbro", "starmie", "mr-mime", "gardevoir", "claydol", "solrock", "lunatone"];
+        const cannotLearnPsychic = ["alakazam", "kadabra", "drowzee", "hypno", "exeggutor", "jynx", "espeon"];
+        if (canLearnPsychic.includes(species)) return true;
+        if (cannotLearnPsychic.includes(species)) return false;
+    }
+    
+    if (move === "submission") {
+        if (gen > 3) return false;
+        const canLearn = [
+            "snorlax", "clefable", "wigglytuff", "chansey", "kangaskhan", "tauros", "poliwrath", "machop", "machoke", "machamp",
+            "pikachu", "raichu", "electabuzz", "jolteon", "mew", "mewtwo", "hitmonlee", "hitmonchan", "pinsir"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["zapdos", "magneton", "electrode"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "dynamic punch") {
+        const canLearn = [
+            "snorlax", "clefable", "wigglytuff", "blissey", "kangaskhan", "ursaring", "tauros", "miltank", "exploud", "kecleon",
+            "electabuzz", "ampharos", "raichu", "machamp", "hitmonlee", "hitmonchan", "hitmontop", "hariyama", "poliwrath", "mew", "mewtwo"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["jolteon", "magneton", "lanturn", "electrode", "raikou", "zapdos"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "brick break") {
+        if (gen < 3) return false;
+        const canLearn = [
+            "snorlax", "clefable", "wigglytuff", "blissey", "kangaskhan", "ursaring", "slaking", "zangoose", "tauros", "miltank", "raticate", "furret", "linoone", "spinda", "exploud", "kecleon", "ambipom", "stoutland", "lopunny",
+            "machamp", "hariyama", "breloom", "heracross", "blaziken", "hitmonlee", "hitmonchan", "hitmontop", "primeape", "lucario", "toxicroak", "gallade", "mew", "mewtwo"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["togetic", "pidgeot", "fearow", "swellow", "noctowl", "castform", "ditto"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "ice punch") {
+        const canLearn = [
+            "machamp", "hitmonchan", "medicham", "poliwrath", "lucario", "toxicroak", "gallade", "conkeldurr", "pangoro", "crabominable", "sneasler",
+            "mew", "mewtwo"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["hitmonlee", "hitmontop", "primeape", "breloom", "heracross", "blaziken", "hawlucha", "bewear", "quaquaval"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "body slam") {
+        const canLearnElectric = ["pikachu", "raichu", "jolteon", "electabuzz", "mew", "mewtwo"];
+        const cannotLearnElectric = ["zapdos", "magneton", "electrode"];
+        if (canLearnElectric.includes(species)) return true;
+        if (cannotLearnElectric.includes(species)) return false;
+    }
+
+    if (move === "swift") {
+        const canLearnElectric = ["pikachu", "raichu", "jolteon", "electabuzz", "magneton", "electrode", "lanturn", "ampharos", "raikou", "mew", "mewtwo"];
+        if (canLearnElectric.includes(species)) return true;
+    }
+
+    if (move === "shadow ball") {
+        if (gen < 2) return false;
+        const canLearn = [
+            "alakazam", "hypno", "mewtwo", "mew", "gardevoir", "grumpig", "claydol", "metagross", "espeon", "xatu", "girafarig", "celebi", "reuniclus", "gothitelle", "beheeyem", "delphox", "oranguru", "jynx"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["exeggutor", "slowbro", "slowking", "wobbuffet", "unown"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "dark pulse") {
+        if (gen < 4) return false;
+        const canLearn = [
+            "alakazam", "mewtwo", "mew", "gardevoir", "grumpig", "claydol", "metagross", "espeon", "celebi", "reuniclus", "gothitelle", "beheeyem", "delphox", "oranguru", "malamar"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["hypno", "exeggutor", "slowbro", "slowking", "wobbuffet", "claydol", "chimecho", "lunatone", "solrock"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "bite") {
+        const canLearn = ["girafarig", "mew", "solrock", "lunatone", "dunspace", "arcanine", "gyarados"];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["alakazam", "hypno", "exeggutor", "slowbro", "starmie", "espeon", "gardevoir", "claydol", "metagross", "kadabra", "drowzee"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    if (move === "flamethrower") {
+        const canLearn = [
+            "dragonite", "charizard", "salamence", "flygon", "rayquaza", "garchomp", "hydreigon", "haxorus", "druddigon", "tyrantrum", "drampa", "turtonator", "kommo-o", "dragapult", "baxcalibur", "archaludon", "altaria",
+            "mew", "mewtwo"
+        ];
+        if (canLearn.includes(species)) return true;
+        const cannotLearn = ["kingdra", "latias", "latios", "appletun", "flapple"];
+        if (cannotLearn.includes(species)) return false;
+    }
+
+    return null;
+}
+
+function guessTypeMoveCompatibility(pkmn, moveEnglishName, gen) {
+    const isType = (t) => pkmn.type1 === t || pkmn.type2 === t;
+    
+    if (moveEnglishName === "earthquake") {
+        return isType("ground") || isType("rock") || isType("steel") || isType("dragon") || (isType("normal") && !isType("flying"));
+    }
+    if (moveEnglishName === "rock slide") {
+        return isType("rock") || isType("ground") || isType("fighting") || isType("fire");
+    }
+    if (moveEnglishName === "close combat" || moveEnglishName === "submission" || moveEnglishName === "dynamic punch" || moveEnglishName === "brick break") {
+        return isType("fighting") || (isType("normal") && !isType("flying")) || isType("electric");
+    }
+    if (moveEnglishName === "ice punch") {
+        return isType("fighting") || isType("water");
+    }
+    if (moveEnglishName === "ice beam" || moveEnglishName === "blizzard") {
+        return isType("water") || isType("ice") || isType("psychic");
+    }
+    if (moveEnglishName === "thunderbolt") {
+        return isType("electric") || isType("water");
+    }
+    if (moveEnglishName === "shadow ball" || moveEnglishName === "dark pulse") {
+        return isType("ghost") || isType("dark") || isType("psychic");
+    }
+    if (moveEnglishName === "flamethrower") {
+        return isType("fire") || isType("dragon");
+    }
+    
+    return true;
+}
+
+function canPokemonLearnMove(pkmn, moveEnglishName, gen) {
+    const species = pkmn.species;
+    const normSpecies = normalizeSpeciesNameForApi(species);
+    const normMove = moveEnglishName.toLowerCase().replace(/-/g, " ");
+
+    if (normMove === "hidden power") {
+        if (["ditto", "unown", "caterpie", "weedle", "kakuna", "metapod", "wobbuffet", "wynaut", "beldum", "smeargle"].includes(normSpecies)) {
+            return false;
+        }
+        return gen >= 2;
+    }
+
+    const isAllowed = checkHardcodedLearnsetRules(normSpecies, normMove, gen);
+    if (isAllowed !== null) {
+        return isAllowed;
+    }
+
+    if (LEARNSET_CACHE[normSpecies]) {
+        return LEARNSET_CACHE[normSpecies].has(normMove);
+    } else {
+        fetchPokemonLearnset(species);
+        return guessTypeMoveCompatibility(pkmn, normMove, gen);
+    }
 }
 
