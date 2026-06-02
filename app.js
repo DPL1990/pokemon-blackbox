@@ -5771,6 +5771,7 @@ function cleanSlateActiveTrainer() {
 }
 
 let minimalModeEnabled = localStorage.getItem("bb_minimal_mode") === "true";
+let currentVisualTheme = localStorage.getItem("bb_visual_theme") || "default";
 
 function toggleMinimalMode() {
     minimalModeEnabled = !minimalModeEnabled;
@@ -5789,6 +5790,28 @@ function applyMinimalMode() {
     }
 }
 
+function setVisualTheme(theme) {
+    currentVisualTheme = theme;
+    localStorage.setItem("bb_visual_theme", theme);
+    
+    // Remove all existing theme classes from body
+    const themesList = ["retro", "advance", "ds", "upgrade", "alola", "legends", "final", "home"];
+    themesList.forEach(t => document.body.classList.remove(`theme-${t}`));
+    
+    // Add the new theme class if it's not the default
+    if (theme !== "default") {
+        document.body.classList.add(`theme-${theme}`);
+    }
+    
+    // Sync the select dropdowns if they exist
+    const themeSelect = document.getElementById("settings-visual-theme");
+    if (themeSelect) themeSelect.value = theme;
+}
+
+function applyVisualTheme() {
+    setVisualTheme(currentVisualTheme);
+}
+
 function openSettingsModal() {
     const modal = document.getElementById("settings-modal");
     if (modal) {
@@ -5800,6 +5823,9 @@ function openSettingsModal() {
 
         const cleanToggle = document.getElementById("settings-clean-layout");
         if (cleanToggle) cleanToggle.checked = minimalModeEnabled;
+
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
 
         modal.classList.add("active");
     }
@@ -5819,6 +5845,7 @@ function toggleAdvancedFilters() {
 
 document.addEventListener("DOMContentLoaded", () => {
     applyMinimalMode();
+    applyVisualTheme();
 });
 
 window.onload = function() {
@@ -5834,6 +5861,8 @@ window.onload = function() {
         if (spriteSelect) spriteSelect.value = currentSpriteStyle;
         const autoToggle = document.getElementById("settings-auto-ribbon");
         if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
         
         switchGame(currentGameId);
     }).catch(err => {
@@ -5849,7 +5878,10 @@ window.onload = function() {
         if (spriteSelect) spriteSelect.value = currentSpriteStyle;
         const autoToggle = document.getElementById("settings-auto-ribbon");
         if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
         
         switchGame(currentGameId);
     });
 };
+

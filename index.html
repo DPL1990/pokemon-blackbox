@@ -1006,6 +1006,22 @@
                         </select>
                     </div>
 
+                    <div class="form-group" style="margin-top: 10px;">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800; display: block; margin-bottom: 4px;">Tema Visual (Skin)</label>
+                        <select id="settings-visual-theme" onchange="setVisualTheme(this.value)" style="width: 100%;">
+                            <option value="default">✨ Default (Glassmorphism)</option>
+                            <option value="retro">📟 Retro (Gen 1 & 2 - Game Boy)</option>
+                            <option value="advance">🎮 Advance (Gen 3 - GBA)</option>
+                            <option value="ds">📟 DS (Gen 4 & 5 - Carbon/Industrial)</option>
+                            <option value="upgrade">💎 Upgrade (Gen 6 - Glossy 3DS)</option>
+                            <option value="alola">☀️ Alola (Gen 7 - Tropical USUM)</option>
+                            <option value="legends">📜 Legends (Arceus - Washi/Parchment)</option>
+                            <option value="final">🏟️ Final (Gen 8 & 9 - Neon/Rotom)</option>
+                            <option value="home">🏠 Home (Cloud White/Green Minimal)</option>
+                        </select>
+                    </div>
+
+
                     <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 12px; margin-bottom: 0;">
                         <input type="checkbox" id="settings-clean-layout" style="width: auto; margin: 0;" onchange="toggleMinimalMode()">
                         <label for="settings-clean-layout" style="margin: 0; font-size: 0.75rem; cursor: pointer; font-weight: 800;">🧼 Aplicar Layout Clean Flat</label>

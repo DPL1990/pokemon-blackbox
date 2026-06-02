@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@300;400;500;600;700;800;900&family=Cinzel:wght@500;700;900&display=swap');
+
 :root {
     /* Design Tokens */
     --bg-main: #090b0e;
@@ -1455,3 +1457,601 @@ body.minimal-mode #theme-minimal-toggle {
         gap: 12px;
     }
 }
+
+/* ==========================================================================
+   📟 1. RETRO THEME (Gen 1 & 2 - Game Boy Monochromatic)
+   ========================================================================== */
+body.theme-retro {
+    --bg-main: #a3b19b;
+    --bg-card: #c2d1b8;
+    --bg-card-hover: #b4c5a9;
+    --bg-input: #cadbbd;
+    --border-color: #0f380f;
+    --border-hover: #0f380f;
+    --text-main: #0f380f;
+    --text-muted: #306230;
+    --game-color: #306230;
+    --game-color-glow: rgba(48, 98, 48, 0.2);
+    
+    background-image: none !important;
+    background-color: var(--bg-main) !important;
+    font-family: 'Courier New', Courier, monospace !important;
+}
+
+body.theme-retro * {
+    font-family: 'Courier New', Courier, monospace !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+}
+
+body.theme-retro h1 {
+    font-family: 'Press Start 2P', monospace !important;
+    font-size: 1.15rem !important;
+    background: none !important;
+    -webkit-text-fill-color: var(--text-main) !important;
+    color: var(--text-main) !important;
+    text-transform: uppercase;
+}
+
+body.theme-retro .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    border: 3px double var(--border-color) !important;
+}
+
+body.theme-retro .btn {
+    background: var(--bg-card) !important;
+    color: var(--text-main) !important;
+    border: 2px solid var(--border-color) !important;
+    font-weight: 900 !important;
+    text-transform: uppercase;
+}
+
+body.theme-retro .btn:hover {
+    background: var(--text-muted) !important;
+    color: var(--bg-card) !important;
+}
+
+body.theme-retro .btn-primary {
+    background: var(--border-color) !important;
+    color: #c2d1b8 !important;
+}
+
+body.theme-retro .slot {
+    background: var(--bg-card) !important;
+    border: 2px solid var(--border-color) !important;
+    min-height: 125px !important;
+}
+
+body.theme-retro .slot:hover {
+    background: var(--bg-card-hover) !important;
+    transform: none !important;
+}
+
+body.theme-retro select,
+body.theme-retro input {
+    background: var(--bg-input) !important;
+    border: 2px solid var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+body.theme-retro .version-badge {
+    background: var(--text-muted) !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--bg-card) !important;
+}
+
+body.theme-retro .slot-sprite {
+    image-rendering: pixelated;
+    filter: contrast(1.2) grayscale(1);
+}
+
+/* ==========================================================================
+   🎮 2. ADVANCE THEME (Gen 3 - GBA Colorful Bevel)
+   ========================================================================== */
+body.theme-advance {
+    --bg-main: #121e36;
+    --bg-card: #1f3258;
+    --bg-card-hover: #263e6d;
+    --bg-input: #172643;
+    --border-color: #3b578c;
+    --border-hover: #4e70b0;
+    --text-main: #eef2f6;
+    --text-muted: #8fa0c4;
+    --game-color: #ea580c; /* Amber/FireRed highlight */
+    --game-color-glow: rgba(234, 88, 12, 0.25);
+    
+    background-image: radial-gradient(circle at top, #1e335c 0%, #0c1424 100%) !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.theme-advance .glass-panel {
+    background: linear-gradient(145deg, #223761, #1b2c4e) !important;
+    border: 2px solid var(--border-color) !important;
+    border-top-color: #5575b3 !important;
+    border-left-color: #5575b3 !important;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4), inset 0 2px 2px rgba(255,255,255,0.05) !important;
+    border-radius: 6px !important;
+}
+
+body.theme-advance .slot {
+    background: #1b2c4e !important;
+    border: 1px solid var(--border-color) !important;
+    border-bottom: 3px solid #0d172a !important;
+    border-radius: 4px !important;
+    transition: transform 0.2s;
+}
+
+body.theme-advance .slot:hover {
+    background: var(--bg-card-hover) !important;
+    transform: translateY(-2px) !important;
+    border-color: var(--border-hover) !important;
+}
+
+body.theme-advance .btn {
+    border-radius: 4px !important;
+    border: 1px solid var(--border-color) !important;
+    background: linear-gradient(180deg, #2a4376, #1d2e53) !important;
+    color: #fff !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3) !important;
+}
+
+body.theme-advance .btn:hover {
+    background: linear-gradient(180deg, #324f8c, #243a68) !important;
+}
+
+body.theme-advance .btn-primary {
+    background: linear-gradient(180deg, #f97316, #c2410c) !important;
+    border-color: #ea580c !important;
+}
+
+body.theme-advance select,
+body.theme-advance input {
+    border-radius: 4px !important;
+    border: 1px solid var(--border-color) !important;
+    background-color: var(--bg-input) !important;
+}
+
+/* ==========================================================================
+   📟 3. DS THEME (Gen 4 & 5 - Carbon/Industrial)
+   ========================================================================== */
+body.theme-ds {
+    --bg-main: #1a1c1e;
+    --bg-card: #282a2d;
+    --bg-card-hover: #33363b;
+    --bg-input: #1e2022;
+    --border-color: #404449;
+    --border-hover: #f59e0b; /* Amber C-Gear Glow */
+    --text-main: #f3f4f6;
+    --text-muted: #9ca3af;
+    --game-color: #f59e0b;
+    --game-color-glow: rgba(245, 158, 11, 0.2);
+    
+    background-image: radial-gradient(circle at top, #2d3035 0%, #121315 100%) !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.theme-ds .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 4px !important;
+    position: relative;
+}
+
+body.theme-ds .glass-panel::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--game-color);
+    border-radius: 4px 4px 0 0;
+}
+
+body.theme-ds .slot {
+    background: #1f2124 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 2px !important;
+}
+
+body.theme-ds .slot:hover {
+    border-color: var(--border-hover) !important;
+    background: var(--bg-card-hover) !important;
+    transform: none !important;
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.15) !important;
+}
+
+body.theme-ds .btn {
+    border-radius: 2px !important;
+    border: 1px solid var(--border-color) !important;
+    background: #2a2c30 !important;
+}
+
+body.theme-ds .btn-primary {
+    background: var(--game-color) !important;
+    border-color: var(--game-color) !important;
+    color: #1a1c1e !important;
+    font-weight: 800 !important;
+}
+
+body.theme-ds select,
+body.theme-ds input {
+    border-radius: 2px !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* ==========================================================================
+   💎 4. UPGRADE THEME (Gen 6 - Glossy 3DS Glass)
+   ========================================================================== */
+body.theme-upgrade {
+    --bg-main: #1c142c;
+    --bg-card: rgba(255, 255, 255, 0.08);
+    --bg-card-hover: rgba(255, 255, 255, 0.14);
+    --bg-input: rgba(0, 0, 0, 0.25);
+    --border-color: rgba(255, 255, 255, 0.15);
+    --border-hover: rgba(236, 72, 153, 0.6); /* Pink/Magenta */
+    --text-main: #ffffff;
+    --text-muted: #c084fc;
+    --game-color: #a855f7;
+    --game-color-glow: rgba(168, 85, 247, 0.35);
+    
+    background-image: linear-gradient(135deg, #1c142c 0%, #0c0817 100%) !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.theme-upgrade .glass-panel {
+    background: rgba(255, 255, 255, 0.05) !important;
+    backdrop-filter: blur(20px) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 8px 32px 0 rgba(168, 85, 247, 0.1) !important;
+}
+
+body.theme-upgrade .slot {
+    background: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 12px !important;
+    backdrop-filter: blur(10px) !important;
+}
+
+body.theme-upgrade .slot:hover {
+    background: var(--bg-card-hover) !important;
+    border-color: var(--border-hover) !important;
+    box-shadow: 0 0 15px rgba(236, 72, 153, 0.25) !important;
+}
+
+body.theme-upgrade .btn {
+    border-radius: 10px !important;
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2)) !important;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    color: #fff !important;
+}
+
+body.theme-upgrade .btn:hover {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.35), rgba(236, 72, 153, 0.35)) !important;
+}
+
+body.theme-upgrade .btn-primary {
+    background: linear-gradient(135deg, #a855f7, #ec4899) !important;
+    border-color: transparent !important;
+}
+
+body.theme-upgrade select,
+body.theme-upgrade input {
+    border-radius: 10px !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+/* ==========================================================================
+   ☀️ 5. ALOLA THEME (Gen 7 - Tropical Sunset Clay)
+   ========================================================================== */
+body.theme-alola {
+    --bg-main: #f97316;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f8fafc;
+    --bg-input: #f1f5f9;
+    --border-color: #e2e8f0;
+    --border-hover: #f97316;
+    --text-main: #334155;
+    --text-muted: #64748b;
+    --game-color: #f97316;
+    --game-color-glow: rgba(249, 115, 22, 0.2);
+    
+    background-image: linear-gradient(135deg, #ffedd5 0%, #fee2e2 50%, #fef9c3 100%) !important;
+    background-color: #ffedd5 !important;
+}
+
+body.theme-alola h1 {
+    background: linear-gradient(135deg, #ea580c 0%, #db2777 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+body.theme-alola .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 14px !important;
+    box-shadow: 0 10px 25px -5px rgba(249, 115, 22, 0.1) !important;
+}
+
+body.theme-alola .panel-title,
+body.theme-alola h2,
+body.theme-alola h3,
+body.theme-alola h4,
+body.theme-alola label {
+    color: #475569 !important;
+}
+
+body.theme-alola .slot {
+    background: #f8fafc !important;
+    border: 2px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+}
+
+body.theme-alola .slot:hover {
+    background: #ffffff !important;
+    border-color: var(--border-hover) !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 0 8px 16px rgba(249, 115, 22, 0.15) !important;
+}
+
+body.theme-alola .btn {
+    border-radius: 8px !important;
+    border: 1px solid var(--border-color) !important;
+    background: #f1f5f9 !important;
+    color: #475569 !important;
+}
+
+body.theme-alola .btn:hover {
+    background: #e2e8f0 !important;
+    color: #1e293b !important;
+}
+
+body.theme-alola .btn-primary {
+    background: linear-gradient(135deg, #f97316, #db2777) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+body.theme-alola select,
+body.theme-alola input {
+    border-radius: 8px !important;
+    border: 1px solid var(--border-color) !important;
+    color: var(--text-main) !important;
+    background-color: var(--bg-input) !important;
+}
+
+/* ==========================================================================
+   📜 6. LEGENDS THEME (Legends Arceus - Antique Washi Parchment)
+   ========================================================================== */
+body.theme-legends {
+    --bg-main: #f0e6d2;
+    --bg-card: #f8f1e5;
+    --bg-card-hover: #eedec4;
+    --bg-input: #ebdcb9;
+    --border-color: #2b1f13;
+    --border-hover: #a12a2a; /* Lacquer Red */
+    --text-main: #382a17;
+    --text-muted: #6e5a44;
+    --game-color: #a12a2a;
+    --game-color-glow: rgba(161, 42, 42, 0.2);
+    
+    background-image: radial-gradient(circle at top, #e4d3b2 0%, #c4af87 100%) !important;
+    background-color: #e4d3b2 !important;
+    font-family: 'Georgia', serif !important;
+}
+
+body.theme-legends * {
+    font-family: 'Georgia', serif !important;
+    text-shadow: none !important;
+}
+
+body.theme-legends h1,
+body.theme-legends h2,
+body.theme-legends h3,
+body.theme-legends h4 {
+    font-family: 'Cinzel', serif !important;
+    font-weight: 700 !important;
+    color: #2b1f13 !important;
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+}
+
+body.theme-legends .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    border: 2px solid var(--border-color) !important;
+    border-radius: 2px !important;
+    box-shadow: 2px 2px 10px rgba(0,0,0,0.15) !important;
+}
+
+body.theme-legends .slot {
+    background: #fbf8f3 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 1px !important;
+}
+
+body.theme-legends .slot:hover {
+    background: var(--bg-card-hover) !important;
+    border-color: var(--border-hover) !important;
+    transform: scale(1.02) !important;
+}
+
+body.theme-legends .btn {
+    border-radius: 2px !important;
+    border: 1px solid var(--border-color) !important;
+    background: #eedecc !important;
+    color: var(--text-main) !important;
+    text-transform: uppercase;
+    font-size: 0.7rem !important;
+}
+
+body.theme-legends .btn:hover {
+    background: #2b1f13 !important;
+    color: #fff !important;
+}
+
+body.theme-legends .btn-primary {
+    background: var(--game-color) !important;
+    color: #fff !important;
+    border-color: var(--game-color) !important;
+}
+
+body.theme-legends select,
+body.theme-legends input {
+    border-radius: 2px !important;
+    border: 1px solid var(--border-color) !important;
+    background-color: var(--bg-input) !important;
+    color: var(--text-main) !important;
+}
+
+/* ==========================================================================
+   🏟️ 7. FINAL THEME (Gen 8 & 9 - Stadium Lights & Rotom Phone)
+   ========================================================================== */
+body.theme-final {
+    --bg-main: #0c051a;
+    --bg-card: rgba(22, 11, 41, 0.85);
+    --bg-card-hover: rgba(36, 18, 66, 0.95);
+    --bg-input: #120822;
+    --border-color: #bd00ff; /* Neon Purple */
+    --border-hover: #00ffff; /* Neon Cyan */
+    --text-main: #f8fafc;
+    --text-muted: #a78bfa;
+    --game-color: #bd00ff;
+    --game-color-glow: rgba(189, 0, 255, 0.25);
+    
+    background-image: linear-gradient(180deg, #18052d 0%, #05010b 100%) !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.theme-final .glass-panel {
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 0 15px rgba(189, 0, 255, 0.15) !important;
+    border-radius: 0 !important;
+    clip-path: polygon(0 0, 97% 0, 100% 7%, 100% 100%, 3% 100%, 0 93%); /* Cyber Cut */
+}
+
+body.theme-final .slot {
+    background: #120822 !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 0 !important;
+}
+
+body.theme-final .slot:hover {
+    border-color: var(--border-hover) !important;
+    background: var(--bg-card-hover) !important;
+    box-shadow: 0 0 15px rgba(0, 255, 255, 0.3) !important;
+    transform: skewX(-2deg) !important;
+}
+
+body.theme-final .btn {
+    border-radius: 0 !important;
+    border: 1px solid var(--border-color) !important;
+    background: #18082f !important;
+    text-transform: uppercase;
+}
+
+body.theme-final .btn:hover {
+    border-color: var(--border-hover) !important;
+    box-shadow: 0 0 10px rgba(0, 255, 255, 0.2) !important;
+}
+
+body.theme-final .btn-primary {
+    background: #bd00ff !important;
+    border-color: #bd00ff !important;
+    color: #fff !important;
+}
+
+body.theme-final select,
+body.theme-final input {
+    border-radius: 0 !important;
+    border: 1px solid var(--border-color) !important;
+    color: #fff !important;
+}
+
+/* ==========================================================================
+   🏠 8. HOME THEME (Pokémon Home - Mint White Minimal)
+   ========================================================================== */
+body.theme-home {
+    --bg-main: #f3f4f6;
+    --bg-card: #ffffff;
+    --bg-card-hover: #f9fafb;
+    --bg-input: #f3f4f6;
+    --border-color: #e5e7eb;
+    --border-hover: #10b981; /* Mint Green */
+    --text-main: #1f2937;
+    --text-muted: #6b7280;
+    --game-color: #10b981;
+    --game-color-glow: rgba(16, 185, 129, 0.15);
+    
+    background-image: none !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.theme-home h1,
+body.theme-home h2,
+body.theme-home h3,
+body.theme-home h4,
+body.theme-home label,
+body.theme-home .panel-title {
+    color: #1f2937 !important;
+}
+
+body.theme-home h1 {
+    font-weight: 800 !important;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+}
+
+body.theme-home .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.05) !important;
+}
+
+body.theme-home .slot {
+    background: #f9fafb !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 16px !important;
+}
+
+body.theme-home .slot:hover {
+    background: #ffffff !important;
+    border-color: var(--border-hover) !important;
+    box-shadow: 0 10px 25px rgba(16, 185, 129, 0.12) !important;
+    transform: translateY(-2px) !important;
+}
+
+body.theme-home .btn {
+    border-radius: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    background: #f3f4f6 !important;
+    color: #4b5563 !important;
+}
+
+body.theme-home .btn:hover {
+    background: #e5e7eb !important;
+    color: #111827 !important;
+}
+
+body.theme-home .btn-primary {
+    background: var(--game-color) !important;
+    color: #fff !important;
+    border: none !important;
+}
+
+body.theme-home select,
+body.theme-home input {
+    border-radius: 12px !important;
+    border: 1px solid var(--border-color) !important;
+    background-color: var(--bg-input) !important;
+}
+
