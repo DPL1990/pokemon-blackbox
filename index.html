@@ -45,9 +45,12 @@
     <div class="container">
         <header>
             <h1>Pokémon BlackBox</h1>
-            <div class="stats-bar">
+            <div class="stats-bar" style="display: flex; gap: 12px; align-items: center;">
                 <div class="stats-badge" id="stat-total-badge">Total Registado: <span id="stat-total">0</span></div>
                 <div class="stats-badge" id="stat-team-badge">Nesta Região: <span id="stat-team">0/6</span></div>
+                <button class="btn btn-action" id="theme-minimal-toggle" onclick="toggleMinimalMode()" style="width: auto; padding: 6px 14px; font-size: 0.7rem; border-radius: 9999px; cursor: pointer;">
+                    ✨ Layout Clean
+                </button>
             </div>
         </header>
 

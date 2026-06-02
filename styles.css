@@ -1331,3 +1331,99 @@ select {
     color: rgba(255, 255, 255, 0.1);
     font-size: 0.8rem;
 }
+
+/* ==========================================================================
+   🧼 CLEAN / MINIMAL MODE OVERRIDES (Flat Dashboard)
+   ========================================================================== */
+body.minimal-mode {
+    --bg-main: #0c0f16;
+    --bg-card: #141822;
+    --bg-card-hover: #191e2b;
+    --bg-input: #1b202c;
+    --border-color: rgba(255, 255, 255, 0.04);
+    --border-hover: rgba(255, 255, 255, 0.08);
+    --text-main: #f8fafc;
+    --text-muted: #64748b;
+    --game-color-glow: rgba(99, 102, 241, 0.05);
+    
+    background-image: none !important;
+    background-color: var(--bg-main) !important;
+}
+
+body.minimal-mode .glass-panel {
+    background: var(--bg-card) !important;
+    backdrop-filter: none !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+    border-radius: 8px !important;
+    border-color: var(--border-color) !important;
+}
+
+body.minimal-mode .btn {
+    border-radius: 6px !important;
+    box-shadow: none !important;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+    letter-spacing: 0.5px;
+}
+
+body.minimal-mode .btn-primary {
+    background: var(--game-color) !important;
+}
+
+body.minimal-mode .btn-danger {
+    background: var(--accent-danger) !important;
+}
+
+body.minimal-mode select, 
+body.minimal-mode input[type="text"], 
+body.minimal-mode input[type="number"], 
+body.minimal-mode textarea {
+    border-radius: 6px !important;
+    background: var(--bg-input) !important;
+    box-shadow: none !important;
+    border-color: var(--border-color) !important;
+}
+
+body.minimal-mode select:focus, 
+body.minimal-mode input:focus, 
+body.minimal-mode textarea:focus {
+    border-color: var(--game-color) !important;
+    box-shadow: 0 0 0 2px var(--game-color-glow) !important;
+}
+
+body.minimal-mode header h1 {
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    color: #fff !important;
+    text-shadow: none !important;
+}
+
+body.minimal-mode .stats-badge {
+    border-radius: 6px !important;
+    background: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+}
+
+body.minimal-mode .type-badge {
+    border-radius: 4px !important;
+    box-shadow: none !important;
+}
+
+body.minimal-mode .pokemon-card {
+    border-radius: 8px !important;
+    background: var(--bg-card) !important;
+    border-color: var(--border-color) !important;
+    box-shadow: none !important;
+}
+
+body.minimal-mode .pokemon-card:hover {
+    background: var(--bg-card-hover) !important;
+    transform: none !important;
+}
+
+body.minimal-mode #theme-minimal-toggle {
+    background: var(--game-color) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+

@@ -5765,6 +5765,29 @@ function cleanSlateActiveTrainer() {
     alert(`Clean Slate concluído! Todos os dados de Pokémon, presets e mural do treinador "${trainerName}" foram eliminados.`);
 }
 
+let minimalModeEnabled = localStorage.getItem("bb_minimal_mode") === "true";
+
+function toggleMinimalMode() {
+    minimalModeEnabled = !minimalModeEnabled;
+    localStorage.setItem("bb_minimal_mode", minimalModeEnabled);
+    applyMinimalMode();
+}
+
+function applyMinimalMode() {
+    const btn = document.getElementById("theme-minimal-toggle");
+    if (minimalModeEnabled) {
+        document.body.classList.add("minimal-mode");
+        if (btn) btn.innerHTML = "🎨 Layout Glass";
+    } else {
+        document.body.classList.remove("minimal-mode");
+        if (btn) btn.innerHTML = "✨ Layout Clean";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    applyMinimalMode();
+});
+
 window.onload = function() {
     initDB().then(() => {
         cleanupDuplicates();
