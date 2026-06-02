@@ -5815,13 +5815,45 @@ function renderWeaknessAnalysis(team, gen) {
             }
         }
         
-        if (moves.length < 4 && moves.length > 0) {
-            suggestions.push({
-                pkmn: p,
-                move: "Ensinar um 4º Movimento",
-                movesList: [],
-                reason: "Este exemplar tem slots de movimentos vazios. Completa o moveset para aumentar versatilidade."
-            });
+        // Check for duplicate moves
+        const uniqueMoves = new Set();
+        let hasDuplicates = false;
+        moves.forEach(m => {
+            if (m) {
+                const norm = m.toLowerCase().trim();
+                if (uniqueMoves.has(norm)) {
+                    hasDuplicates = true;
+                }
+                uniqueMoves.add(norm);
+            }
+        });
+        
+        if (hasDuplicates) {
+            const recommendedFour = getFourRecommendedMoves(p, gen);
+            const movesList = recommendedFour.filter(r => !moves.some(m => m && m.toLowerCase().trim() === r.english.toLowerCase().trim()));
+            
+            if (movesList.length > 0) {
+                suggestions.push({
+                    pkmn: p,
+                    move: "Substituir ataques repetidos",
+                    movesList: movesList,
+                    reason: "Este exemplar tem ataques repetidos no moveset. Substitui por ataques de cobertura para diversificar."
+                });
+            }
+        }
+        
+        if (moves.length < 4) {
+            const recommendedFour = getFourRecommendedMoves(p, gen);
+            const movesList = recommendedFour.filter(r => !moves.some(m => m && m.toLowerCase().trim() === r.english.toLowerCase().trim()));
+            
+            if (movesList.length > 0) {
+                suggestions.push({
+                    pkmn: p,
+                    move: "Preencher slots vazios",
+                    movesList: movesList,
+                    reason: "Este exemplar tem slots de movimentos vazios. Completa o moveset com ataques de cobertura úteis."
+                });
+            }
         }
     });
     
@@ -6569,6 +6601,15 @@ function exportModifiedSave() {
                 }
             }
             
+            if (meta.isParty === false) {
+                // If it is in the Active Box, recalculate the Active Box checksum at 0x34E0
+                let boxSum = 0;
+                for (let i = 0x30C0; i < 0x34E0; i++) {
+                    boxSum += u8[i];
+                }
+                u8[0x34E0] = (~boxSum) & 0xFF;
+            }
+            
             modifyCount++;
         } 
         else if (meta.gen === 2) {
@@ -7023,5 +7064,102 @@ function canPokemonLearnMove(pkmn, moveEnglishName, gen) {
         fetchPokemonLearnset(species);
         return guessTypeMoveCompatibility(pkmn, normMove, gen);
     }
+}
+
+function getFourRecommendedMoves(pkmn, gen) {
+    const moves = [];
+    const addMove = (mEnglish, mDisplay) => {
+        if (moves.length >= 4) return;
+        if (moves.some(x => x.english === mEnglish)) return;
+        if (canPokemonLearnMove(pkmn, mEnglish, gen)) {
+            moves.push({ display: mDisplay, english: mEnglish });
+        }
+    };
+
+    const isType = (t) => pkmn.type1 === t || pkmn.type2 === t;
+
+    // 1. Water STAB / Coverage
+    if (isType("water")) {
+        addMove("Surf", "Surf (Surf)");
+        addMove("Ice Beam", "Raio Gelo (Ice Beam)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
+        addMove("Blizzard", "Nevasca (Blizzard)");
+        addMove("Bite", "Mordida (Bite)");
+    }
+    // 2. Fire STAB / Coverage
+    if (isType("fire")) {
+        addMove("Flamethrower", "Lança-Chamas (Flamethrower)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
+        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
+        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
+    }
+    // 3. Electric STAB / Coverage
+    if (isType("electric")) {
+        addMove("Thunderbolt", "Relâmpago (Thunderbolt)");
+        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
+        addMove("Swift", "Swift (Swift)");
+        addMove("Submission", "Submissão (Submission)");
+        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
+    }
+    // 4. Grass STAB / Coverage
+    if (isType("grass")) {
+        addMove("Giga Drain", "Giga Dreno (Giga Drain)");
+        addMove("Sludge Bomb", "Bomba Lodo (Sludge Bomb)");
+        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+    }
+    // 5. Psychic STAB / Coverage
+    if (isType("psychic")) {
+        addMove("Psychic", "Psíquico (Psychic)");
+        addMove("Thunderbolt", "Relâmpago (Thunderbolt)");
+        addMove("Ice Beam", "Raio Gelo (Ice Beam)");
+        addMove("Shadow Ball", "Bola Sombra (Shadow Ball)");
+        addMove("Bite", "Mordida (Bite)");
+    }
+    // 6. Fighting STAB / Coverage
+    if (isType("fighting")) {
+        if (gen >= 4) addMove("Close Combat", "Combate Próximo (Close Combat)");
+        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
+        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
+        addMove("Ice Punch", "Soco Gelo (Ice Punch)");
+        addMove("Submission", "Submissão (Submission)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+    }
+    // 7. Dragon STAB / Coverage
+    if (isType("dragon")) {
+        addMove("Dragon Claw", "Garra Dragão (Dragon Claw)");
+        addMove("Flamethrower", "Lança-Chamas (Flamethrower)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
+    }
+    // 8. Normal STAB / Coverage
+    if (isType("normal")) {
+        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
+        addMove("Earthquake", "Terramoto (Earthquake)");
+        if (gen >= 4) addMove("Close Combat", "Combate Próximo (Close Combat)");
+        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
+        addMove("Shadow Ball", "Bola Sombra (Shadow Ball)");
+        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
+    }
+
+    // Generic Fallbacks
+    const genericPool = [
+        { english: "Return", display: "Retorno (Return)" },
+        { english: "Double-Edge", display: "Fronte Dupla (Double-Edge)" },
+        { english: "Hyper Beam", display: "Hiper Raio (Hyper Beam)" },
+        { english: "Dig", display: "Cavar (Dig)" },
+        { english: "Psychic", display: "Psíquico (Psychic)" },
+        { english: "Thunderbolt", display: "Relâmpago (Thunderbolt)" },
+        { english: "Ice Beam", display: "Raio Gelo (Ice Beam)" },
+        { english: "Flamethrower", display: "Lança-Chamas (Flamethrower)" }
+    ];
+
+    for (let i = 0; i < genericPool.length && moves.length < 4; i++) {
+        addMove(genericPool[i].english, genericPool[i].display);
+    }
+
+    return moves;
 }
 
