@@ -302,12 +302,21 @@
                                             ⚔️ Liga Local: <span id="allocation-league-name" style="color: var(--game-color);">...</span>
                                         </h3>
                                         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
-                                            Análise tática dos adversários da Elite Four e Champion baseada na Box do teu Treinador.
+                                            Análise tática dos adversários baseada na Box do teu Treinador.
                                         </p>
+                                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                                            <label style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin-bottom: 0;">Oponente / Desafio:</label>
+                                            <select id="allocation-opponent-select" onchange="changeAllocationOpponent(this.value)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; width: 220px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff;"></select>
+                                        </div>
                                     </div>
-                                    <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 0 15px var(--game-color-glow); border-radius: 8px;">
-                                        ⚡ Alocar Equipa Recomendada
-                                    </button>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 0 15px var(--game-color-glow); border-radius: 8px;">
+                                            ⚡ Alocar Equipa
+                                        </button>
+                                        <button class="btn btn-action" id="btn-save-allocation-preset" onclick="saveRecommendedAsPreset()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #fff;">
+                                            💾 Gravar Preset
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1053,6 +1062,10 @@
                         
                         <button class="btn btn-action" onclick="closeSettingsModal(); openSaveImportModal();" style="grid-column: span 2; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); font-size: 0.7rem; font-weight: 800; padding: 8px;">
                             💾 Importar de Save (.sav)
+                        </button>
+
+                        <button class="btn btn-primary" id="btn-export-modified-save" onclick="exportModifiedSave()" style="grid-column: span 2; display: none; background: linear-gradient(135deg, #10b981, #059669); border: none; font-size: 0.7rem; font-weight: 800; padding: 8px; color: #fff; box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);">
+                            📥 Descarregar Save Alterado (.sav)
                         </button>
                     </div>
                 </div>

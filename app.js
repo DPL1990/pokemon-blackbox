@@ -450,6 +450,7 @@ function setupDatalists() {
 
 function switchGame(gameId) {
     currentGameId = gameId; 
+    currentAllocationOpponentId = null; // Reset oponente ao mudar de cartucho
     localStorage.setItem("bb_current_game", gameId);
     document.getElementById("game-select").value = gameId;
     document.body.className = ""; 
@@ -1804,7 +1805,13 @@ function parseGen1Save(buffer) {
                 nickname: nickname || speciesName,
                 level: level || 5,
                 otName: otName,
-                otId: otId
+                otId: otId,
+                saveMeta: {
+                    gen: 1,
+                    isParty: true,
+                    structOffset: structOffset,
+                    index: i
+                }
             });
         }
     }
@@ -1837,7 +1844,13 @@ function parseGen1Save(buffer) {
                 nickname: nickname || speciesName,
                 level: level || 5,
                 otName: otName,
-                otId: otId
+                otId: otId,
+                saveMeta: {
+                    gen: 1,
+                    isParty: false,
+                    structOffset: structOffset,
+                    index: i
+                }
             });
         }
     }
@@ -1894,7 +1907,14 @@ function parseGen2Save(buffer) {
             nickname: nickname || speciesName,
             level: level || 5,
             otName: otName,
-            otId: otId
+            otId: otId,
+            saveMeta: {
+                gen: 2,
+                isCrystal: isCrystal,
+                isParty: true,
+                structOffset: structOffset,
+                index: i
+            }
         });
     }
     
@@ -2029,7 +2049,16 @@ function parseGen3Save(buffer) {
             nickname: nickname || speciesName,
             level: level || 5,
             otName: otName,
-            otId: otId
+            otId: otId,
+            saveMeta: {
+                gen: 3,
+                isParty: true,
+                structOffset: structOffset,
+                index: i,
+                pid: pid,
+                otid: otid,
+                shuffleIndex: shuffleIndex
+            }
         });
     }
     
@@ -2383,22 +2412,66 @@ function handleSaveFileSelect(e) {
         try {
             const buffer = evt.target.result;
             const size = buffer.byteLength;
+            const u8 = new Uint8Array(buffer);
             let parsed = [];
+            
+            let detectedGen = 0;
+            let isCrystal = false;
+            let activeSlotStartSector = 0;
             
             // Check individual files (PK3/4/5/6/7/8/9) first
             if (size === 100 || size === 136 || size === 220 || size === 232 || size === 236 || size === 260 || size === 328 || size === 344) {
                 parsed = parseDecryptedPKM(buffer, file.name);
+                detectedGen = 0;
             } else if (size >= 32000 && size <= 35000) {
                 parsed = parseGen1Save(buffer);
-                if (parsed.length === 0) {
+                if (parsed && parsed.length > 0) {
+                    detectedGen = 1;
+                } else {
                     parsed = parseGen2Save(buffer);
+                    if (parsed && parsed.length > 0) {
+                        detectedGen = 2;
+                        const countCrystal = u8[0x2D82];
+                        if (countCrystal >= 1 && countCrystal <= 6) {
+                            isCrystal = true;
+                        }
+                    }
                 }
             } else if ((size >= 120000 && size <= 140000) || (size >= 60000 && size <= 70000)) {
                 parsed = parseGen3Save(buffer);
+                if (parsed && parsed.length > 0) {
+                    detectedGen = 3;
+                    let maxSaveIndex0 = -1;
+                    let maxSaveIndex1 = -1;
+                    const numSectors = Math.floor(u8.length / 4096);
+                    for (let i = 0; i < 14 && i < numSectors; i++) {
+                        const offset = i * 4096;
+                        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+                        if (sig === 0x08012025) {
+                            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
+                            if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
+                        }
+                    }
+                    if (numSectors >= 28) {
+                        for (let i = 14; i < 28; i++) {
+                            const offset = i * 4096;
+                            const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+                            if (sig === 0x08012025) {
+                                const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
+                                if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
+                            }
+                        }
+                    }
+                    if (numSectors >= 28 && maxSaveIndex1 > maxSaveIndex0) {
+                        activeSlotStartSector = 14;
+                    }
+                }
             } else if (size >= 500000 && size <= 550000) {
                 parsed = parseGen4Gen5Save(buffer);
+                detectedGen = 4;
             } else if (size >= 900000 && size <= 4800000) {
                 parsed = parseGen8Gen9Save(buffer);
+                detectedGen = 8;
             } else {
                 alert(`Tamanho de ficheiro não reconhecido (${size} bytes). Apenas saves de cartucho (~32KB, ~128KB, ~512KB), saves de Switch (~1MB-4.5MB) ou ficheiros individuais descodificados (PKM) são suportados.`);
                 return;
@@ -2407,6 +2480,18 @@ function handleSaveFileSelect(e) {
             if (!parsed || parsed.length === 0) {
                 alert("Não foi possível encontrar nenhum Pokémon no ficheiro de save ou o formato não é suportado.");
                 return;
+            }
+            
+            // Grava variáveis do save para a sessão de edição
+            uploadedSaveBuffer = buffer;
+            uploadedSaveName = file.name;
+            uploadedSaveGen = detectedGen;
+            uploadedSaveIsCrystal = isCrystal;
+            uploadedSaveActiveSectorStart = activeSlotStartSector;
+            
+            const exportBtn = document.getElementById("btn-export-modified-save");
+            if (exportBtn) {
+                exportBtn.style.display = (detectedGen >= 1 && detectedGen <= 3) ? "block" : "none";
             }
             
             // Auto-register any new trainers found in the save
@@ -2668,7 +2753,8 @@ function executeSaveImport() {
                 slotType: "box",
                 slotIndex: 0,
                 history: [],
-                notes: `Importado do ficheiro de save.`
+                notes: `Importado do ficheiro de save.`,
+                saveMeta: p.saveMeta || null
             };
             
             // Auto-Stamp ribbons if enabled
@@ -4881,7 +4967,104 @@ const LEAGUE_OPPONENTS = {
         { name: "Larry", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
         { name: "Hassel", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
         { name: "Geeta", emoji: "👑", types: ["rock", "steel", "psychic"], weaknesses: ["fire", "fighting", "dark", "ghost"] }
+    ]},
+    
+    // --- Ligas Extra, Revanches e Chefes Especiais ---
+    firered_rematch: { name: "Indigo Plateau - Revanche (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost", "dark"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival Blue", emoji: "👑", types: ["normal", "flying", "fire", "steel", "dark"], weaknesses: ["water", "rock", "ground", "fighting"] }
+    ]},
+    leafgreen_rematch: { name: "Indigo Plateau - Revanche (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost", "dark"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival Blue", emoji: "👑", types: ["normal", "flying", "water", "steel", "dark"], weaknesses: ["electric", "ice", "rock", "fighting"] }
+    ]},
+    heartgold_rematch: { name: "Indigo Plateau - Revanche (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison", "steel"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark", "ghost"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    soulsilver_rematch: { name: "Indigo Plateau - Revanche (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison", "steel"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark", "ghost"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    johto_red: { name: "Mt. Silver: Treinador Red (Johto)", opponents: [
+        { name: "Red", emoji: "👑", types: ["electric", "normal", "water", "fire", "grass", "ice"], weaknesses: ["ground", "fighting", "rock"] }
+    ]},
+    emerald_rematch: { name: "Ever Grande City - Revanche (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark", "grass"], weaknesses: ["fighting", "bug", "fire", "fairy"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost", "dark"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice", "water"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "dragon", "fairy"] },
+        { name: "Wallace", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] }
+    ]},
+    emerald_steven: { name: "Meteor Falls: Steven Stone (Hoenn)", opponents: [
+        { name: "Steven Stone", emoji: "🔩", types: ["steel", "rock", "ground"], weaknesses: ["fire", "fighting", "ground", "water"] }
+    ]},
+    bw_cynthia: { name: "Undella Town: Campeã Cynthia (Unova)", opponents: [
+        { name: "Cynthia", emoji: "🎼", types: ["dragon", "ground", "ghost", "water", "fighting"], weaknesses: ["ice", "fairy", "ghost", "dark"] }
     ]}
+};
+
+const GAME_CHALLENGES = {
+    red: [{ id: "red", name: "🏆 Liga Pokémon (Primeira Run)" }],
+    blue: [{ id: "blue", name: "🏆 Liga Pokémon (Primeira Run)" }],
+    yellow: [{ id: "yellow", name: "🏆 Liga Pokémon (Primeira Run)" }],
+    gold: [
+        { id: "gold", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+    ],
+    silver: [
+        { id: "silver", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+    ],
+    crystal: [
+        { id: "crystal", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+    ],
+    firered: [
+        { id: "firered", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "firered_rematch", name: "⚡ Liga Pokémon (Revanche)" }
+    ],
+    leafgreen: [
+        { id: "leafgreen", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "leafgreen_rematch", name: "⚡ Liga Pokémon (Revanche)" }
+    ],
+    ruby: [{ id: "ruby", name: "🏆 Liga Pokémon (Primeira Run)" }],
+    sapphire: [{ id: "sapphire", name: "🏆 Liga Pokémon (Primeira Run)" }],
+    emerald: [
+        { id: "emerald", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "emerald_rematch", name: "⚡ Liga Pokémon (Revanche)" },
+        { id: "emerald_steven", name: "💎 Steven nas Meteor Falls" }
+    ],
+    heartgold: [
+        { id: "heartgold", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "heartgold_rematch", name: "⚡ Liga Pokémon (Revanche)" },
+        { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+    ],
+    soulsilver: [
+        { id: "soulsilver", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "soulsilver_rematch", name: "⚡ Liga Pokémon (Revanche)" },
+        { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+    ],
+    black: [
+        { id: "black", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "bw_cynthia", name: "🎼 Cynthia em Undella Town" }
+    ],
+    white: [
+        { id: "white", name: "🏆 Liga Pokémon (Primeira Run)" },
+        { id: "bw_cynthia", name: "🎼 Cynthia em Undella Town" }
+    ]
 };
 
 const COMMON_MOVES_TYPES = {
@@ -5019,11 +5202,64 @@ function calculatePokemonLeagueScore(p, opponent, gen) {
 }
 
 let currentAllocationRecommendation = [];
+let currentAllocationOpponentId = null;
+
+function populateOpponentSelect() {
+    const select = document.getElementById("allocation-opponent-select");
+    if (!select) return;
+    
+    const challenges = GAME_CHALLENGES[currentGameId] || [{ id: currentGameId, name: "🏆 Liga Pokémon (Primeira Run)" }];
+    
+    select.innerHTML = challenges.map(ch => `<option value="${ch.id}">${ch.name}</option>`).join("");
+    
+    const isValid = challenges.some(ch => ch.id === currentAllocationOpponentId);
+    if (!isValid) {
+        currentAllocationOpponentId = challenges[0].id;
+    }
+    
+    select.value = currentAllocationOpponentId;
+}
+
+function changeAllocationOpponent(opponentId) {
+    currentAllocationOpponentId = opponentId;
+    renderAllocationTab();
+}
+
+function saveRecommendedAsPreset() {
+    if (currentAllocationRecommendation.length === 0) {
+        alert("Não há nenhuma equipa recomendada calculada para gravar.");
+        return;
+    }
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const league = LEAGUE_OPPONENTS[opponentId] || LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const presetName = prompt("Insira o nome para este Preset de Equipa:", `Equipa Contra: ${league.name.replace(/🏆 |⚡ |⛰️ |💎 |🎼 /, "")}`);
+    if (!presetName) return;
+    
+    const presetId = "preset_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const newPreset = {
+        id: presetId,
+        gameId: currentGameId,
+        trainerId: activeTrainerId,
+        name: presetName,
+        pokemonIds: currentAllocationRecommendation.map(p => p.id)
+    };
+    
+    teamPresetsList.push(newPreset);
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    renderPresets();
+    
+    alert(`Preset "${presetName}" gravado com sucesso!`);
+}
 
 function getRecommendedAllocation() {
     const game = GAMES_DB.find(g => g.id === currentGameId);
     const gen = game ? game.gen : 9;
-    const league = LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const league = LEAGUE_OPPONENTS[opponentId] || LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
     
     const boxList = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId);
     
@@ -5127,7 +5363,11 @@ function applyRecommendedAllocation() {
 function renderAllocationTab() {
     const game = GAMES_DB.find(g => g.id === currentGameId);
     const gen = game ? game.gen : 9;
-    const league = LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    populateOpponentSelect();
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const league = LEAGUE_OPPONENTS[opponentId] || LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
     
     const leagueNameSpan = document.getElementById("allocation-league-name");
     if (leagueNameSpan) {
@@ -5180,15 +5420,12 @@ function renderAllocationTab() {
                     }
                 };
                 
-                const typeBadges = [
-                    `<span class="type-badge t-${p.type1}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${p.type1}</span>`
-                ];
-                if (p.type2) {
-                    typeBadges.push(`<span class="type-badge t-${p.type2}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${p.type2}</span>`);
-                }
+                const typeBadges = [p.type1];
+                if (p.type2) typeBadges.push(p.type2);
+                const typeBadgesHtml = typeBadges.map(t => `<span class="type-badge t-${t}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${t}</span>`);
                 
                 return `
-                    <div class="glass-panel" style="padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(99, 102, 241, 0.02);">
+                    <div class="glass-panel slot" style="padding: 12px; text-align: center; border-radius: 12px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.03);">
                         <span style="font-size: 0.55rem; font-weight: 800; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: var(--accent-success); padding: 1px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px; margin-bottom: 4px;">
                             ${rec.counterEmoji} Counter: ${rec.counterFor}
                         </span>
@@ -5197,7 +5434,7 @@ function renderAllocationTab() {
                         </div>
                         <h4 style="font-size: 0.8rem; margin: 4px 0 2px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.nickname || p.species}</h4>
                         <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 4px;">Nível ${p.level}</div>
-                        <div style="display: flex; gap: 2px; justify-content: center;">${typeBadges.join(" ")}</div>
+                        <div style="display: flex; gap: 2px; justify-content: center;">${typeBadgesHtml.join(" ")}</div>
                     </div>
                 `;
             }).join("");
@@ -5771,6 +6008,12 @@ function cleanSlateActiveTrainer() {
 }
 
 let minimalModeEnabled = localStorage.getItem("bb_minimal_mode") === "true";
+let uploadedSaveBuffer = null;
+let uploadedSaveName = "";
+let uploadedSaveGen = 0;
+let uploadedSaveIsCrystal = false;
+let uploadedSaveActiveSectorStart = 0;
+
 let currentVisualTheme = localStorage.getItem("bb_visual_theme") || "default";
 
 function toggleMinimalMode() {
@@ -5826,6 +6069,11 @@ function openSettingsModal() {
 
         const themeSelect = document.getElementById("settings-visual-theme");
         if (themeSelect) themeSelect.value = currentVisualTheme;
+
+        const exportBtn = document.getElementById("btn-export-modified-save");
+        if (exportBtn) {
+            exportBtn.style.display = (uploadedSaveBuffer && uploadedSaveGen >= 1 && uploadedSaveGen <= 3) ? "block" : "none";
+        }
 
         modal.classList.add("active");
     }
@@ -5884,4 +6132,280 @@ window.onload = function() {
         switchGame(currentGameId);
     });
 };
+
+// ==========================================================================
+// 💾 Dicionários e Editor de Saves Binários (Gen 1-3)
+// ==========================================================================
+
+const BINARY_MOVES_MAP = {
+    "pound": 1, "karate chop": 2, "double slap": 3, "comet punch": 4, "mega punch": 5, "pay day": 6, "fire punch": 7, "ice punch": 8, "thunder punch": 9, "scratch": 10,
+    "vice grip": 11, "guillotine": 12, "razor wind": 13, "swords dance": 14, "cut": 15, "gust": 16, "wing attack": 17, "whirlwind": 18, "fly": 19, "bind": 20,
+    "slam": 21, "vine whip": 22, "stomp": 23, "double kick": 24, "mega kick": 25, "jump kick": 26, "rolling kick": 27, "sand attack": 28, "headbutt": 29, "horn attack": 30,
+    "fury attack": 31, "horn drill": 32, "tackle": 33, "body slam": 34, "wrap": 35, "take down": 36, "thrash": 37, "double-edge": 38, "double edge": 38, "tail whip": 39, "poison sting": 40,
+    "twineedle": 41, "pin missile": 42, "leer": 43, "bite": 44, "growl": 45, "roar": 46, "sing": 47, "supersonic": 48, "sonicboom": 49, "sonic boom": 49, "disable": 50,
+    "acid": 51, "ember": 52, "flamethrower": 53, "mist": 54, "water gun": 55, "hydro pump": 56, "surf": 57, "ice beam": 58, "blizzard": 59, "psybeam": 60,
+    "bubblebeam": 61, "bubble beam": 61, "aurora beam": 62, "hyper beam": 63, "peck": 64, "drill peck": 65, "submission": 66, "low kick": 67, "counter": 68, "seismic toss": 69,
+    "strength": 70, "absorb": 71, "mega drain": 72, "leech seed": 73, "growth": 74, "razor leaf": 75, "solar beam": 76, "solarbeam": 76, "poisonpowder": 77, "poison powder": 77,
+    "stun spore": 78, "sleep powder": 79, "petal dance": 80, "string shot": 81, "dragon rage": 82, "fire spin": 83, "thundershock": 84, "thunder shock": 84, "thunderbolt": 85,
+    "thunder wave": 86, "thunder": 87, "rock throw": 88, "earthquake": 89, "fissure": 90, "dig": 91, "toxic": 92, "confusion": 93, "psychic": 94, "hypnosis": 95,
+    "meditate": 96, "agility": 97, "quick attack": 98, "rage": 99, "teleport": 100, "night shade": 101, "mimic": 102, "screech": 103, "double team": 104, "recover": 105,
+    "harden": 106, "minimize": 107, "smokescreen": 108, "confuse ray": 109, "withdraw": 110, "defense curl": 111, "barrier": 112, "light screen": 113, "haze": 114, "reflect": 115,
+    "focus energy": 116, "bide": 117, "metronome": 118, "mirror move": 119, "self-destruct": 120, "self destruct": 120, "egg bomb": 121, "lick": 122, "smog": 123, "sludge": 124,
+    "bone club": 125, "fire blast": 126, "waterfall": 127, "clamp": 128, "swift": 129, "skull bash": 130, "spike cannon": 131, "constrict": 132, "amnesia": 133, "kinesis": 134,
+    "soft-boiled": 135, "softboiled": 135, "high jump kick": 136, "glare": 137, "dream eater": 138, "poison gas": 139, "barrage": 140, "leech life": 141, "lovely kiss": 142, "sky attack": 143,
+    "transform": 144, "bubble": 145, "dizzy punch": 146, "spore": 147, "flash": 148, "psywave": 149, "splash": 150, "acid armor": 151, "crabhammer": 152, "explosion": 153,
+    "fury swipes": 154, "bonemerang": 155, "rest": 156, "rock slide": 157, "hyper fang": 158, "sharpen": 159, "conversion": 160, "tri attack": 161, "super fang": 162, "slash": 163,
+    "substitute": 164, "struggle": 165,
+    
+    // Gen 2 additions
+    "sketch": 166, "triple kick": 167, "thief": 168, "spider web": 169, "mind reader": 170, "nightmare": 171, "flame wheel": 172, "snore": 173, "curse": 174, "flail": 175,
+    "conversion 2": 176, "aeroblast": 177, "cotton spore": 178, "reversal": 179, "spite": 180, "powder snow": 181, "protect": 182, "mach punch": 183, "scary face": 184, "feint attack": 185,
+    "sweet kiss": 186, "belly drum": 187, "sludge bomb": 188, "mud-slap": 189, "mud slap": 189, "octazooka": 190, "spikes": 191, "zap cannon": 192, "foresight": 193, "destiny bond": 194,
+    "perish song": 195, "icy wind": 196, "detect": 197, "bone rush": 198, "lock-on": 199, "lock on": 199, "outrage": 200, "sandstorm": 201, "giga drain": 202, "endure": 203,
+    "charm": 204, "rollout": 205, "false swipe": 206, "swagger": 207, "milk drink": 208, "spark": 209, "fury cutter": 210, "steel wing": 211, "mean look": 212, "attract": 213,
+    "sleep talk": 214, "heal bell": 215, "return": 216, "present": 217, "frustration": 218, "safeguard": 219, "pain split": 220, "sacred fire": 221, "magnitude": 222, "dynamicpunch": 223,
+    "dynamic punch": 223, "megahorn": 224, "dragonbreath": 225, "dragon breath": 225, "baton pass": 226, "encore": 227, "pursuit": 228, "rapid spin": 229, "sweet scent": 230, "iron tail": 231,
+    "metal claw": 232, "vital throw": 233, "morning sun": 234, "synthesis": 235, "moonlight": 236, "hidden power": 237, "cross chop": 238, "twister": 239, "rain dance": 240,
+    "sunny day": 241, "crunch": 242, "mirror coat": 243, "psych up": 244, "extreme speed": 245, "ancientpower": 246, "ancient power": 246, "shadow ball": 247, "future sight": 248, "rock smash": 249,
+    "whirlpool": 250, "beat up": 251,
+    
+    // Gen 3 additions
+    "fake out": 252, "uproar": 253, "stockpile": 254, "spit up": 255, "swallow": 256, "heat wave": 257, "hail": 258, "torment": 259, "flatter": 260,
+    "will-o-wisp": 261, "will o wisp": 261, "memento": 262, "facade": 263, "focus punch": 264, "smellingsalts": 265, "smelling salts": 265, "follow me": 266, "nature power": 267, "charge": 268,
+    "taunt": 269, "helping hand": 270, "trick": 271, "role play": 272, "wish": 273, "assist": 274, "ingrain": 275, "superpower": 276, "magic coat": 277, "recycle": 278,
+    "brick break": 279, "yawn": 280, "knock off": 281, "endeavor": 282, "eruption": 283, "skill swap": 284, "imprison": 285, "refresh": 286, "grudge": 287, "snatch": 288,
+    "secret power": 289, "dive": 290, "arm thrust": 291, "camouflage": 292, "tail glow": 293, "luster purge": 294, "mist ball": 295, "featherdance": 296, "feather dance": 296, "teeter dance": 297,
+    "blaze kick": 298, "mud sport": 299, "ice ball": 300, "needle arm": 301, "slack off": 302, "hyper voice": 303, "poison fang": 304, "crush claw": 305, "blast burn": 306,
+    "hydro cannon": 307, "meteor mash": 308, "astonish": 309, "weather ball": 310, "aromatherapy": 311, "fake tears": 312, "air cutter": 313, "overheat": 314, "odor sleuth": 315,
+    "rock tomb": 316, "silver wind": 317, "metal sound": 318, "grasswhistle": 319, "grass whistle": 319, "tickle": 320, "cosmic power": 321, "water spout": 322, "signal beam": 323,
+    "shadow punch": 324, "extrasensory": 325, "sky uppercut": 326, "sand tomb": 327, "sheer cold": 328, "muddy water": 329, "bullet seed": 330, "aerial ace": 331, "icicle spear": 332,
+    "iron defense": 333, "block": 334, "howl": 335, "dragon claw": 336, "frenzy plant": 337, "bulk up": 338, "bounce": 339, "mud shot": 340, "poison tail": 341, "covet": 342,
+    "volt tackle": 343, "magical leaf": 344, "water sport": 345, "calm mind": 346, "leaf blade": 347, "dragon dance": 348, "rock blast": 349, "shock wave": 350, "water pulse": 351,
+    "doom desire": 352, "psycho boost": 353, "bounce": 354
+};
+
+const BINARY_ITEMS_MAP_GEN2 = {
+    "master ball": 1, "ultra ball": 2, "brightpowder": 3, "great ball": 4, "poke ball": 5,
+    "quick claw": 30, "metal powder": 34, "amulet coin": 35, "cleanse tag": 37, "mystic water": 38,
+    "twistedspoon": 39, "blackbelt": 40, "black belt": 40, "blackglasses": 41, "black glasses": 41,
+    "pink bow": 42, "silk scarf": 42, "charcoal": 43, "berry juice": 44, "dragon scale": 45,
+    "soft sand": 48, "sharp beak": 49, "poison barb": 50, "kings rock": 51, "king's rock": 51,
+    "bitter berry": 52, "mint berry": 53, "red apricorn": 54, "tiny mushroom": 55, "big mushroom": 56,
+    "silverpowder": 57, "silver powder": 57, "blu apricorn": 58, "lucky punch": 68,
+    "leftovers": 76, "mystery berry": 90, "miracle seed": 91,
+    "thick club": 92, "focus band": 93, "polkadot bow": 115, "lucky egg": 118, "sacred ash": 124,
+    "heavy ball": 125, "flower mail": 126, "level ball": 127, "lure ball": 128, "fast ball": 129,
+    "light ball": 131, "friend ball": 132, "moon ball": 133, "love ball": 134, "normal box": 135,
+    "gorgeous box": 136, "sun stone": 137, "everstone": 138, "exp share": 156
+};
+
+const BINARY_ITEMS_MAP_GEN3 = {
+    "master ball": 1, "ultra ball": 2, "great ball": 3, "poke ball": 4, "safari ball": 5, "net ball": 6, "dive ball": 7, "nest ball": 8, "repeat ball": 9, "timer ball": 10, "luxury ball": 11, "premier ball": 12,
+    "brightpowder": 17, "white herb": 18, "macho brace": 19, "exp share": 20, "quick claw": 21, "soothe bell": 22, "mental herb": 23, "choice band": 24, "kings rock": 25, "king's rock": 25, "silverpowder": 26, "silver powder": 26, "amulet coin": 27, "cleanse tag": 28, "soul dew": 29, "deepseatooth": 30, "deep sea tooth": 30, "deepseascale": 31, "deep sea scale": 31, "smoke ball": 32, "everstone": 33, "focus band": 34, "lucky egg": 35, "scope lens": 36, "metal coat": 37, "leftovers": 38, "dragon scale": 39, "light ball": 40, "soft sand": 41, "hard stone": 42, "miracle seed": 43, "blackglasses": 44, "black glasses": 44, "blackbelt": 45, "black belt": 45, "magnet": 46, "mystic water": 47, "sharp beak": 48, "poison barb": 49, "nevermeltice": 50, "never-melt-ice": 50, "spell tag": 51, "twistedspoon": 52, "twisted spoon": 52, "charcoal": 53, "dragon fang": 54, "silk scarf": 55, "up-grade": 56, "shell bell": 57,
+    "sea incense": 58, "lax incense": 59, "lucky punch": 60, "metal powder": 61, "thick club": 62, "stick": 63,
+    "red scarf": 254, "blue scarf": 255, "pink scarf": 256, "green scarf": 257, "yellow scarf": 258
+};
+
+function exportModifiedSave() {
+    if (!uploadedSaveBuffer) {
+        alert("Nenhum ficheiro de save foi carregado nesta sessão.");
+        return;
+    }
+    
+    if (uploadedSaveGen < 1 || uploadedSaveGen > 3) {
+        alert("A gravação e exportação de saves é suportada apenas para as Gerações 1, 2 e 3.");
+        return;
+    }
+    
+    const workingBuffer = uploadedSaveBuffer.slice(0);
+    const u8 = new Uint8Array(workingBuffer);
+    
+    const savablePokemon = pokemonDatabase.filter(p => p.saveMeta && p.saveMeta.gen === uploadedSaveGen);
+    
+    if (savablePokemon.length === 0) {
+        alert("Não existem alterações para gravar de volta no save.");
+        return;
+    }
+    
+    let modifyCount = 0;
+    
+    savablePokemon.forEach(pkmn => {
+        const meta = pkmn.saveMeta;
+        
+        if (meta.gen === 1) {
+            const structOffset = meta.structOffset;
+            const moves = pkmn.moves || [];
+            
+            for (let m = 0; m < 4; m++) {
+                const moveName = (moves[m] || "").toLowerCase().trim();
+                const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                u8[structOffset + 8 + m] = moveId;
+                
+                if (moveId > 0) {
+                    u8[structOffset + 29 + m] = 20; // PP
+                } else {
+                    u8[structOffset + 29 + m] = 0;
+                }
+            }
+            
+            const itemName = (pkmn.item || "").toLowerCase().trim();
+            const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
+            u8[structOffset + 7] = itemId;
+            
+            modifyCount++;
+        } 
+        else if (meta.gen === 2) {
+            const structOffset = meta.structOffset;
+            
+            const itemName = (pkmn.item || "").toLowerCase().trim();
+            const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
+            u8[structOffset + 1] = itemId;
+            
+            const moves = pkmn.moves || [];
+            for (let m = 0; m < 4; m++) {
+                const moveName = (moves[m] || "").toLowerCase().trim();
+                const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                u8[structOffset + 2 + m] = moveId;
+                
+                if (moveId > 0) {
+                    u8[structOffset + 23 + m] = 20; // PP
+                } else {
+                    u8[structOffset + 23 + m] = 0;
+                }
+            }
+            
+            modifyCount++;
+        }
+        else if (meta.gen === 3) {
+            let sectorIndex = -1;
+            for (let s = 0; s < 14; s++) {
+                const sIdx = uploadedSaveActiveSectorStart + s;
+                const offset = sIdx * 4096;
+                const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+                if (sig === 0x08012025 && u8[offset + 0x0FF4] === 1) {
+                    sectorIndex = sIdx;
+                    break;
+                }
+            }
+            
+            if (sectorIndex === -1) return;
+            
+            const sectorOffset = sectorIndex * 4096;
+            const structOffset = sectorOffset + meta.structOffset;
+            
+            const pid = meta.pid;
+            const otid = meta.otid;
+            const key = pid ^ otid;
+            const shuffleIndex = meta.shuffleIndex;
+            const order = blockOrders[shuffleIndex];
+            
+            const decryptedWords = new Uint32Array(12);
+            for (let j = 0; j < 12; j++) {
+                const wordOffset = structOffset + 0x20 + j * 4;
+                const encryptedWord = u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24);
+                decryptedWords[j] = encryptedWord ^ key;
+            }
+            const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+            
+            let blockGIdx = -1;
+            let blockAIdx = -1;
+            for (let b = 0; b < 4; b++) {
+                if (order[b] === 0) blockGIdx = b;
+                if (order[b] === 1) blockAIdx = b;
+            }
+            
+            if (blockGIdx !== -1) {
+                const gOffset = blockGIdx * 12;
+                const itemName = (pkmn.item || "").toLowerCase().trim();
+                const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+                decryptedBytes[gOffset + 2] = itemId & 0xFF;
+                decryptedBytes[gOffset + 3] = (itemId >> 8) & 0xFF;
+            }
+            
+            if (blockAIdx !== -1) {
+                const aOffset = blockAIdx * 12;
+                const moves = pkmn.moves || [];
+                for (let m = 0; m < 4; m++) {
+                    const moveName = (moves[m] || "").toLowerCase().trim();
+                    const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                    
+                    decryptedBytes[aOffset + m * 2] = moveId & 0xFF;
+                    decryptedBytes[aOffset + m * 2 + 1] = (moveId >> 8) & 0xFF;
+                    
+                    if (moveId > 0) {
+                        decryptedBytes[aOffset + 8 + m] = 20;
+                    } else {
+                        decryptedBytes[aOffset + 8 + m] = 0;
+                    }
+                }
+            }
+            
+            const encryptedWords = new Uint32Array(decryptedWords.buffer);
+            for (let j = 0; j < 12; j++) {
+                const wordOffset = structOffset + 0x20 + j * 4;
+                const encryptedWord = encryptedWords[j] ^ key;
+                
+                u8[wordOffset] = encryptedWord & 0xFF;
+                u8[wordOffset + 1] = (encryptedWord >> 8) & 0xFF;
+                u8[wordOffset + 2] = (encryptedWord >> 16) & 0xFF;
+                u8[wordOffset + 3] = (encryptedWord >> 24) & 0xFF;
+            }
+            
+            let sum = 0;
+            for (let j = 0; j < 0x0F80; j += 4) {
+                const offsetInSector = sectorOffset + j;
+                const val = u8[offsetInSector] | (u8[offsetInSector + 1] << 8) | (u8[offsetInSector + 2] << 16) | (u8[offsetInSector + 3] << 24);
+                sum += val;
+            }
+            const checksum = ((sum & 0xFFFF) + (sum >>> 16)) & 0xFFFF;
+            
+            u8[sectorOffset + 0x0FF6] = checksum & 0xFF;
+            u8[sectorOffset + 0x0FF7] = (checksum >> 8) & 0xFF;
+            
+            modifyCount++;
+        }
+    });
+    
+    if (uploadedSaveGen === 1) {
+        let sum = 0;
+        for (let i = 0x2598; i < 0x3523; i++) {
+            sum += u8[i];
+        }
+        u8[0x3523] = (~sum) & 0xFF;
+    } 
+    else if (uploadedSaveGen === 2) {
+        if (uploadedSaveIsCrystal) {
+            let sum1 = 0;
+            for (let i = 0x2009; i <= 0x2B82; i++) {
+                sum1 += u8[i];
+            }
+            u8[0x2B83] = (sum1 >> 8) & 0xFF;
+            u8[0x2B84] = sum1 & 0xFF;
+            
+            let sum2 = 0;
+            for (let i = 0x2B85; i <= 0x2D0C; i++) {
+                sum2 += u8[i];
+            }
+            u8[0x2D0D] = (sum2 >> 8) & 0xFF;
+            u8[0x2D0E] = sum2 & 0xFF;
+        } else {
+            let sum = 0;
+            for (let i = 0x2009; i <= 0x2D0C; i++) {
+                sum += u8[i];
+            }
+            u8[0x2D0D] = (sum >> 8) & 0xFF;
+            u8[0x2D0E] = sum & 0xFF;
+        }
+    }
+    
+    const blob = new Blob([workingBuffer], {type: "application/octet-stream"});
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = (uploadedSaveName || "savefile.sav").replace(/\.sav$/i, "_editado.sav");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    alert(`Sucesso! Save modificado gravado com ${modifyCount} alterações.`);
+}
 
