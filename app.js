@@ -5659,6 +5659,10 @@ function renderWeaknessAnalysis(team, gen) {
             suggestions.push({
                 pkmn: p,
                 move: "Raio Gelo (Ice Beam) / Nevasca",
+                movesList: [
+                    { display: "Raio Gelo (Ice Beam)", english: "Ice Beam" },
+                    { display: "Nevasca (Blizzard)", english: "Blizzard" }
+                ],
                 reason: "Fornece cobertura super eficaz crucial contra os tipos Planta e Dragão que ameaçam Pokémon de Água."
             });
         }
@@ -5667,22 +5671,43 @@ function renderWeaknessAnalysis(team, gen) {
             suggestions.push({
                 pkmn: p,
                 move: "Terramoto (Earthquake) / Deslize de Rocha",
+                movesList: [
+                    { display: "Terramoto (Earthquake)", english: "Earthquake" },
+                    { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" }
+                ],
                 reason: "Permite atacar outros Pokémon de Fogo, Rocha e Aço de forma super eficaz."
             });
         }
         
         if (isNormal && !hasFightingMove && !hasGroundMove) {
             let recommendedMove = "Combate Próximo (Close Combat) / Terramoto";
+            let list = [
+                { display: "Combate Próximo (Close Combat)", english: "Close Combat" },
+                { display: "Terramoto (Earthquake)", english: "Earthquake" }
+            ];
             if (gen === 1) {
                 recommendedMove = "Submissão (Submission) / Terramoto";
+                list = [
+                    { display: "Submissão (Submission)", english: "Submission" },
+                    { display: "Terramoto (Earthquake)", english: "Earthquake" }
+                ];
             } else if (gen === 2) {
                 recommendedMove = "Soco Dinâmico (Dynamic Punch) / Terramoto";
+                list = [
+                    { display: "Soco Dinâmico (Dynamic Punch)", english: "Dynamic Punch" },
+                    { display: "Terramoto (Earthquake)", english: "Earthquake" }
+                ];
             } else if (gen === 3) {
                 recommendedMove = "Quebra Tijolo (Brick Break) / Terramoto";
+                list = [
+                    { display: "Quebra Tijolo (Brick Break)", english: "Brick Break" },
+                    { display: "Terramoto (Earthquake)", english: "Earthquake" }
+                ];
             }
             suggestions.push({
                 pkmn: p,
                 move: recommendedMove,
+                movesList: list,
                 reason: "Normal precisa de movimentos de Luta/Terra para passar por adversários de Rocha e Aço."
             });
         }
@@ -5691,6 +5716,10 @@ function renderWeaknessAnalysis(team, gen) {
             suggestions.push({
                 pkmn: p,
                 move: "Deslize de Rocha (Rock Slide) / Soco Gelo",
+                movesList: [
+                    { display: "Deslize de Rocha (Rock Slide)", english: "Rock Slide" },
+                    { display: "Soco Gelo (Ice Punch)", english: "Ice Punch" }
+                ],
                 reason: "Excelente cobertura para abater as ameaças dos tipos Voador e Psíquico."
             });
         }
@@ -5699,14 +5728,27 @@ function renderWeaknessAnalysis(team, gen) {
             const hasGrass = moves.some(m => guessMoveType(m) === "grass");
             if (!hasIceMove && !hasGrass) {
                 let recommendedMove = "Poder Oculto (Planta/Gelo) / Sinal Luminoso";
+                let list = [
+                    { display: "Poder Oculto (Planta/Gelo)", english: "Hidden Power" },
+                    { display: "Sinal Luminoso (Signal Beam)", english: "Signal Beam" }
+                ];
                 if (gen === 1) {
                     recommendedMove = "Golpe de Corpo (Body Slam) / Submissão";
+                    list = [
+                        { display: "Golpe de Corpo (Body Slam)", english: "Body Slam" },
+                        { display: "Submissão (Submission)", english: "Submission" }
+                    ];
                 } else if (gen === 2) {
                     recommendedMove = "Poder Oculto (Planta/Gelo) / Swift";
+                    list = [
+                        { display: "Poder Oculto (Planta/Gelo)", english: "Hidden Power" },
+                        { display: "Swift", english: "Swift" }
+                    ];
                 }
                 suggestions.push({
                     pkmn: p,
                     move: recommendedMove,
+                    movesList: list,
                     reason: "Evita ser completamente parado por Pokémon do tipo Terra imunes a Elétrico."
                 });
             }
@@ -5714,14 +5756,27 @@ function renderWeaknessAnalysis(team, gen) {
         
         if (isPsychic && !hasGhostDarkMove) {
             let recommendedMove = "Bola Sombra (Shadow Ball) / Pulso Sombrio";
+            let list = [
+                { display: "Bola Sombra (Shadow Ball)", english: "Shadow Ball" },
+                { display: "Pulso Sombrio (Dark Pulse)", english: "Dark Pulse" }
+            ];
             if (gen === 1) {
                 recommendedMove = "Relâmpago (Thunderbolt) / Raio Gelo (Ice Beam)";
+                list = [
+                    { display: "Relâmpago (Thunderbolt)", english: "Thunderbolt" },
+                    { display: "Raio Gelo (Ice Beam)", english: "Ice Beam" }
+                ];
             } else if (gen === 2 || gen === 3) {
                 recommendedMove = "Bola Sombra (Shadow Ball) / Mordida (Bite)";
+                list = [
+                    { display: "Bola Sombra (Shadow Ball)", english: "Shadow Ball" },
+                    { display: "Mordida (Bite)", english: "Bite" }
+                ];
             }
             suggestions.push({
                 pkmn: p,
                 move: recommendedMove,
+                movesList: list,
                 reason: "Crucial para revidar contra outros Psíquicos e contra o tipo Fantasma."
             });
         }
@@ -5730,6 +5785,10 @@ function renderWeaknessAnalysis(team, gen) {
             suggestions.push({
                 pkmn: p,
                 move: "Lança-Chamas (Flamethrower) / Terramoto",
+                movesList: [
+                    { display: "Lança-Chamas (Flamethrower)", english: "Flamethrower" },
+                    { display: "Terramoto (Earthquake)", english: "Earthquake" }
+                ],
                 reason: "Impede que Pokémon do tipo Aço resistam aos teus ataques de Dragão."
             });
         }
@@ -5738,6 +5797,7 @@ function renderWeaknessAnalysis(team, gen) {
             suggestions.push({
                 pkmn: p,
                 move: "Ensinar um 4º Movimento",
+                movesList: [],
                 reason: "Este exemplar tem slots de movimentos vazios. Completa o moveset para aumentar versatilidade."
             });
         }
@@ -5749,6 +5809,16 @@ function renderWeaknessAnalysis(team, gen) {
         suggestionsDiv.innerHTML = `<span style="color: var(--accent-success); font-size: 0.75rem;">A equipa tem um excelente leque de coberturas em todos os movesets!</span>`;
     } else {
         suggestionsDiv.innerHTML = suggestions.slice(0, 5).map(s => {
+            const buttonsHtml = (s.movesList || []).map(m => {
+                const escapedEnglish = m.english.replace(/'/g, "\\'");
+                const escapedDisplay = m.display.replace(/'/g, "\\'");
+                return `
+                    <button class="btn btn-action" onclick="applyRecommendedMove('${s.pkmn.id}', '${escapedEnglish}', '${escapedDisplay}')" style="font-size: 0.6rem; padding: 2px 6px; font-weight: 800; border-radius: 4px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #fff; cursor: pointer;">
+                        ➕ ${m.english}
+                    </button>
+                `;
+            }).join(" ");
+            
             return `
                 <div style="background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; gap: 4px;">
                     <div style="display: flex; align-items: center; justify-content: space-between;">
@@ -5760,9 +5830,61 @@ function renderWeaknessAnalysis(team, gen) {
                     <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
                         ${s.reason}
                     </div>
+                    ${buttonsHtml ? `<div style="display: flex; gap: 6px; align-items: center; margin-top: 4px;"><span style="font-size: 0.6rem; color: var(--text-muted); font-weight: 800;">Aplicar:</span> ${buttonsHtml}</div>` : ""}
                 </div>
             `;
         }).join("");
+    }
+}
+
+function applyRecommendedMove(pokemonId, moveEnglishName, moveDisplayName) {
+    const pkmn = pokemonDatabase.find(p => p.id === pokemonId);
+    if (!pkmn) {
+        alert("Pokémon não encontrado!");
+        return;
+    }
+    
+    const moves = pkmn.moves || [];
+    let targetSlot = -1;
+    
+    // Check if there is an empty slot first
+    for (let i = 0; i < 4; i++) {
+        if (!moves[i]) {
+            targetSlot = i;
+            break;
+        }
+    }
+    
+    if (targetSlot !== -1) {
+        moves[targetSlot] = moveEnglishName;
+        pkmn.moves = moves;
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        renderAll();
+        alert(`Sucesso! Adicionado o ataque "${moveEnglishName}" no slot vazio de ${pkmn.nickname || pkmn.species}.`);
+        return;
+    }
+    
+    // Prompt the user to replace one of the existing moves
+    const msg = `Qual ataque de ${pkmn.nickname || pkmn.species} desejas substituir por "${moveEnglishName}"?\n` +
+                `1: ${moves[0] || 'Vazio'}\n` +
+                `2: ${moves[1] || 'Vazio'}\n` +
+                `3: ${moves[2] || 'Vazio'}\n` +
+                `4: ${moves[3] || 'Vazio'}\n\n` +
+                `Digite o número da opção (1, 2, 3 ou 4):`;
+                
+    const choice = prompt(msg);
+    if (choice === null) return;
+    
+    const choiceNum = parseInt(choice.trim(), 10);
+    if (choiceNum >= 1 && choiceNum <= 4) {
+        const oldMove = moves[choiceNum - 1];
+        moves[choiceNum - 1] = moveEnglishName;
+        pkmn.moves = moves;
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        renderAll();
+        alert(`Sucesso! Substituído o ataque "${oldMove || 'Vazio'}" por "${moveEnglishName}" em ${pkmn.nickname || pkmn.species}.`);
+    } else {
+        alert("Escolha inválida. Introduza um número de 1 a 4.");
     }
 }
 
