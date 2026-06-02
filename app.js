@@ -6477,6 +6477,66 @@ function exportModifiedSave() {
         alert("A gravação e exportação de saves é suportada apenas para as Gerações 1, 2 e 3.");
         return;
     }
+
+    const PORTUGUESE_TO_ENGLISH_MOVES = {
+        "combate próximo": "close combat",
+        "terramoto": "earthquake",
+        "deslize de rocha": "rock slide",
+        "submissão": "submission",
+        "soco dinâmico": "dynamic punch",
+        "quebra tijolo": "brick break",
+        "soco gelo": "ice punch",
+        "poder oculto": "hidden power",
+        "sinal luminoso": "signal beam",
+        "golpe de corpo": "body slam",
+        "bola sombra": "shadow ball",
+        "pulso sombrio": "dark pulse",
+        "relâmpago": "thunderbolt",
+        "mordida": "bite",
+        "lança-chamas": "flamethrower",
+        "raio gelo": "ice beam",
+        "nevasca": "blizzard"
+    };
+
+    const PORTUGUESE_TO_ENGLISH_ITEMS = {
+        "restos": "leftovers",
+        "ovo da sorte": "lucky egg",
+        "garra rápida": "quick claw",
+        "exp. share": "exp share",
+        "partilha exp": "exp share",
+        "banda de foco": "focus band",
+        "óculos pretos": "blackglasses",
+        "óculos escuros": "blackglasses",
+        "carvão": "charcoal",
+        "semente milagrosa": "miracle seed",
+        "água mística": "mystic water"
+    };
+
+    function getEnglishMoveName(name) {
+        if (!name) return "";
+        let clean = name.toLowerCase().trim();
+        const match = clean.match(/\(([^)]+)\)/);
+        if (match) {
+            return match[1].trim();
+        }
+        if (PORTUGUESE_TO_ENGLISH_MOVES[clean]) {
+            return PORTUGUESE_TO_ENGLISH_MOVES[clean];
+        }
+        return clean;
+    }
+
+    function getEnglishItemName(name) {
+        if (!name) return "";
+        let clean = name.toLowerCase().trim();
+        const match = clean.match(/\(([^)]+)\)/);
+        if (match) {
+            return match[1].trim();
+        }
+        if (PORTUGUESE_TO_ENGLISH_ITEMS[clean]) {
+            return PORTUGUESE_TO_ENGLISH_ITEMS[clean];
+        }
+        return clean;
+    }
     
     const workingBuffer = uploadedSaveBuffer.slice(0);
     const u8 = new Uint8Array(workingBuffer);
@@ -6498,7 +6558,7 @@ function exportModifiedSave() {
             const moves = pkmn.moves || [];
             
             for (let m = 0; m < 4; m++) {
-                const moveName = (moves[m] || "").toLowerCase().trim();
+                const moveName = getEnglishMoveName(moves[m]);
                 const moveId = BINARY_MOVES_MAP[moveName] || 0;
                 u8[structOffset + 8 + m] = moveId;
                 
@@ -6509,31 +6569,30 @@ function exportModifiedSave() {
                 }
             }
             
-            const itemName = (pkmn.item || "").toLowerCase().trim();
-            const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
-            u8[structOffset + 7] = itemId;
-            
             modifyCount++;
         } 
         else if (meta.gen === 2) {
-            const structOffset = meta.structOffset;
+            // Write to both primary slot and backup slot (which is primary offset + 0x4000)
+            const offsets = [meta.structOffset, meta.structOffset + 0x4000];
             
-            const itemName = (pkmn.item || "").toLowerCase().trim();
-            const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
-            u8[structOffset + 1] = itemId;
-            
-            const moves = pkmn.moves || [];
-            for (let m = 0; m < 4; m++) {
-                const moveName = (moves[m] || "").toLowerCase().trim();
-                const moveId = BINARY_MOVES_MAP[moveName] || 0;
-                u8[structOffset + 2 + m] = moveId;
+            offsets.forEach(structOffset => {
+                const itemName = getEnglishItemName(pkmn.item);
+                const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
+                u8[structOffset + 1] = itemId;
                 
-                if (moveId > 0) {
-                    u8[structOffset + 23 + m] = 20; // PP
-                } else {
-                    u8[structOffset + 23 + m] = 0;
+                const moves = pkmn.moves || [];
+                for (let m = 0; m < 4; m++) {
+                    const moveName = getEnglishMoveName(moves[m]);
+                    const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                    u8[structOffset + 2 + m] = moveId;
+                    
+                    if (moveId > 0) {
+                        u8[structOffset + 23 + m] = 20; // PP
+                    } else {
+                        u8[structOffset + 23 + m] = 0;
+                    }
                 }
-            }
+            });
             
             modifyCount++;
         }
@@ -6577,7 +6636,7 @@ function exportModifiedSave() {
             
             if (blockGIdx !== -1) {
                 const gOffset = blockGIdx * 12;
-                const itemName = (pkmn.item || "").toLowerCase().trim();
+                const itemName = getEnglishItemName(pkmn.item);
                 const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
                 decryptedBytes[gOffset + 2] = itemId & 0xFF;
                 decryptedBytes[gOffset + 3] = (itemId >> 8) & 0xFF;
@@ -6587,7 +6646,7 @@ function exportModifiedSave() {
                 const aOffset = blockAIdx * 12;
                 const moves = pkmn.moves || [];
                 for (let m = 0; m < 4; m++) {
-                    const moveName = (moves[m] || "").toLowerCase().trim();
+                    const moveName = getEnglishMoveName(moves[m]);
                     const moveId = BINARY_MOVES_MAP[moveName] || 0;
                     
                     decryptedBytes[aOffset + m * 2] = moveId & 0xFF;
@@ -6601,6 +6660,16 @@ function exportModifiedSave() {
                 }
             }
             
+            // Recalculate 16-bit decrypted Pokémon checksum
+            let pkmnSum = 0;
+            const decryptedWords16 = new Uint16Array(decryptedWords.buffer);
+            for (let k = 0; k < 24; k++) {
+                pkmnSum = (pkmnSum + decryptedWords16[k]) & 0xFFFF;
+            }
+            u8[structOffset + 28] = pkmnSum & 0xFF;
+            u8[structOffset + 29] = (pkmnSum >> 8) & 0xFF;
+            
+            // Re-encrypt the 12 words of the data block and write them back
             const encryptedWords = new Uint32Array(decryptedWords.buffer);
             for (let j = 0; j < 12; j++) {
                 const wordOffset = structOffset + 0x20 + j * 4;
@@ -6612,6 +6681,7 @@ function exportModifiedSave() {
                 u8[wordOffset + 3] = (encryptedWord >> 24) & 0xFF;
             }
             
+            // Recalculate Sector 1 Checksum
             let sum = 0;
             for (let j = 0; j < 0x0F80; j += 4) {
                 const offsetInSector = sectorOffset + j;
@@ -6649,6 +6719,21 @@ function exportModifiedSave() {
             }
             u8[0x2D0D] = (sum2 >> 8) & 0xFF;
             u8[0x2D0E] = sum2 & 0xFF;
+            
+            // Also write crystal backup checksums (Bank 2)
+            let sum1Backup = 0;
+            for (let i = 0x6009; i <= 0x6B82; i++) {
+                sum1Backup += u8[i];
+            }
+            u8[0x6B83] = (sum1Backup >> 8) & 0xFF;
+            u8[0x6B84] = sum1Backup & 0xFF;
+            
+            let sum2Backup = 0;
+            for (let i = 0x6B85; i <= 0x6D0C; i++) {
+                sum2Backup += u8[i];
+            }
+            u8[0x6D0D] = (sum2Backup >> 8) & 0xFF;
+            u8[0x6D0E] = sum2Backup & 0xFF;
         } else {
             let sum = 0;
             for (let i = 0x2009; i <= 0x2D0C; i++) {
@@ -6656,6 +6741,14 @@ function exportModifiedSave() {
             }
             u8[0x2D0D] = (sum >> 8) & 0xFF;
             u8[0x2D0E] = sum & 0xFF;
+            
+            // Also write GS backup checksum (Bank 2)
+            let sumBackup = 0;
+            for (let i = 0x6009; i <= 0x6D0C; i++) {
+                sumBackup += u8[i];
+            }
+            u8[0x6D0D] = (sumBackup >> 8) & 0xFF;
+            u8[0x6D0E] = sumBackup & 0xFF;
         }
     }
     
