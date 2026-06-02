@@ -5707,6 +5707,38 @@ function renamePreset(presetId) {
     localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
     renderPresets();
 }
+function cleanSlateActiveTrainer() {
+    const trainer = trainersList.find(t => t.id === activeTrainerId && t.gameId === currentGameId);
+    const trainerName = trainer ? trainer.name : "Treinador Atual";
+    
+    if (!confirm(`Desejas mesmo apagar TODOS os Pokémon e Presets do treinador "${trainerName}" no jogo atual? Esta ação é irreversível e apagará também as fotos do Mural de Honra!`)) {
+        return;
+    }
+    
+    // 1. Limpar Pokémon da base de dados para o treinador ativo e jogo atual
+    pokemonDatabase = pokemonDatabase.filter(p => !(p.currentGame === currentGameId && p.trainerId === activeTrainerId));
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    
+    // 2. Limpar Presets de Equipa para o treinador ativo e jogo atual
+    teamPresetsList = teamPresetsList.filter(tp => !(tp.gameId === currentGameId && tp.trainerId === activeTrainerId));
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    // 3. Limpar Mural de Honra (Hall of Fame) deste treinador no IndexedDB
+    if (dbInstance) {
+        try {
+            const tx = dbInstance.transaction("hall_of_fame", "readwrite");
+            const store = tx.objectStore("hall_of_fame");
+            const key = currentGameId + "_" + activeTrainerId;
+            store.delete(key);
+        } catch (err) {
+            console.error("Erro ao apagar registos do Mural de Honra no IndexedDB:", err);
+        }
+    }
+    
+    // 4. Re-renderizar tudo
+    renderAll();
+    alert(`Clean Slate concluído! Todos os dados de Pokémon, presets e mural do treinador "${trainerName}" foram eliminados.`);
+}
 
 window.onload = function() {
     initDB().then(() => {
