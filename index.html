@@ -538,10 +538,10 @@
                     <div class="form-group">
                         <label>⚔️ Moveset</label>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <input type="text" id="form-move1" list="moves-list" placeholder="Move 1">
-                            <input type="text" id="form-move2" list="moves-list" placeholder="Move 2">
-                            <input type="text" id="form-move3" list="moves-list" placeholder="Move 3">
-                            <input type="text" id="form-move4" list="moves-list" placeholder="Move 4">
+                            <select id="form-move1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
+                            <select id="form-move2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
+                            <select id="form-move3" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
+                            <select id="form-move4" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
                         </div>
                     </div>
 
@@ -631,6 +631,7 @@
                     <div class="footer-actions">
                         <button class="btn btn-primary" onclick="savePokemon()">💾 Gravar Espécime na Caixa Negra</button>
                         <button class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none;">🗑️ Eliminar</button>
+                        <button class="btn btn-action" id="btn-export-individual-pkx" onclick="exportIndividualPkx()" style="display:none; background: var(--accent-info); width: auto; padding: 8px 16px;">📥 Descarregar .pkX</button>
                     </div>
                 </div>
             </div>
@@ -1111,6 +1112,7 @@
     </div>
 
     <!-- External Logic Script -->
+    <script src="scratch/moves_db.js" defer></script>
     <script src="app.js" defer></script>
 </body>
 </html>

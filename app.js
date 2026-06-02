@@ -43,6 +43,103 @@ let selectedPokemonIds = new Set();
 let autoRibbonsEnabled = localStorage.getItem("bb_auto_ribbons") !== "false";
 let teamPresetsList = JSON.parse(localStorage.getItem("bb_team_presets")) || [];
 
+const PORTUGUESE_TO_ENGLISH_MOVES = {
+    "combate próximo": "close combat",
+    "terramoto": "earthquake",
+    "deslize de rocha": "rock slide",
+    "submissão": "submission",
+    "soco dinâmico": "dynamic punch",
+    "quebra tijolo": "brick break",
+    "soco gelo": "ice punch",
+    "poder oculto": "hidden power",
+    "sinal luminoso": "signal beam",
+    "golpe de corpo": "body slam",
+    "bola sombra": "shadow ball",
+    "pulso sombrio": "dark pulse",
+    "relâmpago": "thunderbolt",
+    "mordida": "bite",
+    "lança-chamas": "flamethrower",
+    "raio gelo": "ice beam",
+    "nevasca": "blizzard"
+};
+
+const PORTUGUESE_TO_ENGLISH_ITEMS = {
+    "restos": "leftovers",
+    "ovo da sorte": "lucky egg",
+    "garra rápida": "quick claw",
+    "exp. share": "exp share",
+    "partilha exp": "exp share",
+    "banda de foco": "focus band",
+    "óculos pretos": "blackglasses",
+    "óculos escuros": "blackglasses",
+    "carvão": "charcoal",
+    "semente milagrosa": "miracle seed",
+    "água mística": "mystic water"
+};
+
+const ENGLISH_TO_PORTUGUESE_MOVES = {};
+Object.keys(PORTUGUESE_TO_ENGLISH_MOVES).forEach(pt => {
+    ENGLISH_TO_PORTUGUESE_MOVES[PORTUGUESE_TO_ENGLISH_MOVES[pt]] = pt;
+});
+
+const ENGLISH_TO_PORTUGUESE_ITEMS = {};
+Object.keys(PORTUGUESE_TO_ENGLISH_ITEMS).forEach(pt => {
+    ENGLISH_TO_PORTUGUESE_ITEMS[PORTUGUESE_TO_ENGLISH_ITEMS[pt]] = pt;
+});
+
+function getEnglishMoveName(name) {
+    if (!name) return "";
+    let clean = name.toLowerCase().trim();
+    const match = clean.match(/\(([^)]+)\)/);
+    if (match) {
+        return match[1].trim();
+    }
+    if (PORTUGUESE_TO_ENGLISH_MOVES[clean]) {
+        return PORTUGUESE_TO_ENGLISH_MOVES[clean];
+    }
+    return clean;
+}
+
+function getEnglishItemName(name) {
+    if (!name) return "";
+    let clean = name.toLowerCase().trim();
+    const match = clean.match(/\(([^)]+)\)/);
+    if (match) {
+        return match[1].trim();
+    }
+    if (PORTUGUESE_TO_ENGLISH_ITEMS[clean]) {
+        return PORTUGUESE_TO_ENGLISH_ITEMS[clean];
+    }
+    return clean;
+}
+
+function formatMoveNameForDisplay(englishName) {
+    if (!englishName) return "";
+    const clean = englishName.toLowerCase().replace(/-/g, " ").trim();
+    const capEnglish = englishName.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    
+    const pt = ENGLISH_TO_PORTUGUESE_MOVES[clean];
+    if (pt) {
+        const capPt = pt.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        return `${capPt} (${capEnglish})`;
+    }
+    return `${capEnglish} (${capEnglish})`;
+}
+
+function formatItemNameForDisplay(englishName) {
+    if (!englishName) return "";
+    const clean = englishName.toLowerCase().replace(/-/g, " ").trim();
+    const capEnglish = englishName.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+    
+    const pt = ENGLISH_TO_PORTUGUESE_ITEMS[clean];
+    if (pt) {
+        const capPt = pt.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+        return `${capPt} (${capEnglish})`;
+    }
+    return `${capEnglish} (${capEnglish})`;
+}
+
+
 let trainersList = JSON.parse(localStorage.getItem("bb_trainers")) || [];
 let activeTrainerId = localStorage.getItem(`bb_active_trainer_${currentGameId}`) || `trainer_${currentGameId}_default`;
 let activeTab = "boxes";
@@ -1167,11 +1264,13 @@ function openModalForNew() {
     document.getElementById("ev-spd").value = "0";
     document.getElementById("ev-spe").value = "0";
     
-    document.getElementById("form-move1").value = ""; 
-    document.getElementById("form-move2").value = "";
-    document.getElementById("form-move3").value = ""; 
-    document.getElementById("form-move4").value = ""; 
-    
+    populateMoveSelects({
+        species: "",
+        currentGame: currentGameId,
+        moves: ["", "", "", ""]
+    });
+    const btnExport = document.getElementById("btn-export-individual-pkx");
+    if (btnExport) btnExport.style.display = "none";    
     // Clear checked state
     ALL_RIBBONS.forEach(r => {
         document.getElementById(`ribbon-chk-${r.id}`).checked = false;
@@ -1228,11 +1327,23 @@ function openModalForEdit(id) {
     document.getElementById("ev-spd").value = p.evs?.spd !== undefined ? p.evs.spd : 0;
     document.getElementById("ev-spe").value = p.evs?.spe !== undefined ? p.evs.spe : 0;
     
-    document.getElementById("form-move1").value = p.moves?.[0] || ""; 
-    document.getElementById("form-move2").value = p.moves?.[1] || "";
-    document.getElementById("form-move3").value = p.moves?.[2] || ""; 
-    document.getElementById("form-move4").value = p.moves?.[3] || ""; 
+    populateMoveSelects(p);
     
+    let gen = 3;
+    if (p.saveMeta && p.saveMeta.gen) {
+        gen = p.saveMeta.gen;
+    } else {
+        const game = GAMES_DB.find(g => g.id === p.currentGame);
+        gen = game ? game.gen : 9;
+    }
+    const btnExport = document.getElementById("btn-export-individual-pkx");
+    if (btnExport) {
+        if (gen >= 3) {
+            btnExport.style.display = "inline-block";
+        } else {
+            btnExport.style.display = "none";
+        }
+    }    
     document.getElementById("form-notes").value = p.notes || ""; 
     document.getElementById("form-evolution-notes").value = p.evolutionNotes || ""; 
     document.getElementById("form-origin-game").value = p.originGame || currentGameId;
@@ -1773,6 +1884,35 @@ function decodeUTF16String(uint16Array) {
     return str.trim();
 }
 
+function parseGen1Gen2DVsAndMoves(u8, structOffset, movesOffset, dvsOffset) {
+    const moves = [];
+    for (let m = 0; m < 4; m++) {
+        const moveId = u8[structOffset + movesOffset + m];
+        const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || "";
+        moves.push(formatMoveNameForDisplay(rawName));
+    }
+    
+    const byte1 = u8[structOffset + dvsOffset];
+    const byte2 = u8[structOffset + dvsOffset + 1];
+    
+    const atkDv = (byte1 >> 4) & 15;
+    const defDv = byte1 & 15;
+    const speDv = (byte2 >> 4) & 15;
+    const spcDv = byte2 & 15;
+    const hpDv = ((atkDv & 1) << 3) | ((defDv & 1) << 2) | ((speDv & 1) << 1) | (spcDv & 1);
+    
+    const ivs = {
+        hp: hpDv * 2 + 1,
+        atk: atkDv * 2 + 1,
+        def: defDv * 2 + 1,
+        spe: speDv * 2 + 1,
+        spa: spcDv * 2 + 1,
+        spd: spcDv * 2 + 1
+    };
+    
+    return { moves, ivs };
+}
+
 function parseGen1Save(buffer) {
     const u8 = new Uint8Array(buffer);
     const parsedList = [];
@@ -1798,6 +1938,8 @@ function parseGen1Save(buffer) {
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
+            const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 8, 27);
+            
             parsedList.push({
                 sourceSlot: `Equipa Gen 1 #${i+1}`,
                 pokedexId,
@@ -1806,6 +1948,8 @@ function parseGen1Save(buffer) {
                 level: level || 5,
                 otName: otName,
                 otId: otId,
+                moves: moves,
+                ivs: ivs,
                 saveMeta: {
                     gen: 1,
                     isParty: true,
@@ -1837,6 +1981,8 @@ function parseGen1Save(buffer) {
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
+            const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 8, 27);
+            
             parsedList.push({
                 sourceSlot: `Box Ativa Gen 1 #${i+1}`,
                 pokedexId,
@@ -1845,6 +1991,8 @@ function parseGen1Save(buffer) {
                 level: level || 5,
                 otName: otName,
                 otId: otId,
+                moves: moves,
+                ivs: ivs,
                 saveMeta: {
                     gen: 1,
                     isParty: false,
@@ -1900,6 +2048,8 @@ function parseGen2Save(buffer) {
         
         const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
         
+        const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
+        
         parsedList.push({
             sourceSlot: isCrystal ? `Equipa Crystal #${i+1}` : `Equipa Gold/Silver #${i+1}`,
             pokedexId,
@@ -1908,6 +2058,8 @@ function parseGen2Save(buffer) {
             level: level || 5,
             otName: otName,
             otId: otId,
+            moves: moves,
+            ivs: ivs,
             saveMeta: {
                 gen: 2,
                 isCrystal: isCrystal,
@@ -2022,11 +2174,16 @@ function parseGen3Save(buffer) {
         const order = blockOrders[shuffleIndex];
         
         let blockG = null;
+        let blockA = null;
+        let blockM = null;
         for (let b = 0; b < 4; b++) {
             const blockType = order[b];
             if (blockType === 0) {
                 blockG = decryptedBytes.subarray(b * 12, b * 12 + 12);
-                break;
+            } else if (blockType === 1) {
+                blockA = decryptedBytes.subarray(b * 12, b * 12 + 12);
+            } else if (blockType === 3) {
+                blockM = decryptedBytes.subarray(b * 12, b * 12 + 12);
             }
         }
         
@@ -2042,6 +2199,35 @@ function parseGen3Save(buffer) {
         const otNameBytes = section1.subarray(structOffset + 20, structOffset + 20 + 7);
         const otName = decodeGen3String(otNameBytes);
         
+        let itemName = "";
+        const itemId = blockG[2] | (blockG[3] << 8);
+        const rawItem = REVERSE_ITEMS_MAP_GEN3[itemId] || "";
+        itemName = formatItemNameForDisplay(rawItem);
+        
+        const moves = [];
+        if (blockA) {
+            // Note: blockA.byteOffset is used to map correctly the subarray's underlying ArrayBuffer window
+            const u16BlockA = new Uint16Array(blockA.buffer, blockA.byteOffset, 6);
+            for (let m = 0; m < 4; m++) {
+                const moveId = u16BlockA[m];
+                const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                moves.push(formatMoveNameForDisplay(rawName));
+            }
+        }
+        
+        let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+        if (blockM) {
+            const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
+            ivs = {
+                hp: ivWord & 0x1F,
+                atk: (ivWord >> 5) & 0x1F,
+                def: (ivWord >> 10) & 0x1F,
+                spe: (ivWord >> 15) & 0x1F,
+                spa: (ivWord >> 20) & 0x1F,
+                spd: (ivWord >> 25) & 0x1F
+            };
+        }
+        
         parsedList.push({
             sourceSlot: `Equipa GBA #${i+1}`,
             pokedexId,
@@ -2050,6 +2236,9 @@ function parseGen3Save(buffer) {
             level: level || 5,
             otName: otName,
             otId: otId,
+            item: itemName,
+            moves: moves,
+            ivs: ivs,
             saveMeta: {
                 gen: 3,
                 isParty: true,
@@ -2096,6 +2285,7 @@ function parseGen4Gen5Save(buffer) {
             const order = blockOrders[shuffleIndex];
             
             const blockA = new Uint16Array(16);
+            const blockB = new Uint16Array(16);
             const blockC = new Uint16Array(16);
             const blockD = new Uint16Array(16);
             
@@ -2103,6 +2293,7 @@ function parseGen4Gen5Save(buffer) {
                 const targetBlock = order[b];
                 let dest = null;
                 if (targetBlock === 0) dest = blockA;
+                else if (targetBlock === 1) dest = blockB;
                 else if (targetBlock === 2) dest = blockC;
                 else if (targetBlock === 3) dest = blockD;
                 
@@ -2134,6 +2325,28 @@ function parseGen4Gen5Save(buffer) {
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
             
+            // Extract item, moves, and IVs
+            const itemId = blockA[1];
+            const rawItem = REVERSE_ITEMS_MAP_GEN3[itemId] || "";
+            const itemName = formatItemNameForDisplay(rawItem);
+            
+            const moves = [];
+            for (let m = 0; m < 4; m++) {
+                const moveId = blockB[m];
+                const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                moves.push(formatMoveNameForDisplay(rawName));
+            }
+            
+            const ivWord = blockB[8] | (blockB[9] << 16);
+            const ivs = {
+                hp: ivWord & 0x1F,
+                atk: (ivWord >> 5) & 0x1F,
+                def: (ivWord >> 10) & 0x1F,
+                spe: (ivWord >> 15) & 0x1F,
+                spa: (ivWord >> 20) & 0x1F,
+                spd: (ivWord >> 25) & 0x1F
+            };
+            
             parsedList.push({
                 sourceSlot: isParty ? `Equipa (Gen 4/5)` : `Box (Gen 4/5)`,
                 pokedexId,
@@ -2141,7 +2354,15 @@ function parseGen4Gen5Save(buffer) {
                 nickname: nickname || speciesName,
                 level: level,
                 otName: otName,
-                otId: otId
+                otId: otId,
+                item: itemName,
+                moves: moves,
+                ivs: ivs,
+                saveMeta: {
+                    gen: 4, // or 5, we can mark as 4/5
+                    isParty: isParty,
+                    structOffset: offset
+                }
             });
             
             seenPids.add(pid);
@@ -2165,6 +2386,11 @@ function parseDecryptedPKM(buffer, fileName) {
     let otId = 0;
     let otName = "";
     
+    let moves = [];
+    let itemName = "";
+    let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+    let rawSaveMeta = null;
+    
     if (size === 100) {
         // PK3
         pokedexId = u16[32 / 2];
@@ -2176,6 +2402,27 @@ function parseDecryptedPKM(buffer, fileName) {
         otId = u16[4 / 2];
         const otNameBytes = u8.subarray(20, 27);
         otName = decodeGen3String(otNameBytes);
+        
+        const itemId = u16[34 / 2];
+        itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+        
+        for (let m = 0; m < 4; m++) {
+            const moveId = u16[(44 + m * 2) / 2];
+            const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+            moves.push(formatMoveNameForDisplay(rawName));
+        }
+        
+        const ivWord = u32[72 / 4];
+        ivs = {
+            hp: ivWord & 0x1F,
+            atk: (ivWord >> 5) & 0x1F,
+            def: (ivWord >> 10) & 0x1F,
+            spe: (ivWord >> 15) & 0x1F,
+            spa: (ivWord >> 20) & 0x1F,
+            spd: (ivWord >> 25) & 0x1F
+        };
+        
+        rawSaveMeta = { gen: 3, isIndividual: true, rawBytes: u8.slice(0) };
     } else if (size === 136 || size === 220 || size === 236) {
         // PK4 / PK5
         pokedexId = u16[8 / 2];
@@ -2193,6 +2440,27 @@ function parseDecryptedPKM(buffer, fileName) {
             level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
         }
         sourceSlot = `Ficheiro PK${size === 236 ? '4/5 Party' : '4/5 Box'}`;
+        
+        const itemId = u16[10 / 2];
+        itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+        
+        for (let m = 0; m < 4; m++) {
+            const moveId = u16[(40 + m * 2) / 2];
+            const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+            moves.push(formatMoveNameForDisplay(rawName));
+        }
+        
+        const ivWord = u32[56 / 4];
+        ivs = {
+            hp: ivWord & 0x1F,
+            atk: (ivWord >> 5) & 0x1F,
+            def: (ivWord >> 10) & 0x1F,
+            spe: (ivWord >> 15) & 0x1F,
+            spa: (ivWord >> 20) & 0x1F,
+            spd: (ivWord >> 25) & 0x1F
+        };
+        
+        rawSaveMeta = { gen: size === 236 ? 4 : 5, isIndividual: true, rawBytes: u8.slice(0) };
     } else if (size === 232 || size === 260) {
         // PK6 / PK7
         pokedexId = u16[0x08 / 2];
@@ -2210,6 +2478,27 @@ function parseDecryptedPKM(buffer, fileName) {
             level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
         }
         sourceSlot = `Ficheiro PK${size === 232 ? '6/7 Box' : '6/7 Party'}`;
+        
+        const itemId = u16[0x0A / 2];
+        itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+        
+        for (let m = 0; m < 4; m++) {
+            const moveId = u16[(0x5A + m * 2) / 2];
+            const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+            moves.push(formatMoveNameForDisplay(rawName));
+        }
+        
+        const ivWord = u32[0x74 / 4];
+        ivs = {
+            hp: ivWord & 0x1F,
+            atk: (ivWord >> 5) & 0x1F,
+            def: (ivWord >> 10) & 0x1F,
+            spe: (ivWord >> 15) & 0x1F,
+            spa: (ivWord >> 20) & 0x1F,
+            spd: (ivWord >> 25) & 0x1F
+        };
+        
+        rawSaveMeta = { gen: size === 260 ? 6 : 7, isIndividual: true, rawBytes: u8.slice(0) };
     } else if (size === 328 || size === 344) {
         // PK8 / PK9
         pokedexId = u16[0x08 / 2];
@@ -2223,6 +2512,27 @@ function parseDecryptedPKM(buffer, fileName) {
         
         level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
         sourceSlot = `Ficheiro PK${size === 328 ? '8' : '9'}`;
+        
+        const itemId = u16[0x0A / 2];
+        itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+        
+        for (let m = 0; m < 4; m++) {
+            const moveId = u16[(0x7C + m * 2) / 2];
+            const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+            moves.push(formatMoveNameForDisplay(rawName));
+        }
+        
+        const ivWord = u32[0x8C / 4];
+        ivs = {
+            hp: ivWord & 0x1F,
+            atk: (ivWord >> 5) & 0x1F,
+            def: (ivWord >> 10) & 0x1F,
+            spe: (ivWord >> 15) & 0x1F,
+            spa: (ivWord >> 20) & 0x1F,
+            spd: (ivWord >> 25) & 0x1F
+        };
+        
+        rawSaveMeta = { gen: size === 328 ? 8 : 9, isIndividual: true, rawBytes: u8.slice(0) };
     } else {
         return null;
     }
@@ -2240,7 +2550,11 @@ function parseDecryptedPKM(buffer, fileName) {
         nickname: nickname || speciesName,
         level: level,
         otName: otName,
-        otId: otId
+        otId: otId,
+        item: itemName,
+        moves: moves,
+        ivs: ivs,
+        saveMeta: rawSaveMeta
     }];
 }
 
@@ -6410,6 +6724,7 @@ window.onload = function() {
         if (themeSelect) themeSelect.value = currentVisualTheme;
         
         switchGame(currentGameId);
+        setupEditorMovesListeners();
     }).catch(err => {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
         cleanupDuplicates();
@@ -6427,6 +6742,7 @@ window.onload = function() {
         if (themeSelect) themeSelect.value = currentVisualTheme;
         
         switchGame(currentGameId);
+        setupEditorMovesListeners();
     });
 };
 
@@ -6503,6 +6819,21 @@ const BINARY_ITEMS_MAP_GEN3 = {
     "red scarf": 254, "blue scarf": 255, "pink scarf": 256, "green scarf": 257, "yellow scarf": 258
 };
 
+const REVERSE_ITEMS_MAP_GEN2 = {};
+Object.keys(BINARY_ITEMS_MAP_GEN2).forEach(k => {
+    REVERSE_ITEMS_MAP_GEN2[BINARY_ITEMS_MAP_GEN2[k]] = k;
+});
+
+const REVERSE_ITEMS_MAP_GEN3 = {};
+Object.keys(BINARY_ITEMS_MAP_GEN3).forEach(k => {
+    REVERSE_ITEMS_MAP_GEN3[BINARY_ITEMS_MAP_GEN3[k]] = k;
+});
+
+const REVERSE_MOVES_MAP = {};
+Object.keys(BINARY_MOVES_MAP).forEach(k => {
+    REVERSE_MOVES_MAP[BINARY_MOVES_MAP[k]] = k;
+});
+
 function exportModifiedSave() {
     if (!uploadedSaveBuffer) {
         alert("Nenhum ficheiro de save foi carregado nesta sessão.");
@@ -6514,65 +6845,8 @@ function exportModifiedSave() {
         return;
     }
 
-    const PORTUGUESE_TO_ENGLISH_MOVES = {
-        "combate próximo": "close combat",
-        "terramoto": "earthquake",
-        "deslize de rocha": "rock slide",
-        "submissão": "submission",
-        "soco dinâmico": "dynamic punch",
-        "quebra tijolo": "brick break",
-        "soco gelo": "ice punch",
-        "poder oculto": "hidden power",
-        "sinal luminoso": "signal beam",
-        "golpe de corpo": "body slam",
-        "bola sombra": "shadow ball",
-        "pulso sombrio": "dark pulse",
-        "relâmpago": "thunderbolt",
-        "mordida": "bite",
-        "lança-chamas": "flamethrower",
-        "raio gelo": "ice beam",
-        "nevasca": "blizzard"
-    };
-
-    const PORTUGUESE_TO_ENGLISH_ITEMS = {
-        "restos": "leftovers",
-        "ovo da sorte": "lucky egg",
-        "garra rápida": "quick claw",
-        "exp. share": "exp share",
-        "partilha exp": "exp share",
-        "banda de foco": "focus band",
-        "óculos pretos": "blackglasses",
-        "óculos escuros": "blackglasses",
-        "carvão": "charcoal",
-        "semente milagrosa": "miracle seed",
-        "água mística": "mystic water"
-    };
-
-    function getEnglishMoveName(name) {
-        if (!name) return "";
-        let clean = name.toLowerCase().trim();
-        const match = clean.match(/\(([^)]+)\)/);
-        if (match) {
-            return match[1].trim();
-        }
-        if (PORTUGUESE_TO_ENGLISH_MOVES[clean]) {
-            return PORTUGUESE_TO_ENGLISH_MOVES[clean];
-        }
-        return clean;
-    }
-
-    function getEnglishItemName(name) {
-        if (!name) return "";
-        let clean = name.toLowerCase().trim();
-        const match = clean.match(/\(([^)]+)\)/);
-        if (match) {
-            return match[1].trim();
-        }
-        if (PORTUGUESE_TO_ENGLISH_ITEMS[clean]) {
-            return PORTUGUESE_TO_ENGLISH_ITEMS[clean];
-        }
-        return clean;
-    }
+    // Usando as funções globais de tradução getEnglishMoveName e getEnglishItemName
+    
     
     const workingBuffer = uploadedSaveBuffer.slice(0);
     const u8 = new Uint8Array(workingBuffer);
@@ -6633,6 +6907,16 @@ function exportModifiedSave() {
                 }
             }
             
+            // Grava DVs (Individual Values divididos por 2)
+            const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+            const atkDv = Math.max(0, Math.min(15, Math.floor((ivs.atk || 31) / 2)));
+            const defDv = Math.max(0, Math.min(15, Math.floor((ivs.def || 31) / 2)));
+            const speDv = Math.max(0, Math.min(15, Math.floor((ivs.spe || 31) / 2)));
+            const spcDv = Math.max(0, Math.min(15, Math.floor((ivs.spa || 31) / 2)));
+            
+            u8[structOffset + 27] = (atkDv << 4) | defDv;
+            u8[structOffset + 28] = (speDv << 4) | spcDv;
+            
             if (meta.isParty === false) {
                 // If it is in the Active Box, recalculate the Active Box checksum at 0x3522
                 let boxSum = 0;
@@ -6665,6 +6949,16 @@ function exportModifiedSave() {
                         u8[structOffset + 23 + m] = 0;
                     }
                 }
+                
+                // Grava DVs (Individual Values)
+                const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+                const atkDv = Math.max(0, Math.min(15, Math.floor((ivs.atk || 31) / 2)));
+                const defDv = Math.max(0, Math.min(15, Math.floor((ivs.def || 31) / 2)));
+                const speDv = Math.max(0, Math.min(15, Math.floor((ivs.spe || 31) / 2)));
+                const spcDv = Math.max(0, Math.min(15, Math.floor((ivs.spa || 31) / 2)));
+                
+                u8[structOffset + 21] = (atkDv << 4) | defDv;
+                u8[structOffset + 22] = (speDv << 4) | spcDv;
             });
             
             modifyCount++;
@@ -6702,9 +6996,11 @@ function exportModifiedSave() {
             
             let blockGIdx = -1;
             let blockAIdx = -1;
+            let blockMIdx = -1;
             for (let b = 0; b < 4; b++) {
                 if (order[b] === 0) blockGIdx = b;
                 if (order[b] === 1) blockAIdx = b;
+                if (order[b] === 3) blockMIdx = b;
             }
             
             if (blockGIdx !== -1) {
@@ -6731,6 +7027,35 @@ function exportModifiedSave() {
                         decryptedBytes[aOffset + 8 + m] = 0;
                     }
                 }
+            }
+            
+            if (blockMIdx !== -1) {
+                const mOffset = blockMIdx * 12;
+                let ivWord = decryptedBytes[mOffset + 4] |
+                             (decryptedBytes[mOffset + 5] << 8) |
+                             (decryptedBytes[mOffset + 6] << 16) |
+                             (decryptedBytes[mOffset + 7] << 24);
+                             
+                const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+                const hpIv = Math.max(0, Math.min(31, ivs.hp !== undefined ? ivs.hp : 31));
+                const atkIv = Math.max(0, Math.min(31, ivs.atk !== undefined ? ivs.atk : 31));
+                const defIv = Math.max(0, Math.min(31, ivs.def !== undefined ? ivs.def : 31));
+                const speIv = Math.max(0, Math.min(31, ivs.spe !== undefined ? ivs.spe : 31));
+                const spaIv = Math.max(0, Math.min(31, ivs.spa !== undefined ? ivs.spa : 31));
+                const spdIv = Math.max(0, Math.min(31, ivs.spd !== undefined ? ivs.spd : 31));
+                
+                ivWord = (ivWord & 0xC0000000) |
+                         hpIv |
+                         (atkIv << 5) |
+                         (defIv << 10) |
+                         (speIv << 15) |
+                         (spaIv << 20) |
+                         (spdIv << 25);
+                         
+                decryptedBytes[mOffset + 4] = ivWord & 0xFF;
+                decryptedBytes[mOffset + 5] = (ivWord >> 8) & 0xFF;
+                decryptedBytes[mOffset + 6] = (ivWord >> 16) & 0xFF;
+                decryptedBytes[mOffset + 7] = (ivWord >> 24) & 0xFF;
             }
             
             // Recalculate 16-bit decrypted Pokémon checksum
@@ -6836,8 +7161,568 @@ function exportModifiedSave() {
     alert(`Sucesso! Save modificado gravado com ${modifyCount} alterações.`);
 }
 
+function exportIndividualPkx() {
+    const id = document.getElementById("form-id").value;
+    if (!id) return;
+    const pkmn = pokemonDatabase.find(p => p.id === id);
+    if (!pkmn) return;
+    
+    let gen = 3;
+    if (pkmn.saveMeta && pkmn.saveMeta.gen) {
+        gen = pkmn.saveMeta.gen;
+    } else {
+        const game = GAMES_DB.find(g => g.id === currentGameId);
+        gen = game ? game.gen : 9;
+    }
+    
+    let size = 136;
+    let ext = "pk4";
+    if (gen === 3) { size = 100; ext = "pk3"; }
+    else if (gen === 4 || gen === 5) { size = 136; ext = `pk${gen}`; }
+    else if (gen === 6 || gen === 7) { size = 232; ext = `pk${gen}`; }
+    else if (gen === 8) { size = 328; ext = "pk8"; }
+    else if (gen === 9) { size = 344; ext = "pk9"; }
+    
+    let u8 = null;
+    if (pkmn.saveMeta && pkmn.saveMeta.isIndividual && pkmn.saveMeta.rawBytes) {
+        u8 = new Uint8Array(pkmn.saveMeta.rawBytes);
+    } else if (uploadedSaveBuffer && pkmn.saveMeta && pkmn.saveMeta.structOffset !== undefined) {
+        const saveU8 = new Uint8Array(uploadedSaveBuffer);
+        if (gen === 3) {
+            let sectorIndex = -1;
+            for (let s = 0; s < 14; s++) {
+                const sIdx = uploadedSaveActiveSectorStart + s;
+                const offset = sIdx * 4096;
+                const sig = saveU8[offset + 0x0FF8] | (saveU8[offset + 0x0FF9] << 8) | (saveU8[offset + 0x0FFA] << 16) | (saveU8[offset + 0x0FFB] << 24);
+                if (sig === 0x08012025 && saveU8[offset + 0x0FF4] === 1) {
+                    sectorIndex = sIdx;
+                    break;
+                }
+            }
+            if (sectorIndex !== -1) {
+                const sectorOffset = sectorIndex * 4096;
+                u8 = saveU8.slice(sectorOffset + pkmn.saveMeta.structOffset, sectorOffset + pkmn.saveMeta.structOffset + 100);
+            }
+        } else if (gen === 4 || gen === 5) {
+            u8 = saveU8.slice(pkmn.saveMeta.structOffset, pkmn.saveMeta.structOffset + 136);
+        } else if (gen === 6 || gen === 7) {
+            u8 = saveU8.slice(pkmn.saveMeta.structOffset, pkmn.saveMeta.structOffset + 232);
+        } else if (gen === 8 || gen === 9) {
+            u8 = saveU8.slice(pkmn.saveMeta.structOffset, pkmn.saveMeta.structOffset + size);
+        }
+    }
+    
+    if (!u8 || u8.length !== size) {
+        u8 = new Uint8Array(size);
+        u8[0] = pkmn.pokedexId & 0xFF;
+        u8[1] = (pkmn.pokedexId >> 8) & 0xFF;
+    }
+    
+    const u16 = new Uint16Array(u8.buffer, u8.byteOffset, u8.length / 2);
+    const u32 = new Uint32Array(u8.buffer, u8.byteOffset, u8.length / 4);
+    
+    const moves = [
+        document.getElementById("form-move1").value,
+        document.getElementById("form-move2").value,
+        document.getElementById("form-move3").value,
+        document.getElementById("form-move4").value
+    ].filter(m => m !== "");
+    
+    const ivs = {
+        hp: parseInt(document.getElementById("iv-hp").value) || 31,
+        atk: parseInt(document.getElementById("iv-atk").value) || 31,
+        def: parseInt(document.getElementById("iv-def").value) || 31,
+        spa: parseInt(document.getElementById("iv-spa").value) || 31,
+        spd: parseInt(document.getElementById("iv-spd").value) || 31,
+        spe: parseInt(document.getElementById("iv-spe").value) || 31
+    };
+    
+    const item = document.getElementById("form-item").value;
+    const nickname = document.getElementById("form-nickname").value || pkmn.species;
+    const level = parseInt(document.getElementById("form-level").value, 10) || 50;
+    
+    if (gen === 3) {
+        let pid = pkmn.saveMeta ? pkmn.saveMeta.pid : 0;
+        let otid = pkmn.saveMeta ? pkmn.saveMeta.otid : 0;
+        let shuffleIndex = 0;
+        if (pkmn.saveMeta) {
+            shuffleIndex = pkmn.saveMeta.shuffleIndex;
+        } else {
+            pid = Math.floor(Math.random() * 0xFFFFFFFF);
+            otid = Math.floor(Math.random() * 0xFFFFFFFF);
+            shuffleIndex = pid % 24;
+            
+            u32[0] = pid;
+            u32[1] = otid;
+            
+            const otName = "BlackBox";
+            const nick = nickname;
+            for (let j = 0; j < 7; j++) {
+                u8[20 + j] = j < otName.length ? otName.charCodeAt(j) : 0xFF;
+            }
+            for (let j = 0; j < 10; j++) {
+                u8[8 + j] = j < nick.length ? nick.charCodeAt(j) : 0xFF;
+            }
+            u8[84] = level;
+        }
+        
+        const key = pid ^ otid;
+        const decryptedWords = new Uint32Array(12);
+        for (let j = 0; j < 12; j++) {
+            const wordOffset = 0x20 + j * 4;
+            const encryptedWord = u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24);
+            decryptedWords[j] = encryptedWord ^ key;
+        }
+        const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+        const order = blockOrders[shuffleIndex];
+        
+        let blockGIdx = -1;
+        let blockAIdx = -1;
+        let blockMIdx = -1;
+        for (let b = 0; b < 4; b++) {
+            if (order[b] === 0) blockGIdx = b;
+            if (order[b] === 1) blockAIdx = b;
+            if (order[b] === 3) blockMIdx = b;
+        }
+        
+        if (blockGIdx !== -1) {
+            const gOffset = blockGIdx * 12;
+            const itemName = getEnglishItemName(item);
+            const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+            decryptedBytes[gOffset + 2] = itemId & 0xFF;
+            decryptedBytes[gOffset + 3] = (itemId >> 8) & 0xFF;
+            
+            decryptedBytes[gOffset] = pkmn.pokedexId & 0xFF;
+            decryptedBytes[gOffset + 1] = (pkmn.pokedexId >> 8) & 0xFF;
+        }
+        
+        if (blockAIdx !== -1) {
+            const aOffset = blockAIdx * 12;
+            for (let m = 0; m < 4; m++) {
+                const moveName = getEnglishMoveName(moves[m]);
+                const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                decryptedBytes[aOffset + m * 2] = moveId & 0xFF;
+                decryptedBytes[aOffset + m * 2 + 1] = (moveId >> 8) & 0xFF;
+                decryptedBytes[aOffset + 8 + m] = moveId > 0 ? 20 : 0;
+            }
+        }
+        
+        if (blockMIdx !== -1) {
+            const mOffset = blockMIdx * 12;
+            let ivWord = decryptedBytes[mOffset + 4] |
+                         (decryptedBytes[mOffset + 5] << 8) |
+                         (decryptedBytes[mOffset + 6] << 16) |
+                         (decryptedBytes[mOffset + 7] << 24);
+                         
+            const hpIv = Math.max(0, Math.min(31, ivs.hp || 31));
+            const atkIv = Math.max(0, Math.min(31, ivs.atk || 31));
+            const defIv = Math.max(0, Math.min(31, ivs.def || 31));
+            const speIv = Math.max(0, Math.min(31, ivs.spe || 31));
+            const spaIv = Math.max(0, Math.min(31, ivs.spa || 31));
+            const spdIv = Math.max(0, Math.min(31, ivs.spd || 31));
+            
+            ivWord = (ivWord & 0xC0000000) | hpIv | (atkIv << 5) | (defIv << 10) | (speIv << 15) | (spaIv << 20) | (spdIv << 25);
+            decryptedBytes[mOffset + 4] = ivWord & 0xFF;
+            decryptedBytes[mOffset + 5] = (ivWord >> 8) & 0xFF;
+            decryptedBytes[mOffset + 6] = (ivWord >> 16) & 0xFF;
+            decryptedBytes[mOffset + 7] = (ivWord >> 24) & 0xFF;
+        }
+        
+        let pkmnSum = 0;
+        const decryptedWords16 = new Uint16Array(decryptedWords.buffer);
+        for (let k = 0; k < 24; k++) pkmnSum = (pkmnSum + decryptedWords16[k]) & 0xFFFF;
+        u8[28] = pkmnSum & 0xFF;
+        u8[29] = (pkmnSum >> 8) & 0xFF;
+        
+        const encryptedWords = new Uint32Array(decryptedWords.buffer);
+        for (let j = 0; j < 12; j++) {
+            const wordOffset = 0x20 + j * 4;
+            const encryptedWord = encryptedWords[j] ^ key;
+            u8[wordOffset] = encryptedWord & 0xFF;
+            u8[wordOffset + 1] = (encryptedWord >> 8) & 0xFF;
+            u8[wordOffset + 2] = (encryptedWord >> 16) & 0xFF;
+            u8[wordOffset + 3] = (encryptedWord >> 24) & 0xFF;
+        }
+    } 
+    else if (gen === 4 || gen === 5) {
+        let pid = pkmn.saveMeta ? pkmn.saveMeta.pid : 0;
+        let otid = pkmn.saveMeta ? pkmn.saveMeta.otid : 0;
+        let shuffleIndex = 0;
+        if (pkmn.saveMeta) {
+            shuffleIndex = ((pid & 0x3E000) >>> 13) % 24;
+        } else {
+            pid = Math.floor(Math.random() * 0xFFFFFFFF);
+            otid = Math.floor(Math.random() * 0xFFFFFFFF);
+            shuffleIndex = ((pid & 0x3E000) >>> 13) % 24;
+            u32[0] = pid;
+            u16[4] = pkmn.pokedexId & 0xFFFF;
+        }
+        
+        const checksum = u8[6] | (u8[7] << 8);
+        let seed = checksum;
+        const decryptedWords = new Uint16Array(64);
+        for (let j = 0; j < 64; j++) {
+            const encryptedWord = u8[8 + j * 2] | (u8[8 + j * 2 + 1] << 8);
+            seed = (Math.imul(seed, 1103515245) + 24691) | 0;
+            const key = (seed >>> 16) & 0xFFFF;
+            decryptedWords[j] = encryptedWord ^ key;
+        }
+        
+        const order = blockOrders[shuffleIndex];
+        const blockA = new Uint16Array(16);
+        const blockB = new Uint16Array(16);
+        const blockC = new Uint16Array(16);
+        const blockD = new Uint16Array(16);
+        
+        for (let b = 0; b < 4; b++) {
+            const targetBlock = order[b];
+            let dest = null;
+            if (targetBlock === 0) dest = blockA;
+            else if (targetBlock === 1) dest = blockB;
+            else if (targetBlock === 2) dest = blockC;
+            else if (targetBlock === 3) dest = blockD;
+            
+            if (dest) {
+                for (let w = 0; w < 16; w++) dest[w] = decryptedWords[b * 16 + w];
+            }
+        }
+        
+        blockA[0] = pkmn.pokedexId & 0xFFFF;
+        
+        const itemName = getEnglishItemName(item);
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        blockA[1] = itemId & 0xFFFF;
+        
+        for (let m = 0; m < 4; m++) {
+            const moveName = getEnglishMoveName(moves[m]);
+            const moveId = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && Object.keys(POKEAPI_MOVE_ID_TO_NAME).find(k => POKEAPI_MOVE_ID_TO_NAME[k] === moveName.toLowerCase())) || BINARY_MOVES_MAP[moveName] || 0;
+            blockB[m] = moveId & 0xFFFF;
+        }
+        
+        blockB[4] = (blockB[0] > 0 ? 20 : 0) | ((blockB[1] > 0 ? 20 : 0) << 8);
+        blockB[5] = (blockB[2] > 0 ? 20 : 0) | ((blockB[3] > 0 ? 20 : 0) << 8);
+        
+        let ivWord = blockB[8] | (blockB[9] << 16);
+        const hpIv = Math.max(0, Math.min(31, ivs.hp || 31));
+        const atkIv = Math.max(0, Math.min(31, ivs.atk || 31));
+        const defIv = Math.max(0, Math.min(31, ivs.def || 31));
+        const speIv = Math.max(0, Math.min(31, ivs.spe || 31));
+        const spaIv = Math.max(0, Math.min(31, ivs.spa || 31));
+        const spdIv = Math.max(0, Math.min(31, ivs.spd || 31));
+        
+        ivWord = (ivWord & 0xC0000000) | hpIv | (atkIv << 5) | (defIv << 10) | (speIv << 15) | (spaIv << 20) | (spdIv << 25);
+        blockB[8] = ivWord & 0xFFFF;
+        blockB[9] = (ivWord >> 16) & 0xFFFF;
+        
+        const shuffledWords = new Uint16Array(64);
+        for (let b = 0; b < 4; b++) {
+            const blockType = order[b];
+            const src = blockType === 0 ? blockA : (blockType === 1 ? blockB : (blockType === 2 ? blockC : blockD));
+            const destOffset = b * 16;
+            for (let w = 0; w < 16; w++) shuffledWords[destOffset + w] = src[w];
+        }
+        
+        let sum = 0;
+        for (let w = 0; w < 64; w++) sum = (sum + shuffledWords[w]) & 0xFFFF;
+        
+        u8[6] = sum & 0xFF;
+        u8[7] = (sum >> 8) & 0xFF;
+        
+        let encryptSeed = sum;
+        for (let j = 0; j < 64; j++) {
+            encryptSeed = (Math.imul(encryptSeed, 1103515245) + 24691) | 0;
+            const key = (encryptSeed >>> 16) & 0xFFFF;
+            const enc = shuffledWords[j] ^ key;
+            u8[8 + j * 2] = enc & 0xFF;
+            u8[8 + j * 2 + 1] = (enc >> 8) & 0xFF;
+        }
+    } 
+    else if (gen === 6 || gen === 7) {
+        u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
+        
+        const itemName = getEnglishItemName(item);
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        u16[0x0A / 2] = itemId & 0xFFFF;
+        
+        for (let m = 0; m < 4; m++) {
+            const moveName = getEnglishMoveName(moves[m]);
+            const moveId = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && Object.keys(POKEAPI_MOVE_ID_TO_NAME).find(k => POKEAPI_MOVE_ID_TO_NAME[k] === moveName.toLowerCase())) || BINARY_MOVES_MAP[moveName] || 0;
+            u16[(0x5A + m * 2) / 2] = moveId & 0xFFFF;
+            u8[0x62 + m] = moveId > 0 ? 20 : 0;
+        }
+        
+        let ivWord = u32[0x74 / 4];
+        const hpIv = Math.max(0, Math.min(31, ivs.hp || 31));
+        const atkIv = Math.max(0, Math.min(31, ivs.atk || 31));
+        const defIv = Math.max(0, Math.min(31, ivs.def || 31));
+        const speIv = Math.max(0, Math.min(31, ivs.spe || 31));
+        const spaIv = Math.max(0, Math.min(31, ivs.spa || 31));
+        const spdIv = Math.max(0, Math.min(31, ivs.spd || 31));
+        
+        ivWord = (ivWord & 0xC0000000) | hpIv | (atkIv << 5) | (defIv << 10) | (speIv << 15) | (spaIv << 20) | (spdIv << 25);
+        u32[0x74 / 4] = ivWord;
+        
+        let sum = 0;
+        for (let w = 0; w < 112; w++) {
+            sum = (sum + u16[4 + w]) & 0xFFFF;
+        }
+        u8[6] = sum & 0xFF;
+        u8[7] = (sum >> 8) & 0xFF;
+    } 
+    else if (gen === 8 || gen === 9) {
+        u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
+        
+        const itemName = getEnglishItemName(item);
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        u16[0x0A / 2] = itemId & 0xFFFF;
+        
+        for (let m = 0; m < 4; m++) {
+            const moveName = getEnglishMoveName(moves[m]);
+            const moveId = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && Object.keys(POKEAPI_MOVE_ID_TO_NAME).find(k => POKEAPI_MOVE_ID_TO_NAME[k] === moveName.toLowerCase())) || BINARY_MOVES_MAP[moveName] || 0;
+            u16[(0x7C + m * 2) / 2] = moveId & 0xFFFF;
+            u8[0x84 + m] = moveId > 0 ? 20 : 0;
+        }
+        
+        let ivWord = u32[0x8C / 4];
+        const hpIv = Math.max(0, Math.min(31, ivs.hp || 31));
+        const atkIv = Math.max(0, Math.min(31, ivs.atk || 31));
+        const defIv = Math.max(0, Math.min(31, ivs.def || 31));
+        const speIv = Math.max(0, Math.min(31, ivs.spe || 31));
+        const spaIv = Math.max(0, Math.min(31, ivs.spa || 31));
+        const spdIv = Math.max(0, Math.min(31, ivs.spd || 31));
+        
+        ivWord = (ivWord & 0xC0000000) | hpIv | (atkIv << 5) | (defIv << 10) | (speIv << 15) | (spaIv << 20) | (spdIv << 25);
+        u32[0x8C / 4] = ivWord;
+        
+        let sum = 0;
+        const numWords = (size - 8) / 2;
+        for (let w = 0; w < numWords; w++) {
+            sum = (sum + u16[4 + w]) & 0xFFFF;
+        }
+        u8[6] = sum & 0xFF;
+        u8[7] = (sum >> 8) & 0xFF;
+    }
+    
+    const blob = new Blob([u8], { type: "application/octet-stream" });
+    const link = document.createElement("a");
+    const filename = `${pkmn.nickname || pkmn.species}_${ext}.${ext}`;
+    link.href = URL.createObjectURL(blob);
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+function getMoveGeneration(moveId) {
+    if (moveId >= 10001) return 3; // Shadow moves are Gen 3
+    if (moveId <= 165) return 1;
+    if (moveId <= 251) return 2;
+    if (moveId <= 354) return 3;
+    if (moveId <= 467) return 4;
+    if (moveId <= 559) return 5;
+    if (moveId <= 621) return 6;
+    if (moveId <= 742) return 7;
+    if (moveId <= 826) return 8;
+    return 9;
+}
+
+function populateMoveSelects(p) {
+    if (!p) return;
+    
+    let gen = 9;
+    const currentGame = GAMES_DB.find(g => g.id === (p.currentGame || currentGameId));
+    if (currentGame) {
+        gen = currentGame.gen;
+    }
+    
+    const normSpecies = normalizeSpeciesNameForApi(p.species);
+    
+    // 1. Get current moves of this Pokemon
+    const currentMoves = (p.moves || []).map(m => m ? getEnglishMoveName(m).toLowerCase() : "");
+    
+    // 2. Get recommended moves
+    const recommendedList = getFourRecommendedMoves(p, gen);
+    const recommendedEng = recommendedList.map(m => m.english.toLowerCase());
+    
+    // 3. Let's compile and sort all moves in POKEAPI_MOVE_ID_TO_NAME
+    const learnableMoves = [];
+    const blockedMoves = [];
+    const otherMoves = [];
+    
+    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
+        Object.entries(POKEAPI_MOVE_ID_TO_NAME).forEach(([idStr, rawName]) => {
+            const moveId = parseInt(idStr, 10);
+            const moveGen = getMoveGeneration(moveId);
+            const englishName = rawName.toLowerCase();
+            
+            if (englishName === "struggle") return;
+            
+            const isCurrentlySelected = currentMoves.includes(englishName);
+            const isRec = recommendedEng.includes(englishName);
+            
+            const formattedName = formatMoveNameForDisplay(englishName);
+            const moveObj = { id: moveId, english: englishName, display: formattedName, gen: moveGen };
+            
+            if (isCurrentlySelected || isRec) {
+                return;
+            }
+            
+            if (moveGen <= gen) {
+                if (canPokemonLearnMove(p, englishName, gen)) {
+                    learnableMoves.push(moveObj);
+                } else {
+                    otherMoves.push(moveObj);
+                }
+            } else {
+                if (canPokemonLearnMove(p, englishName, 9)) {
+                    blockedMoves.push(moveObj);
+                } else {
+                    otherMoves.push(moveObj);
+                }
+            }
+        });
+    }
+    
+    const sortFn = (a, b) => a.display.localeCompare(b.display);
+    learnableMoves.sort(sortFn);
+    blockedMoves.sort(sortFn);
+    otherMoves.sort(sortFn);
+    
+    // For each of the 4 select elements
+    for (let slotNum = 1; slotNum <= 4; slotNum++) {
+        const selectId = `form-move${slotNum}`;
+        const selectEl = document.getElementById(selectId);
+        if (!selectEl) continue;
+        
+        const activeMove = p.moves?.[slotNum - 1] || "";
+        const activeMoveEng = activeMove ? getEnglishMoveName(activeMove).toLowerCase() : "";
+        
+        let html = `<option value="">Nenhum (None)</option>`;
+        
+        // Group 1: Ataque Atual
+        if (activeMove) {
+            html += `<optgroup label="Ataque Atual">
+                <option value="${activeMove}" selected>${activeMove}</option>
+            </optgroup>`;
+        }
+        
+        // Group 2: Recomendados
+        if (recommendedList.length > 0) {
+            html += `<optgroup label="Ataques Recomendados">`;
+            recommendedList.forEach(m => {
+                const disp = m.display;
+                if (m.english.toLowerCase() === activeMoveEng) return;
+                html += `<option value="${disp}">${disp}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        
+        // Group 3: Aprendíveis nesta Geração
+        if (learnableMoves.length > 0) {
+            html += `<optgroup label="Aprendíveis (Geração ${gen})">`;
+            learnableMoves.forEach(m => {
+                html += `<option value="${m.display}">${m.display}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        
+        // Group 4: Bloqueados por Geração (Futuros)
+        if (blockedMoves.length > 0) {
+            html += `<optgroup label="Bloqueados por Geração (Gens ${gen + 1}-9)">`;
+            blockedMoves.forEach(m => {
+                html += `<option value="${m.display}" disabled style="color: var(--text-muted); opacity: 0.5;">${m.display} [Bloqueado - Gen ${m.gen}]</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        
+        // Group 5: Outros Ataques (Não Compatíveis / Sem learnset)
+        if (otherMoves.length > 0) {
+            html += `<optgroup label="Outros Ataques (Incompatíveis/Indefinidos)">`;
+            otherMoves.forEach(m => {
+                html += `<option value="${m.display}" style="opacity: 0.7;">${m.display}</option>`;
+            });
+            html += `</optgroup>`;
+        }
+        
+        selectEl.innerHTML = html;
+    }
+}
+
+function setupEditorMovesListeners() {
+    const speciesInput = document.getElementById("form-species");
+    const originGameSelect = document.getElementById("form-origin-game");
+    
+    const onFormChange = () => {
+        const currentId = document.getElementById("form-id").value;
+        const currentSpecies = speciesInput ? speciesInput.value.trim() : "";
+        const currentOrigin = originGameSelect ? originGameSelect.value : currentGameId;
+        
+        let p = pokemonDatabase.find(pkmn => pkmn.id === currentId);
+        if (p) {
+            const tempP = {
+                ...p,
+                species: currentSpecies,
+                currentGame: currentOrigin,
+                moves: [
+                    document.getElementById("form-move1").value,
+                    document.getElementById("form-move2").value,
+                    document.getElementById("form-move3").value,
+                    document.getElementById("form-move4").value
+                ]
+            };
+            populateMoveSelects(tempP);
+        } else {
+            populateMoveSelects({
+                species: currentSpecies,
+                currentGame: currentOrigin,
+                moves: [
+                    document.getElementById("form-move1").value,
+                    document.getElementById("form-move2").value,
+                    document.getElementById("form-move3").value,
+                    document.getElementById("form-move4").value
+                ]
+            });
+        }
+    };
+    
+    if (speciesInput) {
+        speciesInput.addEventListener("input", onFormChange);
+        speciesInput.addEventListener("change", onFormChange);
+    }
+    if (originGameSelect) {
+        originGameSelect.addEventListener("change", onFormChange);
+    }
+    
+    const moveSelects = ["form-move1", "form-move2", "form-move3", "form-move4"];
+    moveSelects.forEach(id => {
+        const sel = document.getElementById(id);
+        if (sel) {
+            sel.addEventListener("change", (event) => {
+                const val = event.target.value;
+                if (!val) return;
+                
+                let duplicate = false;
+                moveSelects.forEach(otherId => {
+                    if (otherId !== id) {
+                        const otherSel = document.getElementById(otherId);
+                        if (otherSel && otherSel.value === val) {
+                            duplicate = true;
+                        }
+                    }
+                });
+                
+                if (duplicate) {
+                    alert("Não podes ter ataques iguais! Este ataque já está selecionado noutro slot.");
+                    event.target.value = "";
+                }
+            });
+        }
+    });
+}
+
 // --- SECTION MOVESET LEARNSET VALIDATION ---
 const LEARNSET_CACHE = {};
+const SPECIES_CACHE = {};
 const FETCHING_LEARNSETS = new Set();
 
 function normalizeSpeciesNameForApi(name) {
@@ -6872,6 +7757,31 @@ async function fetchPokemonLearnset(species) {
                 });
             }
             LEARNSET_CACHE[apiName] = learnedMoves;
+
+            const baseStats = { hp: 80, atk: 80, def: 80, spa: 80, spd: 80, spe: 80 };
+            if (data.stats && Array.isArray(data.stats)) {
+                data.stats.forEach(s => {
+                    if (s.stat.name === "hp") baseStats.hp = s.base_stat;
+                    else if (s.stat.name === "attack") baseStats.atk = s.base_stat;
+                    else if (s.stat.name === "defense") baseStats.def = s.base_stat;
+                    else if (s.stat.name === "special-attack") baseStats.spa = s.base_stat;
+                    else if (s.stat.name === "special-defense") baseStats.spd = s.base_stat;
+                    else if (s.stat.name === "speed") baseStats.spe = s.base_stat;
+                });
+            }
+            
+            const types = [];
+            if (data.types && Array.isArray(data.types)) {
+                data.types.forEach(t => {
+                    if (t.type && t.type.name) types.push(t.type.name.toLowerCase());
+                });
+            }
+            
+            SPECIES_CACHE[apiName] = {
+                learnset: learnedMoves,
+                baseStats: baseStats,
+                types: types
+            };
             
             // Re-render recommendations since we now have the accurate learnset
             const game = GAMES_DB.find(g => g.id === currentGameId);
@@ -6879,6 +7789,37 @@ async function fetchPokemonLearnset(species) {
             const recommendations = getRecommendedAllocation();
             const activeTeam = recommendations.map(rec => rec.pokemon);
             renderWeaknessAnalysis(activeTeam, gen);
+            
+            // Re-populate moves dropdowns if editor is active and matches species
+            const editorModal = document.getElementById("editor-modal");
+            if (editorModal && editorModal.classList.contains("active")) {
+                const currentId = document.getElementById("form-id").value;
+                const currentSpecies = document.getElementById("form-species").value.trim();
+                if (normalizeSpeciesNameForApi(currentSpecies) === apiName) {
+                    let p = pokemonDatabase.find(pkmn => pkmn.id === currentId);
+                    const tempP = p ? {
+                        ...p,
+                        species: currentSpecies,
+                        currentGame: document.getElementById("form-origin-game").value,
+                        moves: [
+                            document.getElementById("form-move1").value,
+                            document.getElementById("form-move2").value,
+                            document.getElementById("form-move3").value,
+                            document.getElementById("form-move4").value
+                        ]
+                    } : {
+                        species: currentSpecies,
+                        currentGame: document.getElementById("form-origin-game").value,
+                        moves: [
+                            document.getElementById("form-move1").value,
+                            document.getElementById("form-move2").value,
+                            document.getElementById("form-move3").value,
+                            document.getElementById("form-move4").value
+                        ]
+                    };
+                    populateMoveSelects(tempP);
+                }
+            }
         }
     } catch (e) {
         console.error("Erro ao procurar learnset para " + species, e);
@@ -7098,100 +8039,263 @@ function canPokemonLearnMove(pkmn, moveEnglishName, gen) {
     }
 }
 
-function getFourRecommendedMoves(pkmn, gen) {
-    const moves = [];
-    const addMove = (mEnglish, mDisplay) => {
-        if (moves.length >= 4) return;
-        if (moves.some(x => x.english === mEnglish)) return;
-        if (canPokemonLearnMove(pkmn, mEnglish, gen)) {
-            moves.push({ display: mDisplay, english: mEnglish });
-        }
-    };
+const MOVE_TYPES = {
+    "pound": "normal", "karate chop": "fighting", "double slap": "normal", "comet punch": "normal", "mega punch": "normal",
+    "pay day": "normal", "fire punch": "fire", "ice punch": "ice", "thunder punch": "electric", "scratch": "normal",
+    "vice grip": "normal", "guillotine": "normal", "razor wind": "normal", "swords dance": "normal", "cut": "normal",
+    "gust": "flying", "wing attack": "flying", "whirlwind": "normal", "fly": "flying", "bind": "normal",
+    "slam": "normal", "vine whip": "grass", "stomp": "normal", "double kick": "fighting", "mega kick": "normal",
+    "jump kick": "fighting", "rolling kick": "fighting", "sand attack": "ground", "headbutt": "normal", "horn attack": "normal",
+    "fury attack": "normal", "horn drill": "normal", "tackle": "normal", "body slam": "normal", "wrap": "normal",
+    "take down": "normal", "thrash": "normal", "double edge": "normal", "tail whip": "normal", "poison sting": "poison",
+    "twineedle": "bug", "pin missile": "bug", "leer": "normal", "bite": "dark", "growl": "normal",
+    "roar": "normal", "sing": "normal", "supersonic": "normal", "sonic boom": "normal", "disable": "normal",
+    "acid": "poison", "ember": "fire", "flamethrower": "fire", "mist": "ice", "water gun": "water",
+    "hydro pump": "water", "surf": "water", "ice beam": "ice", "blizzard": "ice", "psybeam": "psychic",
+    "bubble beam": "water", "aurora beam": "ice", "hyper beam": "normal", "peck": "flying", "drill peck": "flying",
+    "submission": "fighting", "low kick": "fighting", "counter": "fighting", "seismic toss": "fighting", "strength": "normal",
+    "absorb": "grass", "mega drain": "grass", "leech seed": "grass", "growth": "normal", "razor leaf": "grass",
+    "solar beam": "grass", "poison powder": "poison", "stun spore": "grass", "sleep powder": "grass", "petal dance": "grass",
+    "string shot": "bug", "dragon rage": "dragon", "fire spin": "fire", "thunder shock": "electric", "thunderbolt": "electric",
+    "thunder wave": "electric", "thunder": "electric", "rock throw": "rock", "earthquake": "ground", "fissure": "ground",
+    "dig": "ground", "toxic": "poison", "confusion": "psychic", "psychic": "psychic", "hypnosis": "psychic",
+    "meditate": "psychic", "agility": "psychic", "quick attack": "normal", "rage": "normal", "teleport": "psychic",
+    "night shade": "ghost", "mimic": "normal", "screech": "normal", "double team": "normal", "recover": "normal",
+    "harden": "normal", "minimize": "normal", "smokescreen": "normal", "confuse ray": "ghost", "withdraw": "water",
+    "defense curl": "normal", "barrier": "psychic", "light screen": "psychic", "haze": "ice", "reflect": "psychic",
+    "focus energy": "normal", "bide": "normal", "metronome": "normal", "mirror move": "flying", "self destruct": "normal",
+    "egg bomb": "normal", "lick": "ghost", "smog": "poison", "sludge": "poison", "bone club": "ground",
+    "fire blast": "fire", "waterfall": "water", "clamp": "water", "swift": "normal", "skull bash": "normal",
+    "spike cannon": "normal", "constrict": "normal", "amnesia": "psychic", "kinesis": "psychic", "soft boiled": "normal",
+    "high jump kick": "fighting", "glare": "normal", "dream eater": "psychic", "poison gas": "poison", "barrage": "normal",
+    "leech life": "bug", "lovely kiss": "normal", "sky attack": "flying", "transform": "normal", "bubble": "water",
+    "dizzy punch": "normal", "spore": "grass", "flash": "normal", "psywave": "psychic", "splash": "normal",
+    "acid armor": "poison", "crabhammer": "water", "explosion": "normal", "fury swipes": "normal", "bonemerang": "ground",
+    "rest": "normal", "rock slide": "rock", "hyper fang": "normal", "sharpen": "normal", "conversion": "normal",
+    "tri attack": "normal", "super fang": "normal", "slash": "normal", "substitute": "normal", "struggle": "normal",
+    "sketch": "normal", "triple kick": "fighting", "thief": "dark", "spider web": "bug", "mind reader": "normal",
+    "nightmare": "ghost", "flame wheel": "fire", "snore": "normal", "curse": "ghost", "flail": "normal",
+    "conversion 2": "normal", "aeroblast": "flying", "cotton spore": "grass", "reversal": "fighting", "spite": "ghost",
+    "powder snow": "ice", "protect": "normal", "mach punch": "fighting", "scary face": "normal", "feint attack": "dark",
+    "sweet kiss": "fairy", "belly drum": "normal", "sludge bomb": "poison", "mud slap": "ground", "octazooka": "water",
+    "spikes": "ground", "zap cannon": "electric", "foresight": "normal", "destiny bond": "ghost", "perish song": "normal",
+    "icy wind": "ice", "detect": "fighting", "bone rush": "ground", "lock on": "normal", "outrage": "dragon",
+    "sandstorm": "rock", "giga drain": "grass", "endure": "normal", "charm": "fairy", "rollout": "rock",
+    "false swipe": "normal", "swagger": "normal", "milk drink": "normal", "spark": "electric", "fury cutter": "bug",
+    "steel wing": "steel", "mean look": "normal", "attract": "normal", "sleep talk": "normal", "heal bell": "normal",
+    "return": "normal", "present": "normal", "frustration": "normal", "safeguard": "normal", "pain split": "normal",
+    "sacred fire": "fire", "magnitude": "ground", "dynamic punch": "fighting", "megahorn": "bug", "dragon breath": "dragon",
+    "baton pass": "normal", "encore": "normal", "pursuit": "dark", "rapid spin": "normal", "sweet scent": "normal",
+    "iron tail": "steel", "metal claw": "steel", "vital throw": "fighting", "morning sun": "normal", "synthesis": "grass",
+    "moonlight": "fairy", "hidden power": "normal", "cross chop": "fighting", "twister": "dragon", "rain dance": "water",
+    "sunny day": "fire", "crunch": "dark", "mirror coat": "psychic", "psych up": "normal", "extreme speed": "normal",
+    "ancient power": "rock", "shadow ball": "ghost", "future sight": "psychic", "rock smash": "fighting", "whirlpool": "water",
+    "beat up": "dark",
+    "fake out": "normal", "uproar": "normal", "stockpile": "normal", "spit up": "normal", "swallow": "normal",
+    "heat wave": "fire", "hail": "ice", "torment": "dark", "flatter": "dark", "will o wisp": "fire",
+    "memento": "dark", "facade": "normal", "focus punch": "fighting", "smelling salts": "normal", "follow me": "normal",
+    "nature power": "normal", "charge": "electric", "taunt": "dark", "helping hand": "normal", "trick": "psychic",
+    "role play": "psychic", "wish": "normal", "assist": "normal", "ingrain": "grass", "superpower": "fighting",
+    "magic coat": "psychic", "recycle": "normal", "revenge": "fighting", "brick break": "fighting", "yawn": "normal",
+    "knock off": "dark", "endeavor": "normal", "eruption": "fire", "skill swap": "psychic", "imprison": "psychic",
+    "refresh": "normal", "grudge": "ghost", "snatch": "dark", "secret power": "normal", "dive": "water",
+    "arm thrust": "fighting", "camouflage": "normal", "tail glow": "bug", "luster purge": "psychic", "mist ball": "psychic",
+    "feather dance": "flying", "teeter dance": "normal", "blaze kick": "fire", "mud sport": "ground", "ice ball": "ice",
+    "needle arm": "grass", "slack off": "normal", "hyper voice": "normal", "poison fang": "poison", "crush claw": "normal",
+    "blast burn": "fire", "hydro cannon": "water", "meteor mash": "steel", "astonish": "ghost", "weather ball": "normal",
+    "aromatherapy": "grass", "fake tears": "dark", "air cutter": "flying", "overheat": "fire", "odor sleuth": "normal",
+    "rock tomb": "rock", "silver wind": "bug", "metal sound": "steel", "grass whistle": "grass", "tickle": "normal",
+    "cosmic power": "psychic", "water spout": "water", "signal beam": "bug", "shadow punch": "ghost", "extrasensory": "psychic",
+    "sky uppercut": "fighting", "sand tomb": "ground", "sheer cold": "ice", "muddy water": "water", "bullet seed": "grass",
+    "aerial ace": "flying", "icicle spear": "ice", "iron defense": "steel", "block": "normal", "howl": "normal",
+    "dragon claw": "dragon", "frenzy plant": "grass", "bulk up": "fighting", "bounce": "flying", "mud shot": "ground",
+    "poison tail": "poison", "covet": "normal", "volt tackle": "electric", "magical leaf": "grass", "water sport": "water",
+    "calm mind": "psychic", "leaf blade": "grass", "dragon dance": "dragon", "rock blast": "rock", "shock wave": "electric",
+    "water pulse": "water", "doom desire": "steel", "psycho boost": "psychic",
+    "roost": "flying", "gravity": "psychic", "miracle eye": "psychic", "wake up slap": "fighting", "hammer arm": "fighting",
+    "gyro ball": "steel", "healing wish": "psychic", "brine": "water", "natural gift": "normal", "feint": "normal",
+    "pluck": "flying", "tailwind": "flying", "acupressure": "normal", "metal burst": "steel", "u turn": "bug",
+    "close combat": "fighting", "payback": "dark", "assurance": "dark", "embargo": "dark", "fling": "dark",
+    "psycho shift": "psychic", "trump card": "normal", "heal block": "psychic", "wring out": "normal", "power trick": "psychic",
+    "gastro acid": "poison", "lucky chant": "normal", "me first": "normal", "copycat": "normal", "power swap": "psychic",
+    "guard swap": "psychic", "punishment": "dark", "last resort": "normal", "worry seed": "grass", "sucker punch": "dark",
+    "toxic spikes": "poison", "heart swap": "psychic", "aqua ring": "water", "magnet rise": "electric", "flare blitz": "fire",
+    "force palm": "fighting", "aura sphere": "fighting", "rock polish": "rock", "poison jab": "poison", "dark pulse": "dark",
+    "night slash": "dark", "aqua tail": "water", "seed bomb": "grass", "air slash": "flying", "x scissor": "bug",
+    "bug buzz": "bug", "dragon pulse": "dragon", "dragon rush": "dragon", "power gem": "rock", "drain punch": "fighting",
+    "vacuum wave": "fighting", "focus blast": "fighting", "energy ball": "grass", "brave bird": "flying", "earth power": "ground",
+    "switcheroo": "dark", "giga impact": "normal", "nasty plot": "dark", "bullet punch": "steel", "avalanche": "ice",
+    "ice shard": "ice", "shadow claw": "ghost", "thunder fang": "electric", "ice fang": "ice", "fire fang": "fire",
+    "shadow sneak": "ghost", "mud bomb": "ground", "psycho cut": "psychic", "zen headbutt": "psychic", "mirror shot": "steel",
+    "flash cannon": "steel", "rock climb": "normal", "defog": "flying", "trick room": "psychic", "draco meteor": "dragon",
+    "discharge": "electric", "lava plume": "fire", "leaf storm": "grass", "power whip": "grass", "rock wrecker": "rock",
+    "cross poison": "poison", "gunk shot": "poison", "iron head": "steel", "magnet bomb": "steel", "stone edge": "rock",
+    "captivate": "normal", "stealth rock": "rock", "grass knot": "grass", "chatter": "flying", "judgment": "normal",
+    "bug bite": "bug", "charge beam": "electric", "wood hammer": "grass", "aqua jet": "water", "attack order": "bug",
+    "defend order": "bug", "heal order": "bug", "head smash": "rock", "double hit": "normal", "roar of time": "dragon",
+    "spacial rend": "dragon", "lunar dance": "psychic", "crush grip": "normal", "magma storm": "fire", "dark void": "dark",
+    "seed flare": "grass", "ominous wind": "ghost", "shadow force": "ghost",
+    "play rough": "fairy", "dazzling gleam": "fairy", "moonblast": "fairy", "scald": "water", "volt switch": "electric",
+    "flip turn": "water", "parting shot": "dark", "hurricane": "flying", "draco meteor": "dragon"
+};
 
-    const isType = (t) => pkmn.type1 === t || pkmn.type2 === t;
+const PHYSICAL_MOVES = new Set([
+    "earthquake", "body slam", "rock slide", "brick break", "close combat",
+    "ice punch", "submission", "double edge", "return", "dig", "waterfall",
+    "dragon claw", "shadow claw", "poison jab", "iron head", "stone edge",
+    "play rough", "brave bird", "extreme speed", "quick attack", "tackle",
+    "slash", "facade", "fire punch", "thunder punch", "zen headbutt", "liquidation",
+    "flare blitz", "wild charge", "seed bomb", "u turn", "knock off", "sucker punch"
+]);
 
-    // 1. Water STAB / Coverage
-    if (isType("water")) {
-        addMove("Surf", "Surf (Surf)");
-        addMove("Ice Beam", "Raio Gelo (Ice Beam)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
-        addMove("Blizzard", "Nevasca (Blizzard)");
-        addMove("Bite", "Mordida (Bite)");
-    }
-    // 2. Fire STAB / Coverage
-    if (isType("fire")) {
-        addMove("Flamethrower", "Lança-Chamas (Flamethrower)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
-        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
-        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
-    }
-    // 3. Electric STAB / Coverage
-    if (isType("electric")) {
-        addMove("Thunderbolt", "Relâmpago (Thunderbolt)");
-        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
-        addMove("Swift", "Swift (Swift)");
-        addMove("Submission", "Submissão (Submission)");
-        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
-    }
-    // 4. Grass STAB / Coverage
-    if (isType("grass")) {
-        addMove("Giga Drain", "Giga Dreno (Giga Drain)");
-        addMove("Sludge Bomb", "Bomba Lodo (Sludge Bomb)");
-        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-    }
-    // 5. Psychic STAB / Coverage
-    if (isType("psychic")) {
-        addMove("Psychic", "Psíquico (Psychic)");
-        addMove("Thunderbolt", "Relâmpago (Thunderbolt)");
-        addMove("Ice Beam", "Raio Gelo (Ice Beam)");
-        addMove("Shadow Ball", "Bola Sombra (Shadow Ball)");
-        addMove("Bite", "Mordida (Bite)");
-    }
-    // 6. Fighting STAB / Coverage
-    if (isType("fighting")) {
-        if (gen >= 4) addMove("Close Combat", "Combate Próximo (Close Combat)");
-        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
-        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
-        addMove("Ice Punch", "Soco Gelo (Ice Punch)");
-        addMove("Submission", "Submissão (Submission)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-    }
-    // 7. Dragon STAB / Coverage
-    if (isType("dragon")) {
-        addMove("Dragon Claw", "Garra Dragão (Dragon Claw)");
-        addMove("Flamethrower", "Lança-Chamas (Flamethrower)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
-    }
-    // 8. Normal STAB / Coverage
-    if (isType("normal")) {
-        addMove("Body Slam", "Golpe de Corpo (Body Slam)");
-        addMove("Earthquake", "Terramoto (Earthquake)");
-        if (gen >= 4) addMove("Close Combat", "Combate Próximo (Close Combat)");
-        addMove("Brick Break", "Quebra Tijolo (Brick Break)");
-        addMove("Shadow Ball", "Bola Sombra (Shadow Ball)");
-        addMove("Rock Slide", "Deslize de Rocha (Rock Slide)");
-    }
+const SPECIAL_MOVES = new Set([
+    "surf", "ice beam", "blizzard", "flamethrower", "thunderbolt", "giga drain",
+    "psychic", "shadow ball", "dark pulse", "swift", "fire blast", "hydro pump",
+    "solar beam", "dragon pulse", "dazzling gleam", "focus blast", "energy ball",
+    "earth power", "flash cannon", "sludge bomb", "scald", "volt switch", "draco meteor",
+    "air slash", "bug buzz", "hurricane", "leaf storm", "overheat", "extrasensory",
+    "hyper voice", "weather ball", "tri attack", "psybeam", "bubble beam"
+]);
 
-    // Generic Fallbacks
-    const genericPool = [
-        { english: "Return", display: "Retorno (Return)" },
-        { english: "Double-Edge", display: "Fronte Dupla (Double-Edge)" },
-        { english: "Hyper Beam", display: "Hiper Raio (Hyper Beam)" },
-        { english: "Dig", display: "Cavar (Dig)" },
-        { english: "Psychic", display: "Psíquico (Psychic)" },
-        { english: "Thunderbolt", display: "Relâmpago (Thunderbolt)" },
-        { english: "Ice Beam", display: "Raio Gelo (Ice Beam)" },
-        { english: "Flamethrower", display: "Lança-Chamas (Flamethrower)" }
+function getMoveCategory(moveEnglishName, gen) {
+    const normName = moveEnglishName.toLowerCase().replace(/-/g, " ");
+    
+    const statusMoves = [
+        "swords dance", "dragon dance", "calm mind", "nasty plot", "bulk up",
+        "agility", "quiver dance", "shell smash", "roost", "recover", "soft boiled",
+        "wish", "will o wisp", "toxic", "thunder wave", "spore", "sleep powder",
+        "protect", "substitute", "stealth rock", "spikes", "toxic spikes", "defog",
+        "rapid spin", "haze", "taunt", "encore", "baton pass", "yawn"
     ];
-
-    for (let i = 0; i < genericPool.length && moves.length < 4; i++) {
-        addMove(genericPool[i].english, genericPool[i].display);
+    if (statusMoves.includes(normName)) return "status";
+    
+    if (gen < 4) {
+        const moveTypes = {
+            "surf": "water", "ice beam": "ice", "blizzard": "ice", "flamethrower": "fire", "thunderbolt": "electric",
+            "giga drain": "grass", "psychic": "psychic", "shadow ball": "ghost", "dark pulse": "dark", "swift": "normal",
+            "earthquake": "ground", "body slam": "normal", "rock slide": "rock", "brick break": "fighting",
+            "close combat": "fighting", "ice punch": "ice", "submission": "fighting", "dragon claw": "dragon",
+            "return": "normal", "double edge": "normal", "dig": "ground", "waterfall": "water",
+            "sludge bomb": "poison", "bite": "dark", "crunch": "dark", "shadow sneak": "ghost",
+            "bullet punch": "steel", "mach punch": "fighting", "fake out": "normal"
+        };
+        const mType = moveTypes[normName] || "normal";
+        const specialTypes = ["water", "grass", "fire", "ice", "electric", "psychic", "dragon", "dark"];
+        return specialTypes.includes(mType) ? "special" : "physical";
+    } else {
+        if (SPECIAL_MOVES.has(normName)) return "special";
+        return "physical";
     }
+}
 
-    return moves;
+function getFourRecommendedMoves(pkmn, gen) {
+    const species = pkmn.species;
+    const normSpecies = normalizeSpeciesNameForApi(species);
+    
+    const t1 = (pkmn.type1 || "normal").toLowerCase();
+    const t2 = (pkmn.type2 || "").toLowerCase();
+    
+    let bias = "mixed";
+    let bStats = { hp: 80, atk: 80, def: 80, spa: 80, spd: 80, spe: 80 };
+    if (typeof SPECIES_CACHE !== 'undefined' && SPECIES_CACHE[normSpecies]) {
+        bStats = SPECIES_CACHE[normSpecies].baseStats;
+    } else {
+        const physicalTypes = ["fighting", "ground", "rock", "steel", "poison", "bug", "flying"];
+        const specialTypes = ["psychic", "electric", "fire", "ice", "grass", "ghost", "dark", "fairy"];
+        
+        let physCount = 0;
+        let specCount = 0;
+        if (physicalTypes.includes(t1)) physCount++;
+        if (physicalTypes.includes(t2)) physCount++;
+        if (specialTypes.includes(t1)) specCount++;
+        if (specialTypes.includes(t2)) specCount++;
+        
+        if (physCount > specCount) bias = "physical";
+        else if (specCount > physCount) bias = "special";
+    }
+    
+    if (bStats.atk > bStats.spa * 1.1) {
+        bias = "physical";
+    } else if (bStats.spa > bStats.atk * 1.1) {
+        bias = "special";
+    }
+    
+    const learnableCandidates = [];
+    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
+        Object.entries(POKEAPI_MOVE_ID_TO_NAME).forEach(([idStr, rawName]) => {
+            const moveId = parseInt(idStr, 10);
+            const moveGen = getMoveGeneration(moveId);
+            const englishName = rawName.toLowerCase();
+            
+            if (moveGen > gen) return;
+            
+            if (canPokemonLearnMove(pkmn, englishName, gen)) {
+                learnableCandidates.push({ id: moveId, english: englishName, gen: moveGen });
+            }
+        });
+    }
+    
+    const ratedCandidates = learnableCandidates.map(c => {
+        const normName = c.english.toLowerCase();
+        const mType = MOVE_TYPES[normName] || "normal";
+        const category = getMoveCategory(normName, gen);
+        const isSTAB = (mType === t1 || mType === t2);
+        
+        let score = 0;
+        if (isSTAB) score += 35;
+        
+        if (bias === "physical" && category === "physical") score += 25;
+        else if (bias === "special" && category === "special") score += 25;
+        else if (bias === "mixed" && (category === "physical" || category === "special")) score += 10;
+        else if (category === "status") score += 10; 
+        else score -= 20; 
+        
+        const powerMoves = [
+            "earthquake", "surf", "flamethrower", "thunderbolt", "ice beam", "psychic",
+            "close combat", "waterfall", "scald", "play rough", "moonblast", "dazzling gleam",
+            "dark pulse", "shadow ball", "giga drain", "sludge bomb", "leaf storm", "draco meteor",
+            "brave bird", "stone edge", "rock slide", "brick break", "body slam", "dragon dance",
+            "swords dance", "calm mind", "nasty plot", "u turn", "volt switch", "roost", "recover",
+            "spore", "knock off", "sucker punch"
+        ];
+        if (powerMoves.includes(normName)) {
+            score += 15;
+        }
+        
+        return { ...c, score, mType, category };
+    });
+    
+    ratedCandidates.sort((a, b) => b.score - a.score);
+    
+    const selected = [];
+    const selectedTypes = new Set();
+    
+    for (let i = 0; i < ratedCandidates.length && selected.length < 4; i++) {
+        const c = ratedCandidates[i];
+        const disp = formatMoveNameForDisplay(c.english);
+        
+        if (selectedTypes.has(c.mType) && selected.filter(x => (MOVE_TYPES[x.english] || "normal") === c.mType).length >= 2) {
+            continue;
+        }
+        if (selected.some(x => x.english === c.english)) continue;
+        
+        selected.push({ display: disp, english: c.english });
+        selectedTypes.add(c.mType);
+    }
+    
+    if (selected.length < 4) {
+        const fallbackPool = [
+            "earthquake", "surf", "thunderbolt", "ice beam", "flamethrower", "body slam", "psychic", "return"
+        ];
+        fallbackPool.forEach(fb => {
+            if (selected.length >= 4) return;
+            if (selected.some(x => x.english === fb)) return;
+            if (canPokemonLearnMove(pkmn, fb, gen)) {
+                selected.push({ display: formatMoveNameForDisplay(fb), english: fb });
+            }
+        });
+    }
+    
+    return selected;
 }
 
