@@ -5774,13 +5774,41 @@ function toggleMinimalMode() {
 }
 
 function applyMinimalMode() {
-    const btn = document.getElementById("theme-minimal-toggle");
+    const checkbox = document.getElementById("settings-clean-layout");
+    if (checkbox) checkbox.checked = minimalModeEnabled;
+    
     if (minimalModeEnabled) {
         document.body.classList.add("minimal-mode");
-        if (btn) btn.innerHTML = "🎨 Layout Glass";
     } else {
         document.body.classList.remove("minimal-mode");
-        if (btn) btn.innerHTML = "✨ Layout Clean";
+    }
+}
+
+function openSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    if (modal) {
+        const styleSelect = document.getElementById("settings-sprite-style");
+        if (styleSelect) styleSelect.value = currentSpriteStyle;
+
+        const ribbonToggle = document.getElementById("settings-auto-ribbon");
+        if (ribbonToggle) ribbonToggle.checked = autoRibbonsEnabled;
+
+        const cleanToggle = document.getElementById("settings-clean-layout");
+        if (cleanToggle) cleanToggle.checked = minimalModeEnabled;
+
+        modal.classList.add("active");
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function toggleAdvancedFilters() {
+    const panel = document.getElementById("advanced-filters-panel");
+    if (panel) {
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
     }
 }
 
@@ -5796,9 +5824,12 @@ window.onload = function() {
         renderRibbonChecklist();
         initTouchDragAndDrop();
         initGlobalBoxUI();
-        document.getElementById("sprite-style-select").value = currentSpriteStyle;
-        const autoToggle = document.getElementById("auto-ribbon-toggle");
+        
+        const spriteSelect = document.getElementById("settings-sprite-style");
+        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
+        const autoToggle = document.getElementById("settings-auto-ribbon");
         if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        
         switchGame(currentGameId);
     }).catch(err => {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
@@ -5808,9 +5839,12 @@ window.onload = function() {
         renderRibbonChecklist();
         initTouchDragAndDrop();
         initGlobalBoxUI();
-        document.getElementById("sprite-style-select").value = currentSpriteStyle;
-        const autoToggle = document.getElementById("auto-ribbon-toggle");
+        
+        const spriteSelect = document.getElementById("settings-sprite-style");
+        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
+        const autoToggle = document.getElementById("settings-auto-ribbon");
         if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        
         switchGame(currentGameId);
     });
 };

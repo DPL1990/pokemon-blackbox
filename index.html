@@ -43,244 +43,232 @@
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Pokémon BlackBox</h1>
-            <div class="stats-bar" style="display: flex; gap: 12px; align-items: center;">
-                <div class="stats-badge" id="stat-total-badge">Total Registado: <span id="stat-total">0</span></div>
-                <div class="stats-badge" id="stat-team-badge">Nesta Região: <span id="stat-team">0/6</span></div>
-                <button class="btn btn-action" id="theme-minimal-toggle" onclick="toggleMinimalMode()" style="width: auto; padding: 6px 14px; font-size: 0.7rem; border-radius: 9999px; cursor: pointer;">
-                    ✨ Layout Clean
-                </button>
+        <header style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 16px; border-bottom: 1px solid var(--border-color); margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+            <h1 style="margin: 0; font-size: 1.5rem; font-weight: 900; letter-spacing: -0.5px; background: linear-gradient(135deg, #ffffff 40%, var(--game-color) 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; text-shadow: 0 4px 20px var(--game-color-glow);">Pokémon BlackBox</h1>
+            
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <!-- Cartucho Select -->
+                <select id="game-select" onchange="switchGame(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px;"></select>
+                
+                <!-- Trainer Select -->
+                <div style="display: flex; gap: 4px; align-items: center;">
+                    <select id="trainer-select" onchange="switchTrainer(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border-color);"></select>
+                    <button class="btn btn-action" onclick="openTrainerManagerModal()" style="width: auto; padding: 0 10px; font-size: 0.75rem; border-radius: 8px; height: 32px;" title="Gerir Treinadores">👤⚙️</button>
+                </div>
+
+                <!-- Unified Settings Button -->
+                <button class="btn btn-action" onclick="openSettingsModal()" style="width: auto; padding: 0 12px; font-size: 0.75rem; border-radius: 8px; height: 32px;" title="Configurações do Cartucho">⚙️ Definições</button>
             </div>
         </header>
 
-        <div class="dashboard-layout">
-            <!-- Sidebar Panel (Controls, Stats, Hall of fame) -->
-            <aside>
-                <div class="glass-panel">
-                    <div class="panel-title">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
-                        💿 Cartucho Ativo
-                    </div>
-                    <div class="form-group">
-                        <select id="game-select" onchange="switchGame(this.value)"></select>
-                    </div>
-                    <div class="form-group" style="margin-top: 10px; margin-bottom: 10px;">
-                        <label>👤 Treinador Ativo</label>
-                        <div style="display: flex; gap: 6px; align-items: center;">
-                            <select id="trainer-select" onchange="switchTrainer(this.value)" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-color);"></select>
-                            <button class="btn btn-action" onclick="openTrainerManagerModal()" style="width: auto; padding: 8px 12px; font-size: 0.75rem;" title="Gerir Treinadores">⚙️</button>
-                        </div>
-                    </div>
-                    <div class="form-group" style="margin-top: 10px;">
-                        <label>👾 Visual dos Sprites</label>
-                        <select id="sprite-style-select" onchange="setSpriteStyle(this.value)">
-                            <option value="classic">Pixel Art 2D (Clássico)</option>
-                            <option value="3d-home">Renders 3D (Home)</option>
-                            <option value="3d-animated">Modelos 3D (Showdown)</option>
-                        </select>
-                    </div>
-                    <div class="form-group" style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
-                        <input type="checkbox" id="auto-ribbon-toggle" style="width: auto; margin: 0;" onchange="toggleAutoRibbons(this.checked)">
-                        <label for="auto-ribbon-toggle" style="margin: 0; font-size: 0.75rem; cursor: pointer; font-weight: 800;">🎗️ Auto-Carimbo de Ribbons</label>
-                    </div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;">
-                        <button class="btn btn-primary" onclick="openModalForNew()" style="grid-column: span 2;">
-                            <span>➕ Registar Espécime</span>
-                        </button>
-                        <button class="btn btn-action" onclick="openMatchupModal()" style="grid-column: span 2; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
-                            <span>⚖️ Comparar Pokémon (Matchup)</span>
-                        </button>
-                        <button class="btn btn-action" onclick="exportData()">
-                            <span>📥 Exportar</span>
-                        </button>
-                        <button class="btn btn-action" onclick="document.getElementById('import-file').click()">
-                            <span>📤 Importar</span>
-                        </button>
-                        <input type="file" id="import-file" style="display:none" onchange="importData(event)">
-                        <button class="btn btn-action" onclick="openSaveImportModal()" style="grid-column: span 2; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
-                            <span>💾 Importar de Save (.sav)</span>
-                        </button>
-                        <button class="btn btn-danger" onclick="cleanSlateActiveTrainer()" style="grid-column: span 2; margin-top: 4px;">
-                            <span>🗑️ Clean Slate (Limpar Treinador)</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="glass-panel">
-                    <div class="panel-title">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-                        📊 Dexit Monitor
-                    </div>
-                    <div class="dexit-grid" id="dexit-stats-box"></div>
-                </div>
-
-                <div class="glass-panel" style="padding: 16px;">
-                    <div class="panel-title" style="justify-content: space-between; display: flex; align-items: center; width: 100%;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                            🏆 Mural de Honra
-                        </div>
-                        <!-- Navegação de múltiplos HOFs -->
-                        <div id="hof-navigation" style="display: none; align-items: center; gap: 6px;">
-                            <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(-1)">◀</button>
-                            <span id="hof-counter" style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); min-width: 30px; text-align: center;">1/1</span>
-                            <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(1)">▶</button>
-                        </div>
-                    </div>
-                    
-                    <div id="hof-display-area" style="position: relative; width: 100%; height: 190px; margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
-                        <!-- Placeholder, imagem ou cartão 3D gerado aqui dinamicamente -->
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="generateHofFromActiveTeam()">
-                            ⚡ Gerar da Equipa
-                        </button>
-                        <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="document.getElementById('hof-input').click()">
-                            📷 Subir Imagem
-                        </button>
-                        <button class="btn btn-danger" id="btn-delete-hof" style="display: none; grid-column: span 2; font-size: 0.7rem; font-weight: 800; padding: 6px;" onclick="deleteActiveHof()">
-                            🗑️ Eliminar este Mural
-                        </button>
-                    </div>
-                    
-                    <input type="file" id="hof-input" accept="image/*" style="display: none;" onchange="handleHofUpload(event)" />
-                </div>
-            </aside>
-
+        <div class="dashboard-layout" style="display: block;">
             <!-- Main Content Area (Active Team & Regional Box) -->
             <main>
                 <!-- Tabs Header -->
-                <div class="tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                    <button class="btn-tab active" id="tab-btn-boxes" onclick="switchTab('boxes')">Boxes & Equipa</button>
-                    <button class="btn-tab" id="tab-btn-resume" onclick="switchTab('resume')">🏆 Currículo & Desafios</button>
-                    <button class="btn-tab" id="tab-btn-allocation" onclick="switchTab('allocation')">⚔️ Tática & Alocação</button>
+                <div class="tabs-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px; flex-wrap: wrap; gap: 12px;">
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn-tab active" id="tab-btn-boxes" onclick="switchTab('boxes')">Boxes & Equipa</button>
+                        <button class="btn-tab" id="tab-btn-resume" onclick="switchTab('resume')">🏆 Progresso</button>
+                        <button class="btn-tab" id="tab-btn-allocation" onclick="switchTab('allocation')">⚔️ Tática</button>
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="openModalForNew()" style="width: auto; padding: 6px 14px; font-size: 0.75rem; border-radius: 8px;">
+                            ➕ Registar Espécime
+                        </button>
+                        <button class="btn btn-action" onclick="openMatchupModal()" style="width: auto; padding: 6px 14px; font-size: 0.75rem; border-radius: 8px; background: rgba(245, 158, 11, 0.08); border-color: rgba(245, 158, 11, 0.25);">
+                            ⚖️ Matchup
+                        </button>
+                    </div>
                 </div>
 
                 <!-- Boxes & Active Team Tab Content -->
                 <div id="tab-content-boxes">
-                    <!-- Active Team Section -->
-                    <div class="section-header">
-                        <h2 class="section-title">
-                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                            🛡️ Equipa Ativa (Nesta Região)
-                        </h2>
-                    </div>
-                    <div class="team-grid" id="team-container"></div>
+                    <div class="dashboard-two-columns">
+                        <!-- Left Column: Active Team + Dexit Monitor -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Active Team Section -->
+                            <div class="glass-panel" style="padding: 16px;">
+                                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; margin-top: 0; padding-bottom: 0; border: none;">
+                                    <h2 class="section-title">
+                                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                                        🛡️ Equipa Ativa
+                                    </h2>
+                                    <div class="stats-badge" id="stat-team-badge" style="font-size: 0.7rem; padding: 4px 8px;">Equipa: <span id="stat-team" style="color: var(--game-color);">0/6</span></div>
+                                </div>
+                                <div class="team-grid" id="team-container" style="margin-bottom: 0;"></div>
+                            </div>
 
-                    <!-- Box Regional Section -->
-                    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                        <h2 class="section-title" id="box-header-title">
-                            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-                            📦 Box Regional (Sem Limite)
-                        </h2>
-                        <div style="display: flex; gap: 8px; align-items: center;">
-                            <button class="btn btn-action" id="btn-toggle-global-box" onclick="toggleGlobalBoxMode()" style="width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25);">
-                                🌐 Ver Box Global
-                            </button>
-                            <button class="btn btn-action" id="btn-toggle-select-mode" onclick="toggleSelectionMode()" style="width: auto; padding: 6px 12px; font-size: 0.75rem; font-weight: 800;">
-                                ✅ Seleção Múltipla
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <!-- Advanced Box Filter Panel -->
-                    <div class="glass-panel" id="filter-panel" style="padding: 14px; margin-bottom: 16px;">
-                        <div class="panel-title" style="margin-bottom: 10px; font-size: 0.75rem;">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
-                            🔍 Filtrar e Pesquisar Coleção
-                        </div>
-                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick...">
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <select id="filter-type" onchange="renderAll()">
-                                    <option value="">Todos os Tipos</option>
-                                    <option value="normal">Normal</option>
-                                    <option value="fire">Fire</option>
-                                    <option value="water">Water</option>
-                                    <option value="grass">Grass</option>
-                                    <option value="electric">Electric</option>
-                                    <option value="ice">Ice</option>
-                                    <option value="fighting">Fighting</option>
-                                    <option value="poison">Poison</option>
-                                    <option value="ground">Ground</option>
-                                    <option value="flying">Flying</option>
-                                    <option value="psychic">Psychic</option>
-                                    <option value="bug">Bug</option>
-                                    <option value="rock">Rock</option>
-                                    <option value="ghost">Ghost</option>
-                                    <option value="dragon">Dragon</option>
-                                    <option value="dark">Dark</option>
-                                    <option value="steel">Steel</option>
-                                    <option value="fairy">Fairy</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <select id="filter-shiny" onchange="renderAll()">
-                                    <option value="all">Shinies & Normais</option>
-                                    <option value="shiny">Apenas Shinies</option>
-                                    <option value="normal">Apenas Normais</option>
-                                </select>
-                            </div>
-                            <div class="form-group" style="margin-bottom: 0;">
-                                <select id="filter-ribbon" onchange="renderAll()">
-                                    <option value="all">Qualquer Espécime</option>
-                                    <option value="ribbon">Apenas Ribbon Masters</option>
-                                </select>
+                            <!-- Dexit Monitor (Type distribution) -->
+                            <div class="glass-panel" id="dexit-panel" style="padding: 16px;">
+                                <div class="panel-title" style="font-size: 0.75rem; margin-bottom: 10px;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                                    📊 Distribuição de Tipos
+                                </div>
+                                <div class="dexit-grid" id="dexit-stats-box"></div>
                             </div>
                         </div>
-                    </div>
 
-                    <div class="box-grid" id="box-container"></div>
+                        <!-- Right Column: Box Regional -->
+                        <div>
+                            <div class="glass-panel" style="padding: 20px;">
+                                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-top: 0; margin-bottom: 14px; padding-bottom: 0; border: none;">
+                                    <h2 class="section-title" id="box-header-title">
+                                        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                                        📦 Box Regional
+                                    </h2>
+                                    <div style="display: flex; gap: 8px; align-items: center;">
+                                        <button class="btn btn-action" id="btn-toggle-global-box" onclick="toggleGlobalBoxMode()" style="width: auto; padding: 5px 10px; font-size: 0.7rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25);">
+                                            🌐 Box Global
+                                        </button>
+                                        <button class="btn btn-action" id="btn-toggle-select-mode" onclick="toggleSelectionMode()" style="width: auto; padding: 5px 10px; font-size: 0.7rem; font-weight: 800;">
+                                            ✅ Selecionar
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Advanced Box Filter Panel (Sleek inline row + collapsible details) -->
+                                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
+                                    <div style="flex: 1; min-width: 150px;">
+                                        <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick..." style="width: 100%; padding: 8px 12px; font-size: 0.8rem;">
+                                    </div>
+                                    <div style="width: auto;">
+                                        <select id="filter-type" onchange="renderAll()" style="padding: 8px 12px; font-size: 0.8rem; height: auto;">
+                                            <option value="">Todos os Tipos</option>
+                                            <option value="normal">Normal</option>
+                                            <option value="fire">Fire</option>
+                                            <option value="water">Water</option>
+                                            <option value="grass">Grass</option>
+                                            <option value="electric">Electric</option>
+                                            <option value="ice">Ice</option>
+                                            <option value="fighting">Fighting</option>
+                                            <option value="poison">Poison</option>
+                                            <option value="ground">Ground</option>
+                                            <option value="flying">Flying</option>
+                                            <option value="psychic">Psychic</option>
+                                            <option value="bug">Bug</option>
+                                            <option value="rock">Rock</option>
+                                            <option value="ghost">Ghost</option>
+                                            <option value="dragon">Dragon</option>
+                                            <option value="dark">Dark</option>
+                                            <option value="steel">Steel</option>
+                                            <option value="fairy">Fairy</option>
+                                        </select>
+                                    </div>
+                                    <button class="btn btn-action" onclick="toggleAdvancedFilters()" style="width: auto; padding: 8px 12px; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; border-color: rgba(255,255,255,0.08);">
+                                        🔍 Filtros
+                                    </button>
+                                </div>
+
+                                <!-- Collapsible advanced filters -->
+                                <div class="glass-panel" id="advanced-filters-panel" style="display: none; padding: 12px; margin-bottom: 16px; background: rgba(0,0,0,0.15); border-color: rgba(255,255,255,0.04);">
+                                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px;">
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; margin-bottom: 4px; display: block;">Variante de Brilho</label>
+                                            <select id="filter-shiny" onchange="renderAll()">
+                                                <option value="all">Shinies & Normais</option>
+                                                <option value="shiny">Apenas Shinies</option>
+                                                <option value="normal">Apenas Normais</option>
+                                            </select>
+                                        </div>
+                                        <div class="form-group" style="margin-bottom: 0;">
+                                            <label style="font-size: 0.65rem; color: var(--text-muted); text-transform: uppercase; font-weight: 800; margin-bottom: 4px; display: block;">Estado de Fitas</label>
+                                            <select id="filter-ribbon" onchange="renderAll()">
+                                                <option value="all">Qualquer Espécime</option>
+                                                <option value="ribbon">Apenas Ribbon Masters</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Box Pokemon Grid -->
+                                <div class="box-grid" id="box-container" style="margin-bottom: 0;"></div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Trainer Resume Tab Content -->
                 <div id="tab-content-resume" style="display: none; padding-top: 10px;">
-                    <!-- Stats Badges -->
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
-                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
-                            <div style="font-size: 2rem; margin-bottom: 6px;">🏆</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Conquistas de Liga (HOF)</div>
-                            <div id="resume-total-hof" style="font-size: 1.8rem; font-weight: 900; color: #fff; margin-top: 4px;">0</div>
-                        </div>
-                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
-                            <div style="font-size: 2rem; margin-bottom: 6px;">🎗️</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Desafios Concluídos</div>
-                            <div id="resume-completed-challenges" style="font-size: 1.8rem; font-weight: 900; color: var(--accent-success); margin-top: 4px;">0</div>
-                        </div>
-                        <div class="glass-panel" style="padding: 16px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01);">
-                            <div style="font-size: 2rem; margin-bottom: 6px;">👥</div>
-                            <div style="font-size: 0.7rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Total de Treinadores</div>
-                            <div id="resume-total-trainers" style="font-size: 1.8rem; font-weight: 900; color: var(--game-color); margin-top: 4px;">0</div>
-                        </div>
-                    </div>
-
-                    <!-- Side by Side Layout for Timeline & Challenges -->
-                    <div style="display: grid; grid-template-columns: 1.2fr 1fr; gap: 20px; align-items: start;">
-                        <!-- Timeline Panel -->
-                        <div class="glass-panel" style="padding: 20px;">
-                            <div class="panel-title" style="margin-bottom: 16px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                📜 Jornada de Eras (Linha Temporal)
-                            </div>
-                            <div id="timeline-container" style="display: flex; flex-direction: column; gap: 20px; position: relative; padding-left: 20px; border-left: 2px solid rgba(255,255,255,0.05);">
-                                <!-- Dynamic timeline nodes -->
-                            </div>
-                        </div>
-
-                        <!-- Challenges Panel -->
-                        <div class="glass-panel" style="padding: 20px;">
-                            <div class="panel-title" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
-                                    🎗️ Registo de Desafios (Challenge Log)
+                    <div class="dashboard-two-columns">
+                        <!-- Left Column: Mural de Honra -->
+                        <div class="glass-panel" style="padding: 16px;">
+                            <div class="panel-title" style="justify-content: space-between; display: flex; align-items: center; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 8px;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                    🏆 Mural de Honra
                                 </div>
-                                <button class="btn btn-primary" onclick="openChallengeModal()" style="width: auto; padding: 4px 10px; font-size: 0.65rem;">➕ Registar</button>
+                                <!-- Navegação de múltiplos HOFs -->
+                                <div id="hof-navigation" style="display: none; align-items: center; gap: 6px;">
+                                    <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(-1)">◀</button>
+                                    <span id="hof-counter" style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); min-width: 30px; text-align: center;">1/1</span>
+                                    <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(1)">▶</button>
+                                </div>
                             </div>
                             
-                            <div id="challenges-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
-                                <!-- Dynamic challenge items -->
+                            <div id="hof-display-area" style="position: relative; width: 100%; height: 190px; margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
+                                <!-- Placeholder, imagem ou cartão 3D gerado aqui dinamicamente -->
+                            </div>
+
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="generateHofFromActiveTeam()">
+                                    ⚡ Gerar da Equipa
+                                </button>
+                                <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="document.getElementById('hof-input').click()">
+                                    📷 Subir Imagem
+                                </button>
+                                <button class="btn btn-danger" id="btn-delete-hof" style="display: none; grid-column: span 2; font-size: 0.7rem; font-weight: 800; padding: 6px;" onclick="deleteActiveHof()">
+                                    🗑️ Eliminar este Mural
+                                </button>
+                            </div>
+                            
+                            <input type="file" id="hof-input" accept="image/*" style="display: none;" onchange="handleHofUpload(event)" />
+                        </div>
+
+                        <!-- Right Column: Stats, Timeline & Challenges -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Stats Badges (smaller and cleaner) -->
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+                                <div class="glass-panel" style="padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01); margin-bottom: 0;">
+                                    <div style="font-size: 1.5rem; margin-bottom: 2px;">🏆</div>
+                                    <div style="font-size: 0.6rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Hall of Fame</div>
+                                    <div id="resume-total-hof" style="font-size: 1.3rem; font-weight: 900; color: #fff; margin-top: 2px;">0</div>
+                                </div>
+                                <div class="glass-panel" style="padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01); margin-bottom: 0;">
+                                    <div style="font-size: 1.5rem; margin-bottom: 2px;">🎗️</div>
+                                    <div style="font-size: 0.6rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Desafios</div>
+                                    <div id="resume-completed-challenges" style="font-size: 1.3rem; font-weight: 900; color: var(--accent-success); margin-top: 2px;">0</div>
+                                </div>
+                                <div class="glass-panel" style="padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01); margin-bottom: 0;">
+                                    <div style="font-size: 1.5rem; margin-bottom: 2px;">👥</div>
+                                    <div style="font-size: 0.6rem; color: var(--text-muted); font-weight:800; text-transform: uppercase; letter-spacing: 0.5px;">Treinadores</div>
+                                    <div id="resume-total-trainers" style="font-size: 1.3rem; font-weight: 900; color: var(--game-color); margin-top: 2px;">0</div>
+                                </div>
+                            </div>
+
+                            <!-- Timeline & Challenges (side-by-side or stacked inside right column) -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                                <!-- Timeline Panel -->
+                                <div class="glass-panel" style="padding: 20px; margin-bottom: 0;">
+                                    <div class="panel-title" style="margin-bottom: 16px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                        📜 Jornada de Eras
+                                    </div>
+                                    <div id="timeline-container" style="display: flex; flex-direction: column; gap: 20px; position: relative; padding-left: 20px; border-left: 2px solid rgba(255,255,255,0.05);">
+                                        <!-- Dynamic timeline nodes -->
+                                    </div>
+                                </div>
+
+                                <!-- Challenges Panel -->
+                                <div class="glass-panel" style="padding: 20px; margin-bottom: 0;">
+                                    <div class="panel-title" style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                        <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem;">
+                                            🎗️ Registo de Desafios
+                                        </div>
+                                        <button class="btn btn-primary" onclick="openChallengeModal()" style="width: auto; padding: 3px 8px; font-size: 0.6rem;">➕ Registar</button>
+                                    </div>
+                                    <div id="challenges-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 350px; overflow-y: auto; padding-right: 4px;">
+                                        <!-- Dynamic challenge items -->
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -288,101 +276,106 @@
 
                 <!-- Tática & Alocação Tab Content -->
                 <div id="tab-content-allocation" style="display: none; padding-top: 10px;">
-                    <!-- Active League Header -->
-                    <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; background: rgba(99, 102, 241, 0.03); border: 1px solid rgba(99, 102, 241, 0.15);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
-                            <div>
-                                <h3 style="font-size: 1.2rem; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">
-                                    ⚔️ Liga Local: <span id="allocation-league-name" style="color: var(--game-color);">...</span>
-                                </h3>
-                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-                                    Análise tática dos adversários da Elite Four e Champion baseada na Box do teu Treinador.
-                                </p>
-                            </div>
-                            <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 10px 20px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 0 15px var(--game-color-glow);">
-                                ⚡ Alocar Equipa Recomendada
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Layout: Left side League/Counters, Right side Weakness Management -->
-                    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start;">
-                        <!-- Left Panel: League Lineup & Recommended Counter-Squad -->
-                        <div style="display: flex; flex-direction: column; gap: 20px;">
-                            <!-- League Opponents Grid -->
-                            <div class="glass-panel" style="padding: 20px;">
-                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    🛡️ Alinhamento da Elite Four & Campeão
-                                </div>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;" id="allocation-opponents-grid">
-                                    <!-- Dynamic League Opponents -->
+                    <div class="dashboard-two-columns">
+                        <!-- Left Column: Presets de Equipa -->
+                        <div class="glass-panel" style="padding: 16px;">
+                            <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 14px; width: 100%;">
+                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem;">
+                                    🗃️ Presets de Equipa
                                 </div>
                             </div>
-
-                            <!-- Recommended Counter-Squad -->
-                            <div class="glass-panel" style="padding: 20px;">
-                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    🎯 Frota Recomendada (Seleção Tática)
-                                </div>
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;" id="allocation-team-grid">
-                                    <!-- Dynamic 6 recommended Pokémon -->
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Right Panel: Weakness Management & Moveset Suggestions -->
-                        <div style="display: flex; flex-direction: column; gap: 20px;">
-                            <!-- Team Weakness & Redundancy Checklist -->
-                            <div class="glass-panel" style="padding: 20px;">
-                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    📊 Análise de Vulnerabilidades da Equipa
-                                </div>
-                                <div style="display: flex; flex-direction: column; gap: 12px;">
-                                    <div>
-                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Vulnerabilidades Críticas (3+ Fracos):</div>
-                                        <div id="allocation-critical-weaknesses" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
-                                            <!-- Dynamic Weaknesses -->
-                                        </div>
-                                    </div>
-                                    <div style="margin-top: 6px;">
-                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Resistências & Imunidades Relevantes:</div>
-                                        <div id="allocation-team-coverages" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
-                                            <!-- Dynamic Coverages -->
-                                        </div>
-                                    </div>
-                                    <div style="margin-top: 6px;">
-                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Redundâncias de Tipagem:</div>
-                                        <div id="allocation-type-redundancies" style="display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: #fff;">
-                                            <!-- Dynamic Redundancies -->
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Surgical Moveset Adjustments -->
-                            <div class="glass-panel" style="padding: 20px;">
-                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                    🔧 Sugestões de Ajuste Cirúrgico no Moveset
-                                </div>
-                                <div id="allocation-moveset-suggestions" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
-                                    <!-- Dynamic Moveset Suggestions -->
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Presets Section -->
-                    <div class="glass-panel" style="padding: 20px; margin-top: 20px;">
-                        <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 14px;">
-                            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
-                                🗃️ Presets de Equipa (Liga Local)
-                            </div>
-                            <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="width: auto; padding: 6px 12px; font-size: 0.7rem; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
+                            <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="width: 100%; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); margin-bottom: 16px; border-radius: 8px;">
                                 ✨ Dividir Box em Equipas
                             </button>
+                            <div id="allocation-presets-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 450px; overflow-y: auto; padding-right: 4px;">
+                                <!-- Dynamic Presets -->
+                            </div>
                         </div>
-                        <div id="allocation-presets-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
-                            <!-- Dynamic Presets -->
+
+                        <!-- Right Column: Liga Local, Counters, Weakness, Moveset -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Active League Header -->
+                            <div class="glass-panel" style="padding: 16px; background: rgba(99, 102, 241, 0.03); border: 1px solid rgba(99, 102, 241, 0.15); margin-bottom: 0;">
+                                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                                    <div>
+                                        <h3 style="font-size: 1.1rem; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                            ⚔️ Liga Local: <span id="allocation-league-name" style="color: var(--game-color);">...</span>
+                                        </h3>
+                                        <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
+                                            Análise tática dos adversários da Elite Four e Champion baseada na Box do teu Treinador.
+                                        </p>
+                                    </div>
+                                    <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 0 15px var(--game-color-glow); border-radius: 8px;">
+                                        ⚡ Alocar Equipa Recomendada
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Layout for League Opponents, Counters, and analysis inside right column -->
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 20px;">
+                                <!-- Left side (League Lineup & Counters) -->
+                                <div style="display: flex; flex-direction: column; gap: 20px;">
+                                    <!-- League Opponents Grid -->
+                                    <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                        <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                            🛡️ Alinhamento da Elite Four & Campeão
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(100px, 1fr)); gap: 8px;" id="allocation-opponents-grid">
+                                            <!-- Dynamic League Opponents -->
+                                        </div>
+                                    </div>
+
+                                    <!-- Recommended Counter-Squad -->
+                                    <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                        <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                            🎯 Frota Recomendada (Seleção Tática)
+                                        </div>
+                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;" id="allocation-team-grid">
+                                            <!-- Dynamic 6 recommended Pokémon -->
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Right side (Weakness & Moveset Analysis) -->
+                                <div style="display: flex; flex-direction: column; gap: 20px;">
+                                    <!-- Team Weakness & Redundancy Checklist -->
+                                    <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                        <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                            📊 Vulnerabilidades da Equipa
+                                        </div>
+                                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                                            <div>
+                                                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 4px;">Vulnerabilidades Críticas (3+ Fracos):</div>
+                                                <div id="allocation-critical-weaknesses" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.7rem;">
+                                                    <!-- Dynamic Weaknesses -->
+                                                </div>
+                                            </div>
+                                            <div style="margin-top: 4px;">
+                                                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 4px;">Resistências & Imunidades:</div>
+                                                <div id="allocation-team-coverages" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.7rem;">
+                                                    <!-- Dynamic Coverages -->
+                                                </div>
+                                            </div>
+                                            <div style="margin-top: 4px;">
+                                                <div style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 4px;">Redundâncias de Tipagem:</div>
+                                                <div id="allocation-type-redundancies" style="display: flex; flex-direction: column; gap: 2px; font-size: 0.7rem; color: #fff;">
+                                                    <!-- Dynamic Redundancies -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Surgical Moveset Adjustments -->
+                                    <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                        <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                            🔧 Ajustes de Moveset Recomendados
+                                        </div>
+                                        <div id="allocation-moveset-suggestions" style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto; padding-right: 4px;">
+                                            <!-- Dynamic Moveset Suggestions -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -987,6 +980,81 @@
                 <div id="voyage-transfer-guide" class="glass-panel" style="padding: 12px; font-size: 0.75rem; line-height: 1.5; color: #e2e8f0; border-radius: 8px;">
                     <!-- Transfer instructions -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unified Settings Modal -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="modal-content" style="max-width: 480px; width: 95%;">
+            <div class="modal-header">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">⚙️ Definições do Cartucho</h3>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeSettingsModal()">✕</button>
+            </div>
+            <div class="modal-body" style="padding-top: 10px; max-height: 75vh; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;">
+                
+                <!-- Visual / Theme preferences -->
+                <div class="glass-panel" style="padding: 14px; margin-bottom: 0;">
+                    <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--game-color); font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">Preferências Visuais</h4>
+                    
+                    <div class="form-group">
+                        <label style="font-size: 0.7rem; color: var(--text-muted); font-weight: 800;">Estilo dos Sprites</label>
+                        <select id="settings-sprite-style" onchange="setSpriteStyle(this.value)" style="width: 100%;">
+                            <option value="classic">Pixel Art 2D (Clássico)</option>
+                            <option value="3d-home">Renders 3D (Home)</option>
+                            <option value="3d-animated">Modelos 3D (Showdown)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 12px; margin-bottom: 0;">
+                        <input type="checkbox" id="settings-clean-layout" style="width: auto; margin: 0;" onchange="toggleMinimalMode()">
+                        <label for="settings-clean-layout" style="margin: 0; font-size: 0.75rem; cursor: pointer; font-weight: 800;">🧼 Aplicar Layout Clean Flat</label>
+                    </div>
+                </div>
+
+                <!-- Automation Preferences -->
+                <div class="glass-panel" style="padding: 14px; margin-bottom: 0;">
+                    <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--game-color); font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">Automação</h4>
+                    
+                    <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 0;">
+                        <input type="checkbox" id="settings-auto-ribbon" style="width: auto; margin: 0;" onchange="toggleAutoRibbons(this.checked)">
+                        <label for="settings-auto-ribbon" style="margin: 0; font-size: 0.75rem; cursor: pointer; font-weight: 800;">🎗️ Auto-Carimbo de Ribbons (Campeão)</label>
+                    </div>
+                </div>
+
+                <!-- Backup & Import Actions -->
+                <div class="glass-panel" style="padding: 14px; margin-bottom: 0;">
+                    <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--game-color); font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 4px;">Cópia de Segurança e Dados</h4>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                        <button class="btn btn-action" onclick="exportData()" style="font-size: 0.7rem; font-weight: 800; padding: 8px;">
+                            📥 Exportar JSON
+                        </button>
+                        <button class="btn btn-action" onclick="document.getElementById('settings-import-file').click()" style="font-size: 0.7rem; font-weight: 800; padding: 8px;">
+                            📤 Importar JSON
+                        </button>
+                        <input type="file" id="settings-import-file" style="display:none" onchange="importData(event)">
+                        
+                        <button class="btn btn-action" onclick="closeSettingsModal(); openSaveImportModal();" style="grid-column: span 2; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); font-size: 0.7rem; font-weight: 800; padding: 8px;">
+                            💾 Importar de Save (.sav)
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Danger Zone -->
+                <div class="glass-panel" style="padding: 14px; margin-bottom: 0; border-color: rgba(239, 68, 68, 0.25); background: rgba(239, 68, 68, 0.02);">
+                    <h4 style="font-size: 0.75rem; text-transform: uppercase; color: var(--accent-danger); font-weight: 800; margin-bottom: 10px; border-bottom: 1px solid rgba(239,68,68,0.15); padding-bottom: 4px;">Zona de Risco</h4>
+                    <p style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.3;">
+                        A ação seguinte limpa permanentemente todos os Pokémon, presets e mural de fotos associados ao treinador ativo neste cartucho. Não afeta outros cartuchos.
+                    </p>
+                    <button class="btn btn-danger" onclick="cleanSlateActiveTrainer(); closeSettingsModal();" style="width: 100%; font-size: 0.7rem; font-weight: 800; padding: 8px;">
+                        🗑️ Clean Slate (Limpar Treinador)
+                    </button>
+                </div>
+
+            </div>
+            <div class="modal-footer" style="margin-top: 10px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button class="btn btn-primary" onclick="closeSettingsModal()" style="width: auto; padding: 8px 20px;">Concluído</button>
             </div>
         </div>
     </div>

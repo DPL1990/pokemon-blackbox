@@ -1427,3 +1427,31 @@ body.minimal-mode #theme-minimal-toggle {
     border-color: transparent !important;
 }
 
+/* ==========================================================================
+   👥 UNIFIED TWO-COLUMN GRID LAYOUT
+   ========================================================================== */
+.dashboard-two-columns {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+/* Force 2x3 Active Team grid inside Left Column */
+.dashboard-two-columns .team-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    margin-bottom: 0;
+}
+
+@media (max-width: 900px) {
+    .dashboard-two-columns {
+        grid-template-columns: 1fr;
+    }
+    
+    .dashboard-two-columns .team-grid {
+        grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+        gap: 12px;
+    }
+}
