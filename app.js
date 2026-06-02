@@ -2050,7 +2050,7 @@ function parseGen4Gen5Save(buffer) {
             
             const exp = blockA[4] | (blockA[5] << 16);
             const otId = blockA[2];
-            const nickname = decodeUTF16String(blockC.subarray(4, 15));
+            const nickname = decodeUTF16String(blockC.subarray(0, 11));
             const otName = decodeUTF16String(blockD.subarray(4, 12));
             
             let level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
@@ -2112,7 +2112,7 @@ function parseDecryptedPKM(buffer, fileName) {
         // PK4 / PK5
         pokedexId = u16[8 / 2];
         exp = u32[16 / 4];
-        const nickWords = u16.subarray(80 / 2, 80 / 2 + 11);
+        const nickWords = u16.subarray(72 / 2, 72 / 2 + 11);
         nickname = decodeUTF16String(nickWords);
         
         otId = u16[12 / 2];
