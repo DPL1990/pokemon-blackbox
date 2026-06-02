@@ -2732,6 +2732,10 @@ function executeSaveImport() {
             const targetGameId = gameSelect ? gameSelect.value : currentGameId;
             const targetTrainerId = trainerSelect ? trainerSelect.value : `trainer_${targetGameId}_default`;
             
+            const isParty = p.saveMeta && p.saveMeta.isParty === true;
+            const slotType = isParty ? "team" : "box";
+            const slotIndex = isParty ? (p.saveMeta.index !== undefined ? p.saveMeta.index : 0) : 0;
+            
             const newPokemon = {
                 id: "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
                 pokedexId: p.pokedexId,
@@ -2750,8 +2754,8 @@ function executeSaveImport() {
                 evs: p.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
                 currentGame: targetGameId,
                 trainerId: targetTrainerId,
-                slotType: "box",
-                slotIndex: 0,
+                slotType: slotType,
+                slotIndex: slotIndex,
                 history: [],
                 notes: `Importado do ficheiro de save.`,
                 saveMeta: p.saveMeta || null
