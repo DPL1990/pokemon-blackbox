@@ -827,8 +827,13 @@ function createSlotHTML(p, index, type) {
 }
 
 function updateStats() {
-    document.getElementById("stat-total").innerText = pokemonDatabase.length;
-    document.getElementById("stat-team").innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team").length}/6`;
+    const totalEl = document.getElementById("stat-total");
+    if (totalEl) totalEl.innerText = pokemonDatabase.length;
+    
+    const teamEl = document.getElementById("stat-team");
+    if (teamEl) {
+        teamEl.innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team").length}/6`;
+    }
 }
 
 // --- SECTION UNIFIED DRAG & DROP LOGIC ---
