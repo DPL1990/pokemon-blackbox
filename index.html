@@ -77,6 +77,10 @@
                             <option value="3d-animated">Modelos 3D (Showdown)</option>
                         </select>
                     </div>
+                    <div class="form-group" style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                        <input type="checkbox" id="auto-ribbon-toggle" style="width: auto; margin: 0;" onchange="toggleAutoRibbons(this.checked)">
+                        <label for="auto-ribbon-toggle" style="margin: 0; font-size: 0.75rem; cursor: pointer; font-weight: 800;">🎗️ Auto-Carimbo de Ribbons</label>
+                    </div>
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px;">
                         <button class="btn btn-primary" onclick="openModalForNew()" style="grid-column: span 2;">
                             <span>➕ Registar Espécime</span>
@@ -145,6 +149,7 @@
                 <div class="tabs-header" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
                     <button class="btn-tab active" id="tab-btn-boxes" onclick="switchTab('boxes')">Boxes & Equipa</button>
                     <button class="btn-tab" id="tab-btn-resume" onclick="switchTab('resume')">🏆 Currículo & Desafios</button>
+                    <button class="btn-tab" id="tab-btn-allocation" onclick="switchTab('allocation')">⚔️ Tática & Alocação</button>
                 </div>
 
                 <!-- Boxes & Active Team Tab Content -->
@@ -271,6 +276,107 @@
                             <div id="challenges-list-container" style="display: flex; flex-direction: column; gap: 10px; max-height: 400px; overflow-y: auto; padding-right: 4px;">
                                 <!-- Dynamic challenge items -->
                             </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tática & Alocação Tab Content -->
+                <div id="tab-content-allocation" style="display: none; padding-top: 10px;">
+                    <!-- Active League Header -->
+                    <div class="glass-panel" style="padding: 16px; margin-bottom: 20px; background: rgba(99, 102, 241, 0.03); border: 1px solid rgba(99, 102, 241, 0.15);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                            <div>
+                                <h3 style="font-size: 1.2rem; font-weight: 900; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                    ⚔️ Liga Local: <span id="allocation-league-name" style="color: var(--game-color);">...</span>
+                                </h3>
+                                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                                    Análise tática dos adversários da Elite Four e Champion baseada na Box do teu Treinador.
+                                </p>
+                            </div>
+                            <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 10px 20px; font-weight: 800; font-size: 0.8rem; box-shadow: 0 0 15px var(--game-color-glow);">
+                                ⚡ Alocar Equipa Recomendada
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Layout: Left side League/Counters, Right side Weakness Management -->
+                    <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start;">
+                        <!-- Left Panel: League Lineup & Recommended Counter-Squad -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- League Opponents Grid -->
+                            <div class="glass-panel" style="padding: 20px;">
+                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    🛡️ Alinhamento da Elite Four & Campeão
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;" id="allocation-opponents-grid">
+                                    <!-- Dynamic League Opponents -->
+                                </div>
+                            </div>
+
+                            <!-- Recommended Counter-Squad -->
+                            <div class="glass-panel" style="padding: 20px;">
+                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    🎯 Frota Recomendada (Seleção Tática)
+                                </div>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px;" id="allocation-team-grid">
+                                    <!-- Dynamic 6 recommended Pokémon -->
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Right Panel: Weakness Management & Moveset Suggestions -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Team Weakness & Redundancy Checklist -->
+                            <div class="glass-panel" style="padding: 20px;">
+                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    📊 Análise de Vulnerabilidades da Equipa
+                                </div>
+                                <div style="display: flex; flex-direction: column; gap: 12px;">
+                                    <div>
+                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Vulnerabilidades Críticas (3+ Fracos):</div>
+                                        <div id="allocation-critical-weaknesses" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
+                                            <!-- Dynamic Weaknesses -->
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 6px;">
+                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Resistências & Imunidades Relevantes:</div>
+                                        <div id="allocation-team-coverages" style="display: flex; flex-wrap: wrap; gap: 6px; font-size: 0.75rem;">
+                                            <!-- Dynamic Coverages -->
+                                        </div>
+                                    </div>
+                                    <div style="margin-top: 6px;">
+                                        <div style="font-size: 0.75rem; font-weight: 800; color: var(--text-muted); margin-bottom: 6px;">Redundâncias de Tipagem:</div>
+                                        <div id="allocation-type-redundancies" style="display: flex; flex-direction: column; gap: 4px; font-size: 0.75rem; color: #fff;">
+                                            <!-- Dynamic Redundancies -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Surgical Moveset Adjustments -->
+                            <div class="glass-panel" style="padding: 20px;">
+                                <div class="panel-title" style="margin-bottom: 14px; font-size: 0.85rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                    🔧 Sugestões de Ajuste Cirúrgico no Moveset
+                                </div>
+                                <div id="allocation-moveset-suggestions" style="display: flex; flex-direction: column; gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 4px;">
+                                    <!-- Dynamic Moveset Suggestions -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Presets Section -->
+                    <div class="glass-panel" style="padding: 20px; margin-top: 20px;">
+                        <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 14px;">
+                            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.85rem;">
+                                🗃️ Presets de Equipa (Liga Local)
+                            </div>
+                            <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="width: auto; padding: 6px 12px; font-size: 0.7rem; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25);">
+                                ✨ Dividir Box em Equipas
+                            </button>
+                        </div>
+                        <div id="allocation-presets-container" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px;">
+                            <!-- Dynamic Presets -->
                         </div>
                     </div>
                 </div>
@@ -466,6 +572,11 @@
                     <div class="form-group">
                         <label>🥚 Jogo de Origem</label>
                         <select id="form-origin-game"></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>👤 Treinador / Dono (OT)</label>
+                        <select id="form-trainer"></select>
                     </div>
 
                     <!-- Location Stamp Transfer panel -->
@@ -717,6 +828,20 @@
 
                 <!-- Parsed Results -->
                 <div id="save-import-results" style="display: none;">
+                    <!-- Lote / Bulk Action Panel -->
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                        <span style="font-size: 0.7rem; font-weight: 700; color: #fff; text-transform: uppercase;">⚡ Ação em Lote:</span>
+                        <div style="display: flex; align-items: center; gap: 8px; flex: 1; justify-content: flex-end;">
+                            <select id="bulk-import-game" onchange="updateBulkTrainers(this.value)" style="padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; min-width: 120px;">
+                                <!-- Populate dynamically -->
+                            </select>
+                            <select id="bulk-import-trainer" style="padding: 6px; border-radius: 6px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; min-width: 120px;">
+                                <!-- Populate dynamically -->
+                            </select>
+                            <button type="button" class="btn btn-action" onclick="applyBulkSettings()" style="width: auto; padding: 6px 12px; font-size: 0.7rem; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25);">Aplicar a Todos</button>
+                        </div>
+                    </div>
+
                     <div style="max-height: 300px; overflow-y: auto; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; margin-bottom: 16px;">
                         <table style="width: 100%; border-collapse: collapse; font-size: 0.75rem; text-align: left;">
                             <thead>
@@ -856,6 +981,28 @@
                 <div id="voyage-transfer-guide" class="glass-panel" style="padding: 12px; font-size: 0.75rem; line-height: 1.5; color: #e2e8f0; border-radius: 8px;">
                     <!-- Transfer instructions -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Partition Box Modal (Equipas em Lote) -->
+    <div class="modal-overlay" id="partition-modal">
+        <div class="modal-content" style="max-width: 680px; width: 95%;">
+            <div class="modal-header">
+                <h3 style="margin: 0; font-size: 1.1rem; font-weight: 900; color: #fff;">✨ Divisão Tática da Box (Sem Reposição)</h3>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closePartitionModal()">✕</button>
+            </div>
+            <div class="modal-body" style="padding-top: 10px; max-height: 75vh; overflow-y: auto;">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.4;">
+                    O motor analisou a Box atual contra a Elite Four local e dividiu os teus Pokémon em equipas exclusivas de 6 membros (sem repetir nenhum Pokémon). Podes nomear cada equipa e guardá-las como presets para ativar quando quiseres!
+                </p>
+                <div id="partition-results-container" style="display: flex; flex-direction: column; gap: 16px;">
+                    <!-- Dynamic partition rows -->
+                </div>
+            </div>
+            <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                <button class="btn btn-action" onclick="closePartitionModal()" style="width: auto; padding: 8px 16px;">Cancelar</button>
+                <button class="btn btn-primary" onclick="saveGeneratedPartitionPresets()" style="width: auto; padding: 8px 20px;">💾 Guardar Todos os Presets</button>
             </div>
         </div>
     </div>

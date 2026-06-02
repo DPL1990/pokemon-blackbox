@@ -40,6 +40,8 @@ let currentSpriteStyle = localStorage.getItem("bb_sprite_style") || "classic";
 let activeHofIndex = 0;
 let selectionMode = false;
 let selectedPokemonIds = new Set();
+let autoRibbonsEnabled = localStorage.getItem("bb_auto_ribbons") !== "false";
+let teamPresetsList = JSON.parse(localStorage.getItem("bb_team_presets")) || [];
 
 let trainersList = JSON.parse(localStorage.getItem("bb_trainers")) || [];
 let activeTrainerId = localStorage.getItem(`bb_active_trainer_${currentGameId}`) || `trainer_${currentGameId}_default`;
@@ -497,6 +499,24 @@ function updateTrainerSelect() {
     select.value = activeTrainerId;
 }
 
+function updateFormTrainerSelect(selectedTrainerId = null) {
+    const select = document.getElementById("form-trainer");
+    if (!select) return;
+    
+    const gameTrainers = trainersList.filter(t => t.gameId === currentGameId);
+    
+    select.innerHTML = gameTrainers.map(t => {
+        const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
+        return `<option value="${t.id}">${display}</option>`;
+    }).join("");
+    
+    if (selectedTrainerId && gameTrainers.some(t => t.id === selectedTrainerId)) {
+        select.value = selectedTrainerId;
+    } else {
+        select.value = activeTrainerId;
+    }
+}
+
 function toggleGlobalBoxMode() {
     globalBoxMode = !globalBoxMode;
     localStorage.setItem("bb_global_box_mode", globalBoxMode);
@@ -745,6 +765,9 @@ function renderAll() {
     `;
     
     setupDragAndDropEvents();
+    if (activeTab === "allocation") {
+        renderAllocationTab();
+    }
 }
 
 function setSpriteStyle(style) {
@@ -1160,6 +1183,7 @@ function openModalForNew() {
     
     renderCustomRibbonsTags();
     validateEVs();
+    updateFormTrainerSelect(activeTrainerId);
     document.getElementById("editor-modal").classList.add("active");
 }
 
@@ -1231,6 +1255,7 @@ function openModalForEdit(id) {
     renderCustomRibbonsTags();
     validateEVs();
     renderPassportTimeline(p); 
+    updateFormTrainerSelect(p.trainerId);
     document.getElementById("editor-modal").classList.add("active");
 }
 
@@ -1345,16 +1370,20 @@ async function savePokemon() {
     const evolutionNotes = document.getElementById("form-evolution-notes").value;
     const originGame = document.getElementById("form-origin-game").value;
 
+    const selectedTrainerId = document.getElementById("form-trainer").value || activeTrainerId;
+
     let targetPokemon = null;
     if (id) {
         targetPokemon = pokemonDatabase.find(p => p.id === id);
-        if (targetPokemon && targetPokemon.currentGame !== currentGameId) {
-            if (!targetPokemon.history) targetPokemon.history = [];
-            targetPokemon.history.push(targetPokemon.currentGame);
-            targetPokemon.currentGame = currentGameId;
-            targetPokemon.trainerId = activeTrainerId;
-            targetPokemon.slotType = "box"; 
-            targetPokemon.slotIndex = 0;
+        if (targetPokemon) {
+            targetPokemon.trainerId = selectedTrainerId;
+            if (targetPokemon.currentGame !== currentGameId) {
+                if (!targetPokemon.history) targetPokemon.history = [];
+                targetPokemon.history.push(targetPokemon.currentGame);
+                targetPokemon.currentGame = currentGameId;
+                targetPokemon.slotType = "box"; 
+                targetPokemon.slotIndex = 0;
+            }
         }
     }
     
@@ -1363,7 +1392,7 @@ async function savePokemon() {
             id: id || "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5), 
             history: [], 
             currentGame: currentGameId, 
-            trainerId: activeTrainerId,
+            trainerId: selectedTrainerId,
             slotType: "box", 
             slotIndex: 0 
         };
@@ -1449,6 +1478,7 @@ async function parseShowdownText() {
             notes: "Importado via Showdown.", 
             originGame: currentGameId, 
             currentGame: currentGameId, 
+            trainerId: document.getElementById("form-trainer").value || activeTrainerId,
             slotType: "box", 
             slotIndex: 0, 
             pokedexId: 1 
@@ -1752,12 +1782,12 @@ function parseGen1Save(buffer) {
             const structOffset = 0x2F34 + (i * 44);
             const level = u8[structOffset + 33];
             
-            const nickOffset = 0x3258 + (i * 11);
+            const nickOffset = 0x307E + (i * 11);
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
             const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
-            const otOffset = 0x3216 + (i * 11);
+            const otOffset = 0x303C + (i * 11);
             const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
@@ -1785,12 +1815,12 @@ function parseGen1Save(buffer) {
             const structOffset = 0x30D6 + (i * 33);
             const level = u8[structOffset + 3];
             
-            const nickOffset = 0x33E6 + (i * 11);
+            const nickOffset = 0x3446 + (i * 11);
             const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
             const nickname = decodeGen1String(nickBytes);
             
             const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
-            const otOffset = 0x33A4 + (i * 11);
+            const otOffset = 0x336A + (i * 11);
             const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
@@ -1871,8 +1901,9 @@ function parseGen3Save(buffer) {
     
     let maxSaveIndex0 = -1;
     let maxSaveIndex1 = -1;
+    const numSectors = Math.floor(u8.length / 4096);
     
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 14 && i < numSectors; i++) {
         const offset = i * 4096;
         const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
         if (sig === 0x08012025) {
@@ -1880,17 +1911,20 @@ function parseGen3Save(buffer) {
             if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
         }
     }
-    for (let i = 14; i < 28; i++) {
-        const offset = i * 4096;
-        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-        if (sig === 0x08012025) {
-            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
-            if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
+    
+    if (numSectors >= 28) {
+        for (let i = 14; i < 28; i++) {
+            const offset = i * 4096;
+            const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+            if (sig === 0x08012025) {
+                const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
+                if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
+            }
         }
     }
     
     let activeSlotStartSector = 0;
-    if (maxSaveIndex1 > maxSaveIndex0) {
+    if (numSectors >= 28 && maxSaveIndex1 > maxSaveIndex0) {
         activeSlotStartSector = 14;
     }
     
@@ -2176,6 +2210,145 @@ function parseDecryptedPKM(buffer, fileName) {
     }];
 }
 
+function parseGen8Gen9Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    const size = buffer.byteLength;
+    
+    let pkLen = 328;
+    if (size > 2000000) {
+        pkLen = 344;
+    }
+    
+    const parsedList = [];
+    const totalSlots = 960;
+    const blockLen = totalSlots * pkLen;
+    let bestOffset = -1;
+    
+    for (let offset = 0; offset <= size - blockLen; offset += 8) {
+        let validOrZeroCount = 0;
+        let nonZeroCount = 0;
+        
+        for (let i = 0; i < totalSlots; i++) {
+            const slotStart = offset + (i * pkLen);
+            let isZero = true;
+            for (let j = 0; j < pkLen; j++) {
+                if (u8[slotStart + j] !== 0) {
+                    isZero = false;
+                    break;
+                }
+            }
+            
+            if (isZero) {
+                validOrZeroCount++;
+            } else {
+                if (isValidPKMRecord(buffer, slotStart, pkLen)) {
+                    validOrZeroCount++;
+                    nonZeroCount++;
+                } else {
+                    break;
+                }
+            }
+        }
+        
+        if (validOrZeroCount === totalSlots && nonZeroCount > 0) {
+            bestOffset = offset;
+            break;
+        }
+    }
+    
+    if (bestOffset !== -1) {
+        for (let i = 0; i < totalSlots; i++) {
+            const slotStart = bestOffset + (i * pkLen);
+            let isZero = true;
+            for (let j = 0; j < pkLen; j++) {
+                if (u8[slotStart + j] !== 0) {
+                    isZero = false;
+                    break;
+                }
+            }
+            if (isZero) continue;
+            
+            const pkBuffer = buffer.slice(slotStart, slotStart + pkLen);
+            const parsed = parseDecryptedPKM(pkBuffer, `Slot ${i + 1}`);
+            if (parsed && parsed.length > 0) {
+                const boxNum = Math.floor(i / 30) + 1;
+                const slotNum = (i % 30) + 1;
+                parsed[0].sourceSlot = `Caixa ${boxNum} Slot ${slotNum}`;
+                parsedList.push(parsed[0]);
+            }
+        }
+    }
+    
+    return parsedList;
+}
+
+function isValidPKMRecord(buffer, start, len) {
+    const u16 = new Uint16Array(buffer, start, len / 2);
+    const u32 = new Uint32Array(buffer, start, len / 4);
+    
+    const pokedexId = u16[4];
+    const exp = u32[4];
+    
+    if (pokedexId === 0 || pokedexId > 1025) return false;
+    if (exp > 1640000) return false;
+    
+    const nickWords = u16.subarray(44, 44 + 12);
+    const nickname = decodeUTF16String(nickWords);
+    
+    for (let j = 0; j < nickname.length; j++) {
+        const charCode = nickname.charCodeAt(j);
+        if (charCode < 32 || (charCode > 126 && charCode < 160)) {
+            if (charCode !== 0x2642 && charCode !== 0x2640) {
+                return false;
+            }
+        }
+    }
+    
+    return true;
+}
+
+function populateBulkImportSelectors() {
+    const gameSelect = document.getElementById("bulk-import-game");
+    const trainerSelect = document.getElementById("bulk-import-trainer");
+    if (!gameSelect || !trainerSelect) return;
+    
+    gameSelect.innerHTML = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === currentGameId ? 'selected' : ''}>${g.name}</option>`).join("");
+    updateBulkTrainers(gameSelect.value);
+}
+
+function updateBulkTrainers(gameId) {
+    const trainerSelect = document.getElementById("bulk-import-trainer");
+    if (!trainerSelect) return;
+    
+    const gameTrainers = trainersList.filter(t => t.gameId === gameId);
+    trainerSelect.innerHTML = gameTrainers.map(t => {
+        const display = t.tid !== "00000" && t.tid ? `${t.name} (${t.tid})` : t.name;
+        return `<option value="${t.id}">${display}</option>`;
+    }).join("");
+}
+
+function applyBulkSettings() {
+    const gameSelect = document.getElementById("bulk-import-game");
+    const trainerSelect = document.getElementById("bulk-import-trainer");
+    if (!gameSelect || !trainerSelect) return;
+    
+    const targetGameId = gameSelect.value;
+    const targetTrainerId = trainerSelect.value;
+    
+    const gameSelects = document.querySelectorAll(".import-row-game");
+    const trainerSelects = document.querySelectorAll(".import-row-trainer");
+    
+    gameSelects.forEach(sel => {
+        sel.value = targetGameId;
+        const idx = parseInt(sel.getAttribute("data-idx"));
+        updateImportRowTrainers(idx, targetGameId);
+    });
+    
+    trainerSelects.forEach(sel => {
+        sel.value = targetTrainerId;
+    });
+}
+
 function openSaveImportModal() {
     const modal = document.getElementById("save-import-modal");
     if (!modal) return;
@@ -2215,12 +2388,14 @@ function handleSaveFileSelect(e) {
                 if (parsed.length === 0) {
                     parsed = parseGen2Save(buffer);
                 }
-            } else if (size >= 120000 && size <= 140000) {
+            } else if ((size >= 120000 && size <= 140000) || (size >= 60000 && size <= 70000)) {
                 parsed = parseGen3Save(buffer);
             } else if (size >= 500000 && size <= 550000) {
                 parsed = parseGen4Gen5Save(buffer);
+            } else if (size >= 900000 && size <= 4800000) {
+                parsed = parseGen8Gen9Save(buffer);
             } else {
-                alert(`Tamanho de ficheiro não reconhecido (${size} bytes). Apenas saves de cartucho (~32KB, ~128KB, ~512KB) ou ficheiros individuais descodificados (PKM) são suportados.`);
+                alert(`Tamanho de ficheiro não reconhecido (${size} bytes). Apenas saves de cartucho (~32KB, ~128KB, ~512KB), saves de Switch (~1MB-4.5MB) ou ficheiros individuais descodificados (PKM) são suportados.`);
                 return;
             }
             
@@ -2229,7 +2404,40 @@ function handleSaveFileSelect(e) {
                 return;
             }
             
+            // Auto-register any new trainers found in the save
+            let trainersChanged = false;
+            parsed.forEach(p => {
+                if (p.otName) {
+                    const cleanOt = p.otName.toLowerCase().trim();
+                    const formattedOtId = p.otId !== undefined && p.otId !== null ? String(p.otId).padStart(5, '0') : "00000";
+                    
+                    const exists = trainersList.some(t => {
+                        if (t.gameId !== currentGameId) return false;
+                        if (t.name.toLowerCase().trim() !== cleanOt) return false;
+                        const cleanTid = String(t.tid || "").padStart(5, '0');
+                        return cleanTid === formattedOtId;
+                    });
+                    
+                    if (!exists) {
+                        const newTrainerId = "trainer_" + currentGameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+                        trainersList.push({
+                            id: newTrainerId,
+                            gameId: currentGameId,
+                            name: p.otName,
+                            tid: formattedOtId,
+                            sid: "00000"
+                        });
+                        trainersChanged = true;
+                    }
+                }
+            });
+            if (trainersChanged) {
+                localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+                updateTrainerSelect();
+            }
+            
             tempImportList = parsed;
+            populateBulkImportSelectors();
             renderSaveImportList();
             document.getElementById("save-import-results").style.display = "block";
         } catch (err) {
@@ -2249,25 +2457,35 @@ function renderSaveImportList() {
         
         if (p.otName) {
             const cleanOt = p.otName.toLowerCase().trim();
-            let matchedTrainer = null;
+            const formattedOtId = p.otId !== undefined && p.otId !== null ? String(p.otId).padStart(5, '0') : "00000";
             
-            if (p.otId !== undefined && p.otId !== null) {
-                const formattedOtId = String(p.otId).padStart(5, '0');
-                matchedTrainer = trainersList.find(t => {
-                    if (t.name.toLowerCase().trim() !== cleanOt) return false;
-                    const cleanTid = String(t.tid || "").padStart(5, '0');
-                    return cleanTid === formattedOtId;
-                });
-            }
+            let matchedTrainer = trainersList.find(t => {
+                if (t.name.toLowerCase().trim() !== cleanOt) return false;
+                const cleanTid = String(t.tid || "").padStart(5, '0');
+                return cleanTid === formattedOtId;
+            });
             
             if (!matchedTrainer) {
                 matchedTrainer = trainersList.find(t => t.name.toLowerCase().trim() === cleanOt);
             }
             
-            if (matchedTrainer) {
-                selectedGameId = matchedTrainer.gameId;
-                selectedTrainerId = matchedTrainer.id;
+            if (!matchedTrainer) {
+                // Auto-create for selectedGameId (currentGameId)
+                const newTrainerId = "trainer_" + selectedGameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+                matchedTrainer = {
+                    id: newTrainerId,
+                    gameId: selectedGameId,
+                    name: p.otName,
+                    tid: formattedOtId,
+                    sid: "00000"
+                };
+                trainersList.push(matchedTrainer);
+                localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+                updateTrainerSelect();
             }
+            
+            selectedGameId = matchedTrainer.gameId;
+            selectedTrainerId = matchedTrainer.id;
         }
         
         const gameOptionsHtml = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === selectedGameId ? 'selected' : ''}>${g.name}</option>`).join("");
@@ -2315,22 +2533,35 @@ function updateImportRowTrainers(idx, gameId) {
     
     if (p && p.otName) {
         const cleanOt = p.otName.toLowerCase().trim();
-        let matchedTrainer = null;
-        if (p.otId !== undefined && p.otId !== null) {
-            const formattedOtId = String(p.otId).padStart(5, '0');
-            matchedTrainer = trainersList.find(t => {
-                if (t.gameId !== gameId) return false;
-                if (t.name.toLowerCase().trim() !== cleanOt) return false;
-                const cleanTid = String(t.tid || "").padStart(5, '0');
-                return cleanTid === formattedOtId;
-            });
-        }
+        const formattedOtId = p.otId !== undefined && p.otId !== null ? String(p.otId).padStart(5, '0') : "00000";
+        
+        let matchedTrainer = trainersList.find(t => {
+            if (t.gameId !== gameId) return false;
+            if (t.name.toLowerCase().trim() !== cleanOt) return false;
+            const cleanTid = String(t.tid || "").padStart(5, '0');
+            return cleanTid === formattedOtId;
+        });
+        
         if (!matchedTrainer) {
             matchedTrainer = trainersList.find(t => t.gameId === gameId && t.name.toLowerCase().trim() === cleanOt);
         }
-        if (matchedTrainer) {
-            selectedTrainerId = matchedTrainer.id;
+        
+        if (!matchedTrainer) {
+            // Dynamically create a trainer profile for this game!
+            const newTrainerId = "trainer_" + gameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+            matchedTrainer = {
+                id: newTrainerId,
+                gameId: gameId,
+                name: p.otName,
+                tid: formattedOtId,
+                sid: "00000"
+            };
+            trainersList.push(matchedTrainer);
+            localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+            updateTrainerSelect();
         }
+        
+        selectedTrainerId = matchedTrainer.id;
     }
     
     const gameTrainers = trainersList.filter(t => t.gameId === gameId);
@@ -2345,6 +2576,54 @@ function updateImportRowTrainers(idx, gameId) {
 function toggleSelectAllImport(checked) {
     const checkboxes = document.querySelectorAll(".import-row-checkbox");
     checkboxes.forEach(cb => cb.checked = checked);
+}
+
+function toggleAutoRibbons(checked) {
+    autoRibbonsEnabled = checked;
+    localStorage.setItem("bb_auto_ribbons", checked ? "true" : "false");
+}
+
+function applyAutoRibbons(pokemon, targetGameId) {
+    if (!pokemon.ribbons) pokemon.ribbons = [];
+    const game = GAMES_DB.find(g => g.id === targetGameId);
+    if (!game) return;
+
+    // Champion Ribbons based on destination game/generation
+    let ribbonToAdd = "";
+    if (["ruby", "sapphire", "emerald", "omegaruby", "alphasapphire"].includes(targetGameId)) {
+        ribbonToAdd = "champion_hoenn";
+    } else if (["diamond", "pearl", "platinum", "brilliantdiamond", "shiningpearl"].includes(targetGameId)) {
+        ribbonToAdd = "champion_sinnoh";
+    } else if (["heartgold", "soulsilver"].includes(targetGameId)) {
+        ribbonToAdd = "legend"; // Red Defeat Ribbon in HGSS
+    } else if (["x", "y"].includes(targetGameId)) {
+        ribbonToAdd = "champion_kalos";
+    } else if (["sun", "moon", "ultrasun", "ultramoon"].includes(targetGameId)) {
+        ribbonToAdd = "champion_alola";
+    } else if (["sword", "shield"].includes(targetGameId)) {
+        ribbonToAdd = "champion_galar";
+    } else if (targetGameId === "legendsarceus") {
+        ribbonToAdd = "pioneer_hisui";
+    } else if (["scarlet", "violet"].includes(targetGameId)) {
+        ribbonToAdd = "champion_paldea";
+    }
+
+    if (ribbonToAdd && !pokemon.ribbons.includes(ribbonToAdd)) {
+        pokemon.ribbons.push(ribbonToAdd);
+    }
+
+    // Level 100 Ribbons
+    if (pokemon.level === 100) {
+        if (game.gen >= 4) {
+            if (!pokemon.ribbons.includes("footprint")) {
+                pokemon.ribbons.push("footprint");
+            }
+        } else if (game.gen === 3) {
+            if (!pokemon.ribbons.includes("effort")) {
+                pokemon.ribbons.push("effort");
+            }
+        }
+    }
 }
 
 function executeSaveImport() {
@@ -2369,7 +2648,16 @@ function executeSaveImport() {
                 species: p.species,
                 nickname: p.nickname,
                 level: p.level,
-                isShiny: false,
+                isShiny: p.isShiny || false,
+                gender: p.gender || "⚲",
+                nature: p.nature || "",
+                ability: p.ability || "",
+                type1: p.type1 || "normal",
+                type2: p.type2 || "",
+                moves: p.moves || [],
+                ribbons: p.ribbons || [],
+                ivs: p.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+                evs: p.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
                 currentGame: targetGameId,
                 trainerId: targetTrainerId,
                 slotType: "box",
@@ -2377,6 +2665,18 @@ function executeSaveImport() {
                 history: [],
                 notes: `Importado do ficheiro de save.`
             };
+            
+            // Auto-Stamp ribbons if enabled
+            if (autoRibbonsEnabled) {
+                const isParty = p.sourceSlot && (
+                    p.sourceSlot.includes("Equipa") || 
+                    p.sourceSlot.includes("Party") || 
+                    p.sourceSlot.includes("Equipa GBA")
+                );
+                if (isParty) {
+                    applyAutoRibbons(newPokemon, targetGameId);
+                }
+            }
             
             pokemonDatabase.push(newPokemon);
             count++;
@@ -3203,20 +3503,29 @@ function switchTab(tabId) {
     activeTab = tabId;
     const btnBoxes = document.getElementById("tab-btn-boxes");
     const btnResume = document.getElementById("tab-btn-resume");
+    const btnAllocation = document.getElementById("tab-btn-allocation");
     const contentBoxes = document.getElementById("tab-content-boxes");
     const contentResume = document.getElementById("tab-content-resume");
+    const contentAllocation = document.getElementById("tab-content-allocation");
+
+    if (btnBoxes) btnBoxes.classList.remove("active");
+    if (btnResume) btnResume.classList.remove("active");
+    if (btnAllocation) btnAllocation.classList.remove("active");
+    if (contentBoxes) contentBoxes.style.display = "none";
+    if (contentResume) contentResume.style.display = "none";
+    if (contentAllocation) contentAllocation.style.display = "none";
 
     if (tabId === "boxes") {
         if (btnBoxes) btnBoxes.classList.add("active");
-        if (btnResume) btnResume.classList.remove("active");
         if (contentBoxes) contentBoxes.style.display = "block";
-        if (contentResume) contentResume.style.display = "none";
     } else if (tabId === "resume") {
-        if (btnBoxes) btnBoxes.classList.remove("active");
         if (btnResume) btnResume.classList.add("active");
-        if (contentBoxes) contentBoxes.style.display = "none";
         if (contentResume) contentResume.style.display = "block";
         renderTrainerResume();
+    } else if (tabId === "allocation") {
+        if (btnAllocation) btnAllocation.classList.add("active");
+        if (contentAllocation) contentAllocation.style.display = "block";
+        renderAllocationTab();
     }
 }
 
@@ -4264,6 +4573,1141 @@ function renderMovesetHeatmap(pokedexId) {
     `;
 }
 
+const TYPE_EFFECTIVENESS = {
+    normal: { rock: 0.5, ghost: 0, steel: 0.5 },
+    fire: { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+    water: { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+    electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+    grass: { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+    ice: { fire: 0.5, water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+    fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5 },
+    poison: { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2 },
+    ground: { fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+    flying: { electric: 0.5, grass: 2, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+    psychic: { fighting: 2, poison: 2, psychic: 0.5, steel: 0.5, dark: 0 },
+    bug: { fire: 0.5, grass: 2, fighting: 0.5, poison: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5 },
+    rock: { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+    ghost: { normal: 0, psychic: 2, ghost: 2, dark: 0.5, steel: 0.5 },
+    dragon: { dragon: 2, steel: 0.5, fairy: 0 },
+    dark: { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, steel: 0.5, fairy: 0.5 },
+    steel: { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
+    fairy: { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 }
+};
+
+const LEAGUE_OPPONENTS = {
+    // Kanto
+    red: { name: "Indigo Plateau (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival Blue", emoji: "👑", types: ["normal", "flying", "water"], weaknesses: ["electric", "ice", "rock", "ground"] }
+    ]},
+    blue: { name: "Indigo Plateau (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival Blue", emoji: "👑", types: ["normal", "flying", "fire"], weaknesses: ["water", "rock", "ground", "electric"] }
+    ]},
+    yellow: { name: "Indigo Plateau (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival Blue", emoji: "👑", types: ["normal", "flying", "electric"], weaknesses: ["ground", "ice", "rock", "electric"] }
+    ]},
+    firered: { name: "Indigo Plateau (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost", "dark"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival", emoji: "👑", types: ["normal", "flying", "fire"], weaknesses: ["water", "rock", "ground", "electric"] }
+    ]},
+    leafgreen: { name: "Indigo Plateau (Kanto)", opponents: [
+        { name: "Lorelei", emoji: "❄️", types: ["ice", "water"], weaknesses: ["electric", "grass", "fighting", "rock"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Agatha", emoji: "👻", types: ["ghost", "poison"], weaknesses: ["psychic", "ground", "ghost", "dark"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric", "dragon"] },
+        { name: "Rival", emoji: "👑", types: ["normal", "flying", "water"], weaknesses: ["electric", "ice", "rock", "ground"] }
+    ]},
+    
+    // Johto
+    gold: { name: "Indigo Plateau (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    silver: { name: "Indigo Plateau (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    crystal: { name: "Indigo Plateau (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    heartgold: { name: "Indigo Plateau (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    soulsilver: { name: "Indigo Plateau (Johto)", opponents: [
+        { name: "Will", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Koga", emoji: "☠️", types: ["poison"], weaknesses: ["psychic", "ground", "fire"] },
+        { name: "Bruno", emoji: "👊", types: ["fighting", "rock"], weaknesses: ["psychic", "flying", "water", "grass"] },
+        { name: "Karen", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Lance", emoji: "🐉", types: ["dragon", "flying"], weaknesses: ["ice", "rock", "electric"] }
+    ]},
+    
+    // Hoenn
+    ruby: { name: "Ever Grande City (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon"] },
+        { name: "Steven", emoji: "🔩", types: ["steel", "rock"], weaknesses: ["fire", "fighting", "ground"] }
+    ]},
+    sapphire: { name: "Ever Grande City (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon"] },
+        { name: "Steven", emoji: "🔩", types: ["steel", "rock"], weaknesses: ["fire", "fighting", "ground"] }
+    ]},
+    emerald: { name: "Ever Grande City (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon"] },
+        { name: "Wallace", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] }
+    ]},
+    omegaruby: { name: "Ever Grande City (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark"], weaknesses: ["fighting", "bug", "fairy"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Steven", emoji: "🔩", types: ["steel", "rock"], weaknesses: ["fire", "fighting", "ground"] }
+    ]},
+    alphasapphire: { name: "Ever Grande City (Hoenn)", opponents: [
+        { name: "Sidney", emoji: "🕶️", types: ["dark"], weaknesses: ["fighting", "bug", "fairy"] },
+        { name: "Phoebe", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Glacia", emoji: "❄️", types: ["ice"], weaknesses: ["fighting", "fire", "rock", "steel"] },
+        { name: "Drake", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Steven", emoji: "🔩", types: ["steel", "rock"], weaknesses: ["fire", "fighting", "ground"] }
+    ]},
+    
+    // Sinnoh
+    diamond: { name: "Pokémon League (Sinnoh)", opponents: [
+        { name: "Aaron", emoji: "🐞", types: ["bug"], weaknesses: ["fire", "flying", "rock"] },
+        { name: "Bertha", emoji: "🏜️", types: ["ground", "rock"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Flint", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Lucian", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Cynthia", emoji: "👑", types: ["dragon", "water", "ground"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    pearl: { name: "Pokémon League (Sinnoh)", opponents: [
+        { name: "Aaron", emoji: "🐞", types: ["bug"], weaknesses: ["fire", "flying", "rock"] },
+        { name: "Bertha", emoji: "🏜️", types: ["ground", "rock"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Flint", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Lucian", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Cynthia", emoji: "👑", types: ["dragon", "water", "ground"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    platinum: { name: "Pokémon League (Sinnoh)", opponents: [
+        { name: "Aaron", emoji: "🐞", types: ["bug"], weaknesses: ["fire", "flying", "rock"] },
+        { name: "Bertha", emoji: "🏜️", types: ["ground", "rock"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Flint", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Lucian", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Cynthia", emoji: "👑", types: ["dragon", "water", "ground"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    brilliantdiamond: { name: "Pokémon League (Sinnoh)", opponents: [
+        { name: "Aaron", emoji: "🐞", types: ["bug"], weaknesses: ["fire", "flying", "rock"] },
+        { name: "Bertha", emoji: "🏜️", types: ["ground", "rock"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Flint", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Lucian", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Cynthia", emoji: "👑", types: ["dragon", "water", "ground"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    shiningpearl: { name: "Pokémon League (Sinnoh)", opponents: [
+        { name: "Aaron", emoji: "🐞", types: ["bug"], weaknesses: ["fire", "flying", "rock"] },
+        { name: "Bertha", emoji: "🏜️", types: ["ground", "rock"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Flint", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Lucian", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Cynthia", emoji: "👑", types: ["dragon", "water", "ground"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    
+    // Unova
+    black: { name: "Pokémon League (Unova)", opponents: [
+        { name: "Shauntal", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Marshal", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying"] },
+        { name: "Grimsley", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Caitlin", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Alder", emoji: "👑", types: ["bug", "fire"], weaknesses: ["fire", "flying", "rock", "water"] }
+    ]},
+    white: { name: "Pokémon League (Unova)", opponents: [
+        { name: "Shauntal", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Marshal", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying"] },
+        { name: "Grimsley", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug"] },
+        { name: "Caitlin", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Alder", emoji: "👑", types: ["bug", "fire"], weaknesses: ["fire", "flying", "rock", "water"] }
+    ]},
+    black2: { name: "Pokémon League (Unova)", opponents: [
+        { name: "Shauntal", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Marshal", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying", "fairy"] },
+        { name: "Grimsley", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug", "fairy"] },
+        { name: "Caitlin", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Iris", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    white2: { name: "Pokémon League (Unova)", opponents: [
+        { name: "Shauntal", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Marshal", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying", "fairy"] },
+        { name: "Grimsley", emoji: "🌙", types: ["dark"], weaknesses: ["fighting", "bug", "fairy"] },
+        { name: "Caitlin", emoji: "🔮", types: ["psychic"], weaknesses: ["ghost", "dark", "bug"] },
+        { name: "Iris", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] }
+    ]},
+    
+    // Kalos
+    x: { name: "Lumiose City (Kalos)", opponents: [
+        { name: "Malva", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Siebold", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] },
+        { name: "Wikstrom", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Drasna", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Diantha", emoji: "👑", types: ["fairy", "rock"], weaknesses: ["steel", "poison"] }
+    ]},
+    y: { name: "Lumiose City (Kalos)", opponents: [
+        { name: "Malva", emoji: "🔥", types: ["fire"], weaknesses: ["water", "ground", "rock"] },
+        { name: "Siebold", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] },
+        { name: "Wikstrom", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Drasna", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Diantha", emoji: "👑", types: ["fairy", "rock"], weaknesses: ["steel", "poison"] }
+    ]},
+    
+    // Alola
+    sun: { name: "Mount Lanakila (Alola)", opponents: [
+        { name: "Hala", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying", "fairy"] },
+        { name: "Olivia", emoji: "💎", types: ["rock"], weaknesses: ["water", "grass", "fighting", "ground", "steel"] },
+        { name: "Acerola", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Kahili", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Prof. Kukui", emoji: "👑", types: ["water", "fire", "grass"], weaknesses: ["electric", "ice", "ground"] }
+    ]},
+    moon: { name: "Mount Lanakila (Alola)", opponents: [
+        { name: "Hala", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying", "fairy"] },
+        { name: "Olivia", emoji: "💎", types: ["rock"], weaknesses: ["water", "grass", "fighting", "ground", "steel"] },
+        { name: "Acerola", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Kahili", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Prof. Kukui", emoji: "👑", types: ["water", "fire", "grass"], weaknesses: ["electric", "ice", "ground"] }
+    ]},
+    ultrasun: { name: "Mount Lanakila (Alola)", opponents: [
+        { name: "Molayne", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Olivia", emoji: "💎", types: ["rock"], weaknesses: ["water", "grass", "fighting", "ground", "steel"] },
+        { name: "Acerola", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Kahili", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Hau", emoji: "👑", types: ["water", "fire", "electric"], weaknesses: ["ground", "grass", "electric"] }
+    ]},
+    ultramoon: { name: "Mount Lanakila (Alola)", opponents: [
+        { name: "Molayne", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Olivia", emoji: "💎", types: ["rock"], weaknesses: ["water", "grass", "fighting", "ground", "steel"] },
+        { name: "Acerola", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Kahili", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Hau", emoji: "👑", types: ["water", "fire", "electric"], weaknesses: ["ground", "grass", "electric"] }
+    ]},
+    
+    // Galar
+    sword: { name: "Wyndon Stadium (Galar)", opponents: [
+        { name: "Nessa", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] },
+        { name: "Bea", emoji: "👊", types: ["fighting"], weaknesses: ["psychic", "flying", "fairy"] },
+        { name: "Raihan", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Leon", emoji: "👑", types: ["fire", "dragon", "ghost"], weaknesses: ["electric", "ice", "rock"] }
+    ]},
+    shield: { name: "Wyndon Stadium (Galar)", opponents: [
+        { name: "Nessa", emoji: "🌊", types: ["water"], weaknesses: ["electric", "grass"] },
+        { name: "Allister", emoji: "👻", types: ["ghost"], weaknesses: ["ghost", "dark"] },
+        { name: "Raihan", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Leon", emoji: "👑", types: ["fire", "dragon", "ghost"], weaknesses: ["electric", "ice", "rock"] }
+    ]},
+    
+    // Hisui
+    legendsarceus: { name: "Templo de Sinnoh (Hisui)", opponents: [
+        { name: "Beni", emoji: "🥷", types: ["poison", "psychic", "fairy"], weaknesses: ["ground", "ghost"] },
+        { name: "Kamado", emoji: "🛡️", types: ["steel", "fighting"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Volo", emoji: "⚡", types: ["fairy", "dragon", "fire"], weaknesses: ["ice", "fairy", "dragon"] },
+        { name: "Giratina", emoji: "🐉", types: ["ghost", "dragon"], weaknesses: ["ghost", "dark", "ice", "fairy", "dragon"] }
+    ]},
+
+    // Paldea
+    scarlet: { name: "Mesagoza (Paldea)", opponents: [
+        { name: "Rika", emoji: "🏜️", types: ["ground"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Poppy", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Larry", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Hassel", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Geeta", emoji: "👑", types: ["rock", "steel", "psychic"], weaknesses: ["fire", "fighting", "dark", "ghost"] }
+    ]},
+    violet: { name: "Mesagoza (Paldea)", opponents: [
+        { name: "Rika", emoji: "🏜️", types: ["ground"], weaknesses: ["water", "grass", "ice"] },
+        { name: "Poppy", emoji: "🛡️", types: ["steel"], weaknesses: ["fire", "fighting", "ground"] },
+        { name: "Larry", emoji: "🦅", types: ["flying"], weaknesses: ["electric", "ice", "rock"] },
+        { name: "Hassel", emoji: "🐉", types: ["dragon"], weaknesses: ["ice", "dragon", "fairy"] },
+        { name: "Geeta", emoji: "👑", types: ["rock", "steel", "psychic"], weaknesses: ["fire", "fighting", "dark", "ghost"] }
+    ]}
+};
+
+const COMMON_MOVES_TYPES = {
+    "body slam": "normal", "slash": "normal", "hyper beam": "normal", "double edge": "normal", "quick attack": "normal",
+    "extreme speed": "normal", "return": "normal", "frustration": "normal", "facade": "normal",
+    "flamethrower": "fire", "fire blast": "fire", "fire punch": "fire", "flare blitz": "fire", "overheat": "fire", "ember": "fire",
+    "surf": "water", "hydro pump": "water", "waterfall": "water", "scald": "water", "water gun": "water", "aqua tail": "water",
+    "thunderbolt": "electric", "thunder": "electric", "thunder punch": "electric", "volt switch": "electric", "spark": "electric",
+    "solarbeam": "grass", "solar beam": "grass", "giga drain": "grass", "energy ball": "grass", "leaf storm": "grass", "razor leaf": "grass",
+    "ice beam": "ice", "blizzard": "ice", "ice punch": "ice", "icicle crash": "ice", "powder snow": "ice", "avalanche": "ice",
+    "close combat": "fighting", "superpower": "fighting", "dynamic punch": "fighting", "brick break": "fighting", "drain punch": "fighting",
+    "sludge bomb": "poison", "toxic": "poison", "poison jab": "poison", "gunk shot": "poison", "sludge wave": "poison",
+    "earthquake": "ground", "earth power": "ground", "dig": "ground", "mud shot": "ground",
+    "fly": "flying", "hurricane": "flying", "brave bird": "flying", "air slash": "flying", "gust": "flying",
+    "psychic": "psychic", "psyshock": "psychic", "zen headbutt": "psychic", "confusion": "psychic",
+    "bug buzz": "bug", "u-turn": "bug", "x-scissor": "bug", "signal beam": "bug", "leech life": "bug",
+    "rock slide": "rock", "stone edge": "rock", "power gem": "rock", "rock tomb": "rock",
+    "shadow ball": "ghost", "shadow claw": "ghost", "shadow sneak": "ghost", "astonish": "ghost",
+    "dragon claw": "dragon", "draco meteor": "dragon", "dragon pulse": "dragon", "outrage": "dragon",
+    "dark pulse": "dark", "crunch": "dark", "bite": "dark", "knock off": "dark", "foul play": "dark",
+    "iron head": "steel", "flash cannon": "steel", "steel wing": "steel", "meteor mash": "steel",
+    "moonblast": "fairy", "play rough": "fairy", "dazzling gleam": "fairy", "draining kiss": "fairy"
+};
+
+function getTypeMultiplier(atk, def, gen = 9) {
+    atk = atk.toLowerCase();
+    def = def.toLowerCase();
+    
+    // Gen 1 specific checks
+    if (gen === 1) {
+        if (atk === "ghost" && def === "psychic") return 0;
+        if (atk === "bug" && def === "poison") return 2;
+        if (atk === "poison" && def === "bug") return 2;
+        if (["dark", "steel", "fairy"].includes(atk) || ["dark", "steel", "fairy"].includes(def)) return 1;
+    }
+    
+    // Pre-Gen 6 Steel resistances
+    if (gen < 6) {
+        if (def === "steel" && (atk === "ghost" || atk === "dark")) return 0.5;
+    }
+    
+    // No Fairy type before Gen 6
+    if (gen < 6) {
+        if (atk === "fairy" || def === "fairy") return 1;
+    }
+    
+    // Normal lookup
+    if (TYPE_EFFECTIVENESS[atk] && TYPE_EFFECTIVENESS[atk][def] !== undefined) {
+        return TYPE_EFFECTIVENESS[atk][def];
+    }
+    
+    return 1;
+}
+
+function guessMoveType(moveName) {
+    const clean = moveName.toLowerCase().trim().replace("-", " ");
+    if (COMMON_MOVES_TYPES[clean]) {
+        return COMMON_MOVES_TYPES[clean];
+    }
+    if (clean.includes("fire") || clean.includes("flame") || clean.includes("blitz") || clean.includes("burn")) return "fire";
+    if (clean.includes("water") || clean.includes("hydro") || clean.includes("surf") || clean.includes("aqua") || clean.includes("liquid")) return "water";
+    if (clean.includes("bolt") || clean.includes("thunder") || clean.includes("volt") || clean.includes("spark")) return "electric";
+    if (clean.includes("grass") || clean.includes("leaf") || clean.includes("solar") || clean.includes("seed") || clean.includes("mega")) return "grass";
+    if (clean.includes("ice") || clean.includes("blizzard") || clean.includes("freeze") || clean.includes("snow") || clean.includes("frost")) return "ice";
+    if (clean.includes("punch") || clean.includes("kick") || clean.includes("combat") || clean.includes("fist") || clean.includes("chop")) return "fighting";
+    if (clean.includes("poison") || clean.includes("sludge") || clean.includes("toxic") || clean.includes("acid")) return "poison";
+    if (clean.includes("earth") || clean.includes("ground") || clean.includes("mud") || clean.includes("sand") || clean.includes("dig")) return "ground";
+    if (clean.includes("fly") || clean.includes("air") || clean.includes("wing") || clean.includes("hurricane") || clean.includes("gust")) return "flying";
+    if (clean.includes("psych") || clean.includes("psy") || clean.includes("mind") || clean.includes("zen")) return "psychic";
+    if (clean.includes("bug") || clean.includes("scissor") || clean.includes("leech") || clean.includes("sting") || clean.includes("web")) return "bug";
+    if (clean.includes("rock") || clean.includes("stone") || clean.includes("gem") || clean.includes("slide")) return "rock";
+    if (clean.includes("ghost") || clean.includes("shadow") || clean.includes("spook") || clean.includes("curse")) return "ghost";
+    if (clean.includes("dragon") || clean.includes("draco") || clean.includes("outrage")) return "dragon";
+    if (clean.includes("dark") || clean.includes("crunch") || clean.includes("bite") || clean.includes("shadow") || clean.includes("night") || clean.includes("thief")) return "dark";
+    if (clean.includes("steel") || clean.includes("iron") || clean.includes("metal") || clean.includes("shield")) return "steel";
+    if (clean.includes("fairy") || clean.includes("gleam") || clean.includes("moon") || clean.includes("kiss") || clean.includes("charm") || clean.includes("play")) return "fairy";
+    
+    return "normal";
+}
+
+function calculatePokemonLeagueScore(p, opponent, gen) {
+    let score = 0;
+    
+    score += (p.level || 50) * 1.5;
+    
+    let defenseRating = 0;
+    opponent.types.forEach(opType => {
+        const mult1 = getTypeMultiplier(opType, p.type1 || "normal", gen);
+        const mult2 = p.type2 ? getTypeMultiplier(opType, p.type2, gen) : 1;
+        const totalMult = mult1 * mult2;
+        
+        if (totalMult < 1) {
+            defenseRating += 15;
+            if (totalMult === 0) defenseRating += 10;
+        } else if (totalMult > 1) {
+            defenseRating -= 20;
+        }
+    });
+    score += defenseRating;
+    
+    let offenseRating = 0;
+    opponent.types.forEach(opType => {
+        const mult1 = getTypeMultiplier(p.type1 || "normal", opType, gen);
+        const mult2 = p.type2 ? getTypeMultiplier(p.type2, opType, gen) : 1;
+        if (mult1 > 1 || mult2 > 1) {
+            offenseRating += 10;
+        }
+    });
+    
+    const moves = p.moves || [];
+    let hasSuperEffectiveMove = false;
+    
+    moves.forEach(m => {
+        if (!m) return;
+        const moveType = guessMoveType(m);
+        
+        opponent.types.forEach(opType => {
+            const mult = getTypeMultiplier(moveType, opType, gen);
+            if (mult > 1) {
+                hasSuperEffectiveMove = true;
+                offenseRating += 20;
+                if (moveType === p.type1 || moveType === p.type2) {
+                    offenseRating += 5;
+                }
+            }
+        });
+    });
+    
+    if (hasSuperEffectiveMove) {
+        offenseRating += 15;
+    }
+    
+    score += offenseRating;
+    return score;
+}
+
+let currentAllocationRecommendation = [];
+
+function getRecommendedAllocation() {
+    const game = GAMES_DB.find(g => g.id === currentGameId);
+    const gen = game ? game.gen : 9;
+    const league = LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const boxList = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId);
+    
+    if (boxList.length === 0) {
+        return [];
+    }
+    
+    const chosenTeam = [];
+    const usedIds = new Set();
+    
+    league.opponents.forEach(opponent => {
+        let bestPkmn = null;
+        let bestScore = -999;
+        
+        boxList.forEach(p => {
+            if (usedIds.has(p.id)) return;
+            const score = calculatePokemonLeagueScore(p, opponent, gen);
+            if (score > bestScore) {
+                bestScore = score;
+                bestPkmn = p;
+            }
+        });
+        
+        if (bestPkmn) {
+            chosenTeam.push({
+                pokemon: bestPkmn,
+                counterFor: opponent.name,
+                counterEmoji: opponent.emoji,
+                score: bestScore
+            });
+            usedIds.add(bestPkmn.id);
+        }
+    });
+    
+    while (chosenTeam.length < 6 && chosenTeam.length < boxList.length) {
+        let bestPkmn = null;
+        let bestScore = -999;
+        let counterFor = "Reserva Tática";
+        let counterEmoji = "🛡️";
+        
+        boxList.forEach(p => {
+            if (usedIds.has(p.id)) return;
+            
+            let avgScore = 0;
+            league.opponents.forEach(opponent => {
+                avgScore += calculatePokemonLeagueScore(p, opponent, gen);
+            });
+            avgScore /= league.opponents.length;
+            
+            if (avgScore > bestScore) {
+                bestScore = avgScore;
+                bestPkmn = p;
+            }
+        });
+        
+        if (bestPkmn) {
+            chosenTeam.push({
+                pokemon: bestPkmn,
+                counterFor: counterFor,
+                counterEmoji: counterEmoji,
+                score: bestScore
+            });
+            usedIds.add(bestPkmn.id);
+        }
+    }
+    
+    currentAllocationRecommendation = chosenTeam.map(t => t.pokemon);
+    return chosenTeam;
+}
+
+function applyRecommendedAllocation() {
+    if (currentAllocationRecommendation.length === 0) {
+        alert("Nenhum Pokémon disponível na Box do treinador ativo para efetuar a alocação.");
+        return;
+    }
+    
+    if (!confirm(`Desejas alocar estes ${currentAllocationRecommendation.length} Pokémon como a tua equipa ativa para a Liga local?`)) {
+        return;
+    }
+    
+    pokemonDatabase.forEach(p => {
+        if (p.currentGame === currentGameId && p.trainerId === activeTrainerId) {
+            p.slotType = "box";
+        }
+    });
+    
+    currentAllocationRecommendation.forEach((pkmn, index) => {
+        const found = pokemonDatabase.find(p => p.id === pkmn.id);
+        if (found) {
+            found.slotType = "team";
+            found.slotIndex = index;
+        }
+    });
+    
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    renderAll();
+    switchTab("boxes");
+    alert("Frota tática alocada com sucesso! A tua equipa ativa foi atualizada.");
+}
+
+function renderAllocationTab() {
+    const game = GAMES_DB.find(g => g.id === currentGameId);
+    const gen = game ? game.gen : 9;
+    const league = LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const leagueNameSpan = document.getElementById("allocation-league-name");
+    if (leagueNameSpan) {
+        leagueNameSpan.textContent = league.name;
+    }
+    
+    const opponentsGrid = document.getElementById("allocation-opponents-grid");
+    if (opponentsGrid) {
+        opponentsGrid.innerHTML = league.opponents.map(opp => {
+            const typesBadge = opp.types.map(t => `<span class="type-badge t-${t}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${t}</span>`).join(" ");
+            const weakBadges = opp.weaknesses.map(w => `<span class="type-badge t-${w}" style="font-size: 0.5rem; padding: 1px 3px; border-radius: 3px; text-transform: uppercase;" title="Fraco a ${w}">${w}</span>`).join("");
+            
+            return `
+                <div class="glass-panel" style="padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.04); background: rgba(0,0,0,0.15);">
+                    <div style="font-size: 1.5rem; margin-bottom: 4px;">${opp.emoji}</div>
+                    <div style="font-weight: 800; font-size: 0.8rem; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${opp.name}">${opp.name}</div>
+                    <div style="margin-top: 4px; display: flex; justify-content: center; gap: 2px; flex-wrap: wrap;">${typesBadge}</div>
+                    <div style="margin-top: 6px;">
+                        <div style="font-size: 0.55rem; color: var(--text-muted); margin-bottom: 2px;">Vulnerabilidades:</div>
+                        <div style="display: flex; gap: 2px; justify-content: center; flex-wrap: wrap;">${weakBadges}</div>
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+    
+    const recommendations = getRecommendedAllocation();
+    
+    const teamGrid = document.getElementById("allocation-team-grid");
+    if (teamGrid) {
+        if (recommendations.length === 0) {
+            teamGrid.innerHTML = `<div style="grid-column: span 6; text-align: center; padding: 20px; font-size: 0.8rem; color: var(--text-muted);">Nenhum Pokémon registado na Box do Treinador Ativo. Regista exemplares ou importa um save para ver a alocação!</div>`;
+        } else {
+            teamGrid.innerHTML = recommendations.map(rec => {
+                const p = rec.pokemon;
+                const getSprite = (pkmn) => {
+                    const id = pkmn.pokedexId || 1;
+                    if (currentSpriteStyle === "classic") {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+                    } else if (currentSpriteStyle === "3d-home") {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${id}.png`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+                    } else {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+                    }
+                };
+                
+                const typeBadges = [
+                    `<span class="type-badge t-${p.type1}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${p.type1}</span>`
+                ];
+                if (p.type2) {
+                    typeBadges.push(`<span class="type-badge t-${p.type2}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${p.type2}</span>`);
+                }
+                
+                return `
+                    <div class="glass-panel" style="padding: 10px; text-align: center; border: 1px solid rgba(255,255,255,0.06); background: rgba(99, 102, 241, 0.02);">
+                        <span style="font-size: 0.55rem; font-weight: 800; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.3); color: var(--accent-success); padding: 1px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px; margin-bottom: 4px;">
+                            ${rec.counterEmoji} Counter: ${rec.counterFor}
+                        </span>
+                        <div style="width: 60px; height: 60px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                            <img src="${getSprite(p)}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png'">
+                        </div>
+                        <h4 style="font-size: 0.8rem; margin: 4px 0 2px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.nickname || p.species}</h4>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 4px;">Nível ${p.level}</div>
+                        <div style="display: flex; gap: 2px; justify-content: center;">${typeBadges.join(" ")}</div>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+    
+    const activeTeam = recommendations.map(rec => rec.pokemon);
+    renderWeaknessAnalysis(activeTeam, gen);
+    renderPresets();
+}
+
+function renderWeaknessAnalysis(team, gen) {
+    const critWeaknessesDiv = document.getElementById("allocation-critical-weaknesses");
+    const coveragesDiv = document.getElementById("allocation-team-coverages");
+    const redundanciesDiv = document.getElementById("allocation-type-redundancies");
+    const suggestionsDiv = document.getElementById("allocation-moveset-suggestions");
+    
+    if (!critWeaknessesDiv || !coveragesDiv || !redundanciesDiv || !suggestionsDiv) return;
+    
+    if (team.length === 0) {
+        critWeaknessesDiv.innerHTML = `<span style="color: var(--text-muted);">Sem dados de equipa.</span>`;
+        coveragesDiv.innerHTML = `<span style="color: var(--text-muted);">Sem dados de equipa.</span>`;
+        redundanciesDiv.innerHTML = `<span style="color: var(--text-muted);">Sem dados de equipa.</span>`;
+        suggestionsDiv.innerHTML = `<span style="color: var(--text-muted);">Sem dados de equipa.</span>`;
+        return;
+    }
+    
+    const types = ["normal", "fire", "water", "electric", "grass", "ice", "fighting", "poison", "ground", "flying", "psychic", "bug", "rock", "ghost", "dragon", "dark", "steel", "fairy"];
+    
+    const weaknessCounts = {};
+    const resistanceCounts = {};
+    const immunityCounts = {};
+    
+    types.forEach(t => {
+        weaknessCounts[t] = 0;
+        resistanceCounts[t] = 0;
+        immunityCounts[t] = 0;
+    });
+    
+    team.forEach(p => {
+        types.forEach(t => {
+            const mult1 = getTypeMultiplier(t, p.type1 || "normal", gen);
+            const mult2 = p.type2 ? getTypeMultiplier(t, p.type2, gen) : 1;
+            const totalMult = mult1 * mult2;
+            
+            if (totalMult === 0) {
+                immunityCounts[t]++;
+            } else if (totalMult < 1) {
+                resistanceCounts[t]++;
+            } else if (totalMult > 1) {
+                weaknessCounts[t]++;
+            }
+        });
+    });
+    
+    const criticals = types.filter(t => weaknessCounts[t] >= 3);
+    if (criticals.length === 0) {
+        critWeaknessesDiv.innerHTML = `<span style="color: var(--accent-success); font-weight: 800; display: flex; align-items: center; gap: 4px;">✅ Nenhuma fraqueza crítica! A equipa está bem equilibrada.</span>`;
+    } else {
+        critWeaknessesDiv.innerHTML = criticals.map(t => {
+            return `<span class="type-badge t-${t}" style="font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; font-weight: 900; border: 1px solid var(--accent-danger); box-shadow: 0 0 8px rgba(239, 68, 68, 0.1);" title="${weaknessCounts[t]} membros fracos a ${t}">
+                ⚠️ ${t} (${weaknessCounts[t]}x fracos)
+            </span>`;
+        }).join(" ");
+    }
+    
+    const coverages = types.filter(t => (resistanceCounts[t] + immunityCounts[t]) >= 3);
+    if (coverages.length === 0) {
+        coveragesDiv.innerHTML = `<span style="color: var(--text-muted);">Nenhuma imunidade/resistência predominante (>= 3).</span>`;
+    } else {
+        coveragesDiv.innerHTML = coverages.map(t => {
+            const label = immunityCounts[t] > 0 ? `🛡️ ${t} (imune+res)` : `🛡️ ${t}`;
+            return `<span class="type-badge t-${t}" style="font-size: 0.65rem; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; font-weight: 900; border: 1px solid var(--accent-success); opacity: 0.85;" title="${resistanceCounts[t] + immunityCounts[t]} coberturas contra ${t}">
+                ${label}
+            </span>`;
+        }).join(" ");
+    }
+    
+    const typeCounts = {};
+    team.forEach(p => {
+        if (p.type1) typeCounts[p.type1] = (typeCounts[p.type1] || 0) + 1;
+        if (p.type2) typeCounts[p.type2] = (typeCounts[p.type2] || 0) + 1;
+    });
+    
+    const redundancies = Object.keys(typeCounts).filter(t => typeCounts[t] >= 2);
+    if (redundancies.length === 0) {
+        redundanciesDiv.innerHTML = `<span style="color: var(--accent-success); font-weight: 800;">✅ Excelente diversidade de tipagem. Sem redundâncias de tipo!</span>`;
+    } else {
+        redundanciesDiv.innerHTML = redundancies.map(t => {
+            return `
+                <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.02); padding: 4px 0;">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="type-badge t-${t}" style="font-size: 0.55rem; padding: 1px 4px; border-radius: 4px; text-transform: uppercase;">${t}</span>
+                        <span>Partilhado por <strong>${typeCounts[t]}</strong> Pokémon</span>
+                    </div>
+                    <span style="font-size: 0.65rem; color: var(--text-muted);">Sugestão: diversificar tipo</span>
+                </div>
+            `;
+        }).join("");
+    }
+    
+    const suggestions = [];
+    
+    team.forEach(p => {
+        const moves = p.moves || [];
+        const isWater = p.type1 === "water" || p.type2 === "water";
+        const isFire = p.type1 === "fire" || p.type2 === "fire";
+        const isFighting = p.type1 === "fighting" || p.type2 === "fighting";
+        const isNormal = p.type1 === "normal" || p.type2 === "normal";
+        const isElectric = p.type1 === "electric" || p.type2 === "electric";
+        const isGrass = p.type1 === "grass" || p.type2 === "grass";
+        const isPsychic = p.type1 === "psychic" || p.type2 === "psychic";
+        const isGround = p.type1 === "ground" || p.type2 === "ground";
+        const isDragon = p.type1 === "dragon" || p.type2 === "dragon";
+        
+        const hasIceMove = moves.some(m => guessMoveType(m) === "ice");
+        const hasGroundMove = moves.some(m => guessMoveType(m) === "ground");
+        const hasFireMove = moves.some(m => guessMoveType(m) === "fire");
+        const hasElectricMove = moves.some(m => guessMoveType(m) === "electric");
+        const hasGhostDarkMove = moves.some(m => ["ghost", "dark"].includes(guessMoveType(m)));
+        const hasFightingMove = moves.some(m => guessMoveType(m) === "fighting");
+        const hasRockMove = moves.some(m => guessMoveType(m) === "rock");
+        
+        if (isWater && !hasIceMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Raio Gelo (Ice Beam) / Nevasca",
+                reason: "Fornece cobertura super eficaz crucial contra os tipos Planta e Dragão que ameaçam Pokémon de Água."
+            });
+        }
+        
+        if (isFire && !hasGroundMove && !hasRockMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Terramoto (Earthquake) / Deslize de Rocha",
+                reason: "Permite atacar outros Pokémon de Fogo, Rocha e Aço de forma super eficaz."
+            });
+        }
+        
+        if (isNormal && !hasFightingMove && !hasGroundMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Combate Próximo (Close Combat) / Terramoto",
+                reason: "Normal precisa de movimentos de Luta/Terra para passar por adversários de Rocha e Aço."
+            });
+        }
+        
+        if (isFighting && !hasRockMove && !hasIceMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Deslize de Rocha (Rock Slide) / Soco Gelo",
+                reason: "Excelente cobertura para abater as ameaças dos tipos Voador e Psíquico."
+            });
+        }
+        
+        if (isElectric) {
+            const hasGrass = moves.some(m => guessMoveType(m) === "grass");
+            if (!hasIceMove && !hasGrass) {
+                suggestions.push({
+                    pkmn: p,
+                    move: "Poder Oculto (Planta/Gelo) / Sinal Luminoso",
+                    reason: "Evita ser completamente parado por Pokémon do tipo Terra imunes a Elétrico."
+                });
+            }
+        }
+        
+        if (isPsychic && !hasGhostDarkMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Bola Sombra (Shadow Ball) / Pulso Sombrio",
+                reason: "Crucial para revidar contra outros Psíquicos e contra o tipo Fantasma."
+            });
+        }
+        
+        if (isDragon && !hasFireMove && !hasGroundMove) {
+            suggestions.push({
+                pkmn: p,
+                move: "Lança-Chamas (Flamethrower) / Terramoto",
+                reason: "Impede que Pokémon do tipo Aço resistam aos teus ataques de Dragão."
+            });
+        }
+        
+        if (moves.length < 4 && moves.length > 0) {
+            suggestions.push({
+                pkmn: p,
+                move: "Ensinar um 4º Movimento",
+                reason: "Este exemplar tem slots de movimentos vazios. Completa o moveset para aumentar versatilidade."
+            });
+        }
+    });
+    
+    suggestions.sort((a, b) => (b.pkmn.level || 0) - (a.pkmn.level || 0));
+    
+    if (suggestions.length === 0) {
+        suggestionsDiv.innerHTML = `<span style="color: var(--accent-success); font-size: 0.75rem;">A equipa tem um excelente leque de coberturas em todos os movesets!</span>`;
+    } else {
+        suggestionsDiv.innerHTML = suggestions.slice(0, 5).map(s => {
+            return `
+                <div style="background: rgba(255,255,255,0.02); padding: 8px 12px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.04); display: flex; flex-direction: column; gap: 4px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <span style="font-weight: 800; font-size: 0.8rem; color: #fff;">${s.pkmn.nickname || s.pkmn.species}</span>
+                        <span style="font-size: 0.7rem; font-weight: 800; color: var(--game-color); background: rgba(99,102,241,0.08); padding: 1px 6px; border-radius: 4px; border: 1px solid rgba(99,102,241,0.25);">
+                            Recomenda-se: ${s.move}
+                        </span>
+                    </div>
+                    <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.3;">
+                        ${s.reason}
+                    </div>
+                </div>
+            `;
+        }).join("");
+    }
+}
+
+let tempGeneratedPartition = [];
+
+function openPartitionModal() {
+    const modal = document.getElementById("partition-modal");
+    if (modal) modal.classList.add("active");
+}
+
+function closePartitionModal() {
+    const modal = document.getElementById("partition-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function generateAndShowBoxPartition() {
+    const pool = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId);
+    if (pool.length < 6) {
+        alert("Precisas de ter pelo menos 6 Pokémon registados sob o treinador ativo para efetuar a divisão em equipas.");
+        return;
+    }
+
+    const game = GAMES_DB.find(g => g.id === currentGameId);
+    const gen = game ? game.gen : 9;
+    const league = LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const remainingPool = [...pool];
+    const generatedTeams = [];
+    
+    let teamCounter = 1;
+    
+    while (remainingPool.length >= 6) {
+        const team = [];
+        const usedIndices = new Set();
+        
+        league.opponents.forEach(opponent => {
+            if (team.length >= 6) return;
+            let bestIdx = -1;
+            let bestScore = -999;
+            
+            remainingPool.forEach((p, idx) => {
+                if (usedIndices.has(idx)) return;
+                const score = calculatePokemonLeagueScore(p, opponent, gen);
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIdx = idx;
+                }
+            });
+            
+            if (bestIdx !== -1) {
+                team.push(remainingPool[bestIdx]);
+                usedIndices.add(bestIdx);
+            }
+        });
+        
+        while (team.length < 6 && team.length < remainingPool.length) {
+            let bestIdx = -1;
+            let bestScore = -999;
+            
+            remainingPool.forEach((p, idx) => {
+                if (usedIndices.has(idx)) return;
+                
+                let avgScore = 0;
+                league.opponents.forEach(opponent => {
+                    avgScore += calculatePokemonLeagueScore(p, opponent, gen);
+                });
+                avgScore /= league.opponents.length;
+                
+                if (avgScore > bestScore) {
+                    bestScore = avgScore;
+                    bestIdx = idx;
+                }
+            });
+            
+            if (bestIdx !== -1) {
+                team.push(remainingPool[bestIdx]);
+                usedIndices.add(bestIdx);
+            }
+        }
+        
+        const sortedIndices = Array.from(usedIndices).sort((a, b) => b - a);
+        sortedIndices.forEach(idx => {
+            remainingPool.splice(idx, 1);
+        });
+        
+        generatedTeams.push({
+            id: "gen_team_" + teamCounter,
+            defaultName: `Equipa Tática #${teamCounter}`,
+            pokemon: team
+        });
+        
+        teamCounter++;
+    }
+    
+    tempGeneratedPartition = generatedTeams;
+    renderPartitionModalResults();
+    openPartitionModal();
+}
+
+function renderPartitionModalResults() {
+    const container = document.getElementById("partition-results-container");
+    if (!container) return;
+    
+    if (tempGeneratedPartition.length === 0) {
+        container.innerHTML = `<p style="font-size: 0.8rem; text-align: center; color: var(--text-muted);">Nenhuma equipa pôde ser gerada.</p>`;
+        return;
+    }
+    
+    const getSprite = (p) => {
+        const id = p.pokedexId || 1;
+        if (currentSpriteStyle === "classic") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        } else if (currentSpriteStyle === "3d-home") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+        } else {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+        }
+    };
+    
+    let html = "";
+    
+    tempGeneratedPartition.forEach((gt, idx) => {
+        const membersHtml = gt.pokemon.map(p => {
+            const types = [p.type1];
+            if (p.type2) types.push(p.type2);
+            const badges = types.map(t => `<span class="type-badge t-${t}" style="font-size: 0.5rem; padding: 1px 3px; border-radius: 3px; text-transform: uppercase;">${t}</span>`).join(" ");
+            
+            return `
+                <div style="flex: 1; text-align: center; min-width: 60px; background: rgba(255,255,255,0.02); padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.03);">
+                    <img src="${getSprite(p)}" style="width: 40px; height: 40px; object-fit: contain;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png'">
+                    <div style="font-size: 0.65rem; font-weight: 800; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${p.nickname || p.species}</div>
+                    <div style="font-size: 0.55rem; color: var(--text-muted); margin-bottom: 2px;">Nível ${p.level}</div>
+                    <div>${badges}</div>
+                </div>
+            `;
+        }).join("");
+        
+        html += `
+            <div class="glass-panel" style="padding: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(99, 102, 241, 0.01);">
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.04); padding-bottom: 8px;">
+                    <span style="font-size: 0.75rem; font-weight: 800; color: var(--game-color);">Nome da Equipa:</span>
+                    <input type="text" id="partition-name-${gt.id}" value="${gt.defaultName}" style="flex: 1; padding: 6px 10px; font-size: 0.75rem; border-radius: 6px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff;">
+                </div>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                    ${membersHtml}
+                </div>
+            </div>
+        `;
+    });
+    
+    const pool = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId);
+    const usedCount = tempGeneratedPartition.length * 6;
+    const leftoverCount = pool.length - usedCount;
+    
+    if (leftoverCount > 0) {
+        html += `
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-align: center; padding: 10px; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px; background: rgba(255,255,255,0.01);">
+                ℹ️ Sobraram <strong>${leftoverCount}</strong> Pokémon na Box que não completaram um grupo de 6 e permanecerão na Box.
+            </div>
+        `;
+    }
+    
+    container.innerHTML = html;
+}
+
+function saveGeneratedPartitionPresets() {
+    if (tempGeneratedPartition.length === 0) return;
+    
+    tempGeneratedPartition.forEach(gt => {
+        const input = document.getElementById(`partition-name-${gt.id}`);
+        const finalName = input ? input.value.trim() : gt.defaultName;
+        
+        const newPreset = {
+            id: "preset_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
+            name: finalName || gt.defaultName,
+            gameId: currentGameId,
+            trainerId: activeTrainerId,
+            pokemonIds: gt.pokemon.map(p => p.id)
+        };
+        
+        teamPresetsList.push(newPreset);
+    });
+    
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    closePartitionModal();
+    renderPresets();
+    alert("Presets salvos com sucesso! Podes visualizá-los e ativá-los abaixo.");
+}
+
+function renderPresets() {
+    const container = document.getElementById("allocation-presets-container");
+    if (!container) return;
+    
+    const activePresets = teamPresetsList.filter(tp => tp.gameId === currentGameId && tp.trainerId === activeTrainerId);
+    
+    if (activePresets.length === 0) {
+        container.innerHTML = `
+            <div style="grid-column: span 3; text-align: center; padding: 20px; font-size: 0.75rem; color: var(--text-muted); border: 1px dashed rgba(255,255,255,0.05); border-radius: 8px; background: rgba(0,0,0,0.1);">
+                Nenhum preset de equipa registado para este cartucho/treinador. Clica em "Dividir Box em Equipas" para gerar automaticamente.
+            </div>
+        `;
+        return;
+    }
+    
+    const getSprite = (p) => {
+        const id = p.pokedexId || 1;
+        if (currentSpriteStyle === "classic") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+        } else if (currentSpriteStyle === "3d-home") {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${id}.png`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+        } else {
+            return p.isShiny
+                ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+                : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+        }
+    };
+    
+    container.innerHTML = activePresets.map(preset => {
+        const resolvedMembers = [];
+        preset.pokemonIds.forEach(id => {
+            const found = pokemonDatabase.find(p => p.id === id);
+            if (found) resolvedMembers.push(found);
+        });
+        
+        const membersHtml = resolvedMembers.map(p => {
+            return `
+                <div style="text-align: center; flex: 1; min-width: 38px;">
+                    <img src="${getSprite(p)}" style="width: 32px; height: 32px; object-fit: contain;" title="${p.nickname || p.species} (Nível ${p.level})" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png'">
+                    <div style="font-size: 0.55rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 36px;">${p.nickname || p.species}</div>
+                </div>
+            `;
+        }).join("");
+        
+        return `
+            <div class="glass-panel" style="padding: 12px; border: 1px solid rgba(255,255,255,0.06); background: rgba(255,255,255,0.01); display: flex; flex-direction: column; justify-content: space-between; gap: 10px;">
+                <div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span style="font-weight: 800; font-size: 0.8rem; color: #fff;" id="preset-title-${preset.id}">${preset.name}</span>
+                        <div style="display: flex; gap: 4px;">
+                            <button class="btn btn-action" style="width: auto; padding: 2px 6px; font-size: 0.6rem;" onclick="renamePreset('${preset.id}')" title="Renomear">✏️</button>
+                            <button class="btn btn-danger" style="width: auto; padding: 2px 6px; font-size: 0.6rem;" onclick="deletePreset('${preset.id}')" title="Eliminar">🗑️</button>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 4px; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                        ${membersHtml}
+                        ${resolvedMembers.length < 6 ? '<span style="font-size:0.6rem; color:var(--text-muted); align-self:center;">(Incompleta)</span>' : ''}
+                    </div>
+                </div>
+                <button class="btn btn-primary" onclick="loadPreset('${preset.id}')" style="width: 100%; padding: 6px; font-size: 0.7rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); color: var(--game-color);">
+                    ⚡ Ativar este Preset
+                </button>
+            </div>
+        `;
+    }).join("");
+}
+
+function loadPreset(presetId) {
+    const preset = teamPresetsList.find(tp => tp.id === presetId);
+    if (!preset) return;
+    
+    if (!confirm(`Desejas carregar o preset "${preset.name}"? Isso irá substituir a tua equipa ativa atual.`)) {
+        return;
+    }
+    
+    pokemonDatabase.forEach(p => {
+        if (p.currentGame === currentGameId && p.trainerId === activeTrainerId) {
+            p.slotType = "box";
+        }
+    });
+    
+    preset.pokemonIds.forEach((id, index) => {
+        const found = pokemonDatabase.find(p => p.id === id);
+        if (found) {
+            found.slotType = "team";
+            found.slotIndex = index;
+        }
+    });
+    
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    renderAll();
+    switchTab("boxes");
+    alert(`Preset "${preset.name}" ativado com sucesso!`);
+}
+
+function deletePreset(presetId) {
+    const preset = teamPresetsList.find(tp => tp.id === presetId);
+    if (!preset) return;
+    
+    if (!confirm(`Tem a certeza que deseja eliminar o preset "${preset.name}"?`)) {
+        return;
+    }
+    
+    teamPresetsList = teamPresetsList.filter(tp => tp.id !== presetId);
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    renderPresets();
+}
+
+function renamePreset(presetId) {
+    const preset = teamPresetsList.find(tp => tp.id === presetId);
+    if (!preset) return;
+    
+    const newName = prompt(`Introduza o novo nome para o preset "${preset.name}":`, preset.name);
+    if (newName === null) return;
+    
+    const trimmed = newName.trim();
+    if (!trimmed) {
+        alert("O nome do preset não pode estar vazio.");
+        return;
+    }
+    
+    preset.name = trimmed;
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    renderPresets();
+}
+
 window.onload = function() {
     initDB().then(() => {
         cleanupDuplicates();
@@ -4273,6 +5717,8 @@ window.onload = function() {
         initTouchDragAndDrop();
         initGlobalBoxUI();
         document.getElementById("sprite-style-select").value = currentSpriteStyle;
+        const autoToggle = document.getElementById("auto-ribbon-toggle");
+        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
         switchGame(currentGameId);
     }).catch(err => {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
@@ -4283,6 +5729,8 @@ window.onload = function() {
         initTouchDragAndDrop();
         initGlobalBoxUI();
         document.getElementById("sprite-style-select").value = currentSpriteStyle;
+        const autoToggle = document.getElementById("auto-ribbon-toggle");
+        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
         switchGame(currentGameId);
     });
 };
