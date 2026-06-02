@@ -6573,7 +6573,35 @@ function exportModifiedSave() {
     const workingBuffer = uploadedSaveBuffer.slice(0);
     const u8 = new Uint8Array(workingBuffer);
     
-    const savablePokemon = pokemonDatabase.filter(p => p.saveMeta && p.saveMeta.gen === uploadedSaveGen);
+    const rawSavable = pokemonDatabase.filter(p => p.saveMeta && p.saveMeta.gen === uploadedSaveGen);
+    
+    // Deduplicate savable pokemon by unique memory slot to prevent older unmodified imports from overwriting newer edits
+    const uniqueSlots = new Map();
+    rawSavable.forEach(p => {
+        const meta = p.saveMeta;
+        let slotKey = "";
+        if (meta.gen === 1) {
+            slotKey = `${meta.isParty}_${meta.structOffset}`;
+        } else if (meta.gen === 2) {
+            slotKey = `${meta.isParty}_${meta.structOffset}`;
+        } else if (meta.gen === 3) {
+            slotKey = `${meta.structOffset}`;
+        }
+        
+        if (uniqueSlots.has(slotKey)) {
+            const existing = uniqueSlots.get(slotKey);
+            // Select the one with the most moves or customized notes (i.e. the one edited by the user)
+            const existingScore = (existing.notes && existing.notes !== "Importado do ficheiro de save." ? 5 : 0) + (existing.moves && existing.moves.length > 0 ? existing.moves.length : 0);
+            const currentScore = (p.notes && p.notes !== "Importado do ficheiro de save." ? 5 : 0) + (p.moves && p.moves.length > 0 ? p.moves.length : 0);
+            if (currentScore > existingScore) {
+                uniqueSlots.set(slotKey, p);
+            }
+        } else {
+            uniqueSlots.set(slotKey, p);
+        }
+    });
+    
+    const savablePokemon = Array.from(uniqueSlots.values());
     
     if (savablePokemon.length === 0) {
         alert("Não existem alterações para gravar de volta no save.");
@@ -6602,12 +6630,12 @@ function exportModifiedSave() {
             }
             
             if (meta.isParty === false) {
-                // If it is in the Active Box, recalculate the Active Box checksum at 0x34E0
+                // If it is in the Active Box, recalculate the Active Box checksum at 0x3522
                 let boxSum = 0;
-                for (let i = 0x30C0; i < 0x34E0; i++) {
+                for (let i = 0x30C0; i < 0x3522; i++) {
                     boxSum += u8[i];
                 }
-                u8[0x34E0] = (~boxSum) & 0xFF;
+                u8[0x3522] = (~boxSum) & 0xFF;
             }
             
             modifyCount++;
