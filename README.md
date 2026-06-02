@@ -39,6 +39,23 @@ Pokémon BlackBox é um dashboard avançado de planeamento estratégico e gestã
 ### 7. 🗑️ Função Clean Slate
 * **Limpeza Completa por Treinador**: Um botão vermelho `🗑️ Clean Slate` na barra lateral permite limpar instantaneamente todos os Pokémon, presets de equipas, desafios e registos de fotos no Mural de Honra associados ao treinador ativo no jogo atual. Útil para recomeçar aventuras do zero.
 
+### 8. 📐 Layout Limpo e Simétrico de Duas Colunas
+* **Estrutura PC Box Style**: A disposição da aplicação foi reestruturada num design simétrico de duas colunas (Equipa e status à esquerda, Box expandida à direita), imitando o ecrã clássico dos PCs de jogos Pokémon originais.
+* **Responsividade Colapsável**: A interface ajusta-se automaticamente a ecrãs mais pequenos (como telemóveis) colapsando as duas colunas verticalmente sem perda de usabilidade.
+* **Modal de Definições Unificado**: Consolidação de preferências secundárias (estilo dos sprites, auto-carimbo de fitas, cópias de segurança JSON e savefiles) numa única janela modal elegante.
+
+### 9. 🎨 Temas Visuais Multi-Gerações (Skins)
+* **9 Skins Selecionáveis**: Temas integrados dinamicamente via CSS/JS e persistidos no `localStorage` que redefinem completamente a estética visual da aplicação:
+  * **Default (Glassmorphism)**: Estética moderna com painéis de vidro e gradientes suaves.
+  * **Retro (Gen 1 & 2)**: Game Boy clássico monocromático com contornos duplos, fonte monoespaçada e sprites filtrados em tons de verde/cinzento.
+  * **Advance (Gen 3)**: Cores vivas e metálicas inspiradas no Game Boy Advance com relevos e chanfros.
+  * **DS (Gen 4 & 5)**: Carbono industrial e tons de azul escuro do C-Gear da Nintendo DS.
+  * **Upgrade (Gen 6)**: Efeito brilhante tridimensional ("glossy") e néon moderno típico da Nintendo 3DS.
+  * **Alola (Gen 7)**: Tons tropicais quentes com gradientes de pôr-do-sol baseados em USUM.
+  * **Legends (Arceus)**: Papel pergaminho texturado clássico e bordas pretas simulando pinceladas orientais.
+  * **Final (Gen 8 & 9)**: Luzes de estádio desportivo néon misturadas com elementos geométricos da interface Rotom.
+  * **Home (Pokémon Home)**: Minimalismo elegante de cor verde-menta e fundo branco limpo com painéis circulares suaves.
+
 ---
 
 ## 🛠️ Tecnologias Utilizadas
