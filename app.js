@@ -5208,14 +5208,111 @@ function populateOpponentSelect() {
     const select = document.getElementById("allocation-opponent-select");
     if (!select) return;
     
-    const challenges = GAME_CHALLENGES[currentGameId] || [{ id: currentGameId, name: "🏆 Liga Pokémon (Primeira Run)" }];
+    const allGroups = [
+        {
+            label: "Geração 1 (Kanto)",
+            options: [
+                { id: "red", name: "🏆 Liga Pokémon - Red" },
+                { id: "blue", name: "🏆 Liga Pokémon - Blue" },
+                { id: "yellow", name: "🏆 Liga Pokémon - Yellow" }
+            ]
+        },
+        {
+            label: "Geração 2 (Johto)",
+            options: [
+                { id: "gold", name: "🏆 Liga Pokémon - Gold" },
+                { id: "silver", name: "🏆 Liga Pokémon - Silver" },
+                { id: "crystal", name: "🏆 Liga Pokémon - Crystal" },
+                { id: "johto_red", name: "⛰️ Red no Mt. Silver" }
+            ]
+        },
+        {
+            label: "Geração 3 (Hoenn / Kanto)",
+            options: [
+                { id: "ruby", name: "🏆 Liga Pokémon - Ruby" },
+                { id: "sapphire", name: "🏆 Liga Pokémon - Sapphire" },
+                { id: "emerald", name: "🏆 Liga Pokémon - Emerald" },
+                { id: "emerald_rematch", name: "⚡ Liga Pokémon (Revanche) - Emerald" },
+                { id: "emerald_steven", name: "💎 Steven nas Meteor Falls" },
+                { id: "firered", name: "🏆 Liga Pokémon - FireRed" },
+                { id: "leafgreen", name: "🏆 Liga Pokémon - LeafGreen" },
+                { id: "firered_rematch", name: "⚡ Liga Pokémon (Revanche) - FireRed" },
+                { id: "leafgreen_rematch", name: "⚡ Liga Pokémon (Revanche) - LeafGreen" }
+            ]
+        },
+        {
+            label: "Geração 4 (Sinnoh / Johto)",
+            options: [
+                { id: "diamond", name: "🏆 Liga Pokémon - Diamond" },
+                { id: "pearl", name: "🏆 Liga Pokémon - Pearl" },
+                { id: "platinum", name: "🏆 Liga Pokémon - Platinum" },
+                { id: "heartgold", name: "🏆 Liga Pokémon - HeartGold" },
+                { id: "soulsilver", name: "🏆 Liga Pokémon - SoulSilver" },
+                { id: "heartgold_rematch", name: "⚡ Liga Pokémon (Revanche) - HeartGold" },
+                { id: "soulsilver_rematch", name: "⚡ Liga Pokémon (Revanche) - SoulSilver" }
+            ]
+        },
+        {
+            label: "Geração 5 (Unova)",
+            options: [
+                { id: "black", name: "🏆 Liga Pokémon - Black" },
+                { id: "white", name: "🏆 Liga Pokémon - White" },
+                { id: "black2", name: "🏆 Liga Pokémon - Black 2" },
+                { id: "white2", name: "🏆 Liga Pokémon - White 2" },
+                { id: "bw_cynthia", name: "🎼 Cynthia em Undella Town" }
+            ]
+        },
+        {
+            label: "Geração 6 (Kalos / Hoenn)",
+            options: [
+                { id: "x", name: "🏆 Liga Pokémon - X" },
+                { id: "y", name: "🏆 Liga Pokémon - Y" },
+                { id: "omegaruby", name: "🏆 Liga Pokémon - Omega Ruby" },
+                { id: "alphasapphire", name: "🏆 Liga Pokémon - Alpha Sapphire" }
+            ]
+        },
+        {
+            label: "Geração 7 (Alola)",
+            options: [
+                { id: "sun", name: "🏆 Liga Pokémon - Sun" },
+                { id: "moon", name: "🏆 Liga Pokémon - Moon" },
+                { id: "ultrasun", name: "🏆 Liga Pokémon - Ultra Sun" },
+                { id: "ultramoon", name: "🏆 Liga Pokémon - Ultra Moon" }
+            ]
+        },
+        {
+            label: "Geração 8 (Galar / Sinnoh / Hisui)",
+            options: [
+                { id: "sword", name: "🏆 Copa dos Campeões - Sword" },
+                { id: "shield", name: "🏆 Copa dos Campeões - Shield" },
+                { id: "brilliantdiamond", name: "🏆 Liga Pokémon - Brilliant Diamond" },
+                { id: "shiningpearl", name: "🏆 Liga Pokémon - Shining Pearl" },
+                { id: "legendsarceus", name: "⛰️ Templo de Sinnoh (Legends)" }
+            ]
+        },
+        {
+            label: "Geração 9 (Paldea)",
+            options: [
+                { id: "scarlet", name: "🏆 Liga Pokémon - Scarlet" },
+                { id: "violet", name: "🏆 Liga Pokémon - Violet" }
+            ]
+        }
+    ];
     
-    select.innerHTML = challenges.map(ch => `<option value="${ch.id}">${ch.name}</option>`).join("");
+    let allChallengeIds = [];
+    allGroups.forEach(grp => {
+        allChallengeIds = allChallengeIds.concat(grp.options.map(o => o.id));
+    });
     
-    const isValid = challenges.some(ch => ch.id === currentAllocationOpponentId);
-    if (!isValid) {
-        currentAllocationOpponentId = challenges[0].id;
+    if (!currentAllocationOpponentId || !allChallengeIds.includes(currentAllocationOpponentId)) {
+        const currentCartridgeChallenges = GAME_CHALLENGES[currentGameId] || [{ id: currentGameId }];
+        currentAllocationOpponentId = currentCartridgeChallenges[0].id;
     }
+    
+    select.innerHTML = allGroups.map(grp => {
+        const optionsHtml = grp.options.map(o => `<option value="${o.id}">${o.name}</option>`).join("");
+        return `<optgroup label="${grp.label}">${optionsHtml}</optgroup>`;
+    }).join("");
     
     select.value = currentAllocationOpponentId;
 }
