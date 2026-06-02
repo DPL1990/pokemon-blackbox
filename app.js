@@ -5575,9 +5575,17 @@ function renderWeaknessAnalysis(team, gen) {
         }
         
         if (isNormal && !hasFightingMove && !hasGroundMove) {
+            let recommendedMove = "Combate Próximo (Close Combat) / Terramoto";
+            if (gen === 1) {
+                recommendedMove = "Submissão (Submission) / Terramoto";
+            } else if (gen === 2) {
+                recommendedMove = "Soco Dinâmico (Dynamic Punch) / Terramoto";
+            } else if (gen === 3) {
+                recommendedMove = "Quebra Tijolo (Brick Break) / Terramoto";
+            }
             suggestions.push({
                 pkmn: p,
-                move: "Combate Próximo (Close Combat) / Terramoto",
+                move: recommendedMove,
                 reason: "Normal precisa de movimentos de Luta/Terra para passar por adversários de Rocha e Aço."
             });
         }
@@ -5593,18 +5601,30 @@ function renderWeaknessAnalysis(team, gen) {
         if (isElectric) {
             const hasGrass = moves.some(m => guessMoveType(m) === "grass");
             if (!hasIceMove && !hasGrass) {
+                let recommendedMove = "Poder Oculto (Planta/Gelo) / Sinal Luminoso";
+                if (gen === 1) {
+                    recommendedMove = "Golpe de Corpo (Body Slam) / Submissão";
+                } else if (gen === 2) {
+                    recommendedMove = "Poder Oculto (Planta/Gelo) / Swift";
+                }
                 suggestions.push({
                     pkmn: p,
-                    move: "Poder Oculto (Planta/Gelo) / Sinal Luminoso",
+                    move: recommendedMove,
                     reason: "Evita ser completamente parado por Pokémon do tipo Terra imunes a Elétrico."
                 });
             }
         }
         
         if (isPsychic && !hasGhostDarkMove) {
+            let recommendedMove = "Bola Sombra (Shadow Ball) / Pulso Sombrio";
+            if (gen === 1) {
+                recommendedMove = "Relâmpago (Thunderbolt) / Raio Gelo (Ice Beam)";
+            } else if (gen === 2 || gen === 3) {
+                recommendedMove = "Bola Sombra (Shadow Ball) / Mordida (Bite)";
+            }
             suggestions.push({
                 pkmn: p,
-                move: "Bola Sombra (Shadow Ball) / Pulso Sombrio",
+                move: recommendedMove,
                 reason: "Crucial para revidar contra outros Psíquicos e contra o tipo Fantasma."
             });
         }
