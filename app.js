@@ -3646,7 +3646,16 @@ function saveChallenge() {
     if (id) {
         const index = challengesList.findIndex(c => c.id === id);
         if (index !== -1) {
-            challengesList[index] = { id, title, gameId, type, status, notes };
+            const existing = challengesList[index];
+            challengesList[index] = { 
+                id, 
+                title, 
+                gameId, 
+                type, 
+                status, 
+                notes,
+                trainerId: existing.trainerId || activeTrainerId
+            };
         }
     } else {
         const newChallenge = {
@@ -3655,7 +3664,8 @@ function saveChallenge() {
             gameId,
             type,
             status,
-            notes
+            notes,
+            trainerId: activeTrainerId
         };
         challengesList.push(newChallenge);
     }
@@ -3690,16 +3700,21 @@ function renderChallengesList() {
     const container = document.getElementById("challenges-list-container");
     if (!container) return;
 
-    if (challengesList.length === 0) {
+    const activeTrainerChallenges = challengesList.filter(ch => {
+        const challengeTrainerId = ch.trainerId || `trainer_${ch.gameId}_default`;
+        return challengeTrainerId === activeTrainerId;
+    });
+
+    if (activeTrainerChallenges.length === 0) {
         container.innerHTML = `
             <div style="text-align: center; padding: 24px; color: var(--text-muted); font-size: 0.75rem;">
-                Nenhum desafio registado. Clique em "➕ Registar" para começar!
+                Nenhum desafio registado para este treinador. Clique em "➕ Registar" para começar!
             </div>
         `;
         return;
     }
 
-    container.innerHTML = challengesList.map(ch => {
+    container.innerHTML = activeTrainerChallenges.map(ch => {
         const game = GAMES_DB.find(g => g.id === ch.gameId);
         const gameName = game ? game.name : "Desconhecido";
         const gameColor = getGameColor(ch.gameId);
@@ -3744,7 +3759,10 @@ function renderTimeline(HofCountsMap) {
         const gameTrainers = trainersList.filter(t => t.gameId === game.id);
         const gamePokemon = pokemonDatabase.filter(p => p.currentGame === game.id);
         const gameHofCount = HofCountsMap[game.id] || 0;
-        const gameChallenges = challengesList.filter(c => c.gameId === game.id);
+        
+        const gameActiveTrainerId = localStorage.getItem("bb_active_trainer_" + game.id) || `trainer_${game.id}_default`;
+        const gameChallenges = challengesList.filter(c => c.gameId === game.id && (c.trainerId === gameActiveTrainerId || (!c.trainerId && gameActiveTrainerId === `trainer_${game.id}_default`)));
+        
         return gameTrainers.length > 0 || gamePokemon.length > 0 || gameHofCount > 0 || gameChallenges.length > 0;
     });
 
@@ -3761,7 +3779,10 @@ function renderTimeline(HofCountsMap) {
         const gameTrainers = trainersList.filter(t => t.gameId === game.id);
         const gamePokemon = pokemonDatabase.filter(p => p.currentGame === game.id);
         const gameHofCount = HofCountsMap[game.id] || 0;
-        const gameChallenges = challengesList.filter(c => c.gameId === game.id);
+        
+        const gameActiveTrainerId = localStorage.getItem("bb_active_trainer_" + game.id) || `trainer_${game.id}_default`;
+        const gameChallenges = challengesList.filter(c => c.gameId === game.id && (c.trainerId === gameActiveTrainerId || (!c.trainerId && gameActiveTrainerId === `trainer_${game.id}_default`)));
+        
         const gameColor = getGameColor(game.id);
 
         return `
@@ -3824,7 +3845,7 @@ function renderTrainerResume() {
         totalTrainersBadge.textContent = trainersList.length;
     }
     if (completedChallengesBadge) {
-        completedChallengesBadge.textContent = challengesList.filter(c => c.status === "completed").length;
+        completedChallengesBadge.textContent = challengesList.filter(c => c.status === "completed" && (c.trainerId === activeTrainerId || (!c.trainerId && activeTrainerId === `trainer_${c.gameId}_default`))).length;
     }
 
     countTotalHofRecords().then(totalHofs => {
@@ -5722,6 +5743,10 @@ function cleanSlateActiveTrainer() {
     // 2. Limpar Presets de Equipa para o treinador ativo e jogo atual
     teamPresetsList = teamPresetsList.filter(tp => !(tp.gameId === currentGameId && tp.trainerId === activeTrainerId));
     localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    // 2.1. Limpar Desafios para o treinador ativo e jogo atual
+    challengesList = challengesList.filter(ch => !(ch.gameId === currentGameId && (ch.trainerId === activeTrainerId || (!ch.trainerId && activeTrainerId === `trainer_${ch.gameId}_default`))));
+    localStorage.setItem("bb_challenges", JSON.stringify(challengesList));
     
     // 3. Limpar Mural de Honra (Hall of Fame) deste treinador no IndexedDB
     if (dbInstance) {
