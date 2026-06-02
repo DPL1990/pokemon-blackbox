@@ -9,12 +9,7 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/ultra-ball.png",
-      "sizes": "96x96",
-      "type": "image/png"
-    },
-    {
-      "src": "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/master-ball.png",
+      "src": "blackbox_app_icon.png",
       "sizes": "512x512",
       "type": "image/png"
     }

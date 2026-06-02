@@ -6,4 +6,5 @@ index - Cópia.html
 /brain/
 scratch/
 *.png
+!blackbox_app_icon.png
 
