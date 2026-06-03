@@ -908,8 +908,13 @@ function createSlotHTML(p, index, type) {
     const trainerName = trainerObj ? trainerObj.name : "Padrão";
     const originBadge = globalBoxMode ? `<span class="global-origin-badge" style="background-color: ${getGameColor(p.currentGame)}">${trainerName}</span>` : '';
 
+    const isAllowed = isPokemonAllowedInGame(pokedexId, currentGameId);
+    const dexitClass = isAllowed ? '' : 'dexit-incompatible';
+    const dexitBadge = isAllowed ? '' : `<span class="dexit-incompatible-badge">Incompatível</span>`;
+    const trophyBadge = p.isLocked ? `<span class="locked-trophy-badge" title="Este espécime está trancado por ser vencedor de um desafio">🏆</span>` : '';
+
     return `
-        <div class="slot ${typeClass} ${selectedClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+        <div class="slot ${typeClass} ${selectedClass} ${dexitClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
                 <img class="slot-sprite" draggable="false" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
@@ -920,6 +925,8 @@ function createSlotHTML(p, index, type) {
                 <span>${subText}</span>
             </div>
             ${originBadge}
+            ${dexitBadge}
+            ${trophyBadge}
         </div>
     `;
 }
@@ -943,6 +950,12 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
     
     const draggedPkmn = pokemonDatabase[pkmnIndex]; 
 
+    // Dexit Check for target Game (currentGameId)
+    if (!isPokemonAllowedInGame(draggedPkmn.pokedexId || 1, currentGameId)) {
+        alert(`Dexit: O Pokémon ${draggedPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser movido para as suas caixas.`);
+        return;
+    }
+
     // Validate drop to active team from other trainers/games
     if (targetSlotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
         alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
@@ -955,6 +968,12 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
         if (targetPkmnIndex !== -1) {
             const targetPkmn = pokemonDatabase[targetPkmnIndex];
             
+            // Check Dexit for swapped Pokemon
+            if (!isPokemonAllowedInGame(targetPkmn.pokedexId || 1, currentGameId)) {
+                alert(`Dexit: O Pokémon ${targetPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}).`);
+                return;
+            }
+
             // Validate drops to team for swap operations
             if (targetPkmn.slotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
                 alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
@@ -963,6 +982,24 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
             if (draggedPkmn.slotType === "team" && (targetPkmn.currentGame !== currentGameId || targetPkmn.trainerId !== activeTrainerId)) {
                 alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
                 return;
+            }
+            
+            // Validate active team rules for the swap
+            if (targetPkmn.slotType === "team") {
+                const candidatePkmn = { ...draggedPkmn, slotType: "team" };
+                const teamVal = validateActiveTeamRules(candidatePkmn);
+                if (!teamVal.valid) {
+                    alert(teamVal.reason);
+                    return;
+                }
+            }
+            if (draggedPkmn.slotType === "team") {
+                const candidatePkmn = { ...targetPkmn, slotType: "team" };
+                const teamVal = validateActiveTeamRules(candidatePkmn);
+                if (!teamVal.valid) {
+                    alert(teamVal.reason);
+                    return;
+                }
             }
             
             // Synchronize game context when swapping between team and box
@@ -987,6 +1024,13 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
     } else {
         // Placing in empty slot
         if (targetSlotType === "team") {
+            const candidatePkmn = { ...draggedPkmn, slotType: "team" };
+            const teamVal = validateActiveTeamRules(candidatePkmn);
+            if (!teamVal.valid) {
+                alert(teamVal.reason);
+                return;
+            }
+
             draggedPkmn.currentGame = currentGameId; 
             draggedPkmn.trainerId = activeTrainerId;
             const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
@@ -1236,7 +1280,32 @@ function removeCustomRibbon(name) {
 }
 // ----------------------------------------
 
+function setFormLockedState(isLocked) {
+    const warningEl = document.getElementById("editor-lock-warning");
+    if (isLocked) {
+        warningEl.style.display = "block";
+        warningEl.innerText = "⚠️ Este espécime está trancado porque faz parte de uma equipa vencedora do Hall of Fame 🏆 e não pode ser editado nem eliminado.";
+    } else {
+        warningEl.style.display = "none";
+    }
+    
+    // Select all inputs, selects, textareas inside the modal content
+    const elementsToToggle = document.querySelectorAll(
+        "#editor-modal input, #editor-modal select, #editor-modal textarea, #editor-modal button:not([onclick='closeModal()']):not(#btn-export-individual-pkx)"
+    );
+    
+    elementsToToggle.forEach(el => {
+        el.disabled = isLocked;
+    });
+}
+
 function openModalForNew() {
+    setFormLockedState(false);
+    
+    const footerActions = document.querySelector("#editor-modal .footer-actions");
+    const saveBtn = footerActions ? footerActions.querySelector(".btn-primary") : null;
+    if (saveBtn) saveBtn.style.display = "inline-block";
+
     document.getElementById("form-id").value = ""; 
     document.getElementById("form-species").value = ""; 
     document.getElementById("form-nickname").value = "";
@@ -1300,6 +1369,20 @@ function openModalForEdit(id) {
     const p = pokemonDatabase.find(pkmn => pkmn.id === id); 
     if (!p) return;
     
+    setFormLockedState(!!p.isLocked);
+    
+    const btnDelete = document.getElementById("btn-delete-pkmn");
+    const footerActions = document.querySelector("#editor-modal .footer-actions");
+    const saveBtn = footerActions ? footerActions.querySelector(".btn-primary") : null;
+    
+    if (p.isLocked) {
+        if (btnDelete) btnDelete.style.display = "none";
+        if (saveBtn) saveBtn.style.display = "none";
+    } else {
+        if (btnDelete) btnDelete.style.display = "block";
+        if (saveBtn) saveBtn.style.display = "inline-block";
+    }
+    
     document.getElementById("form-id").value = p.id; 
     document.getElementById("form-species").value = p.species; 
     document.getElementById("form-nickname").value = p.nickname || "";
@@ -1348,7 +1431,6 @@ function openModalForEdit(id) {
     document.getElementById("form-evolution-notes").value = p.evolutionNotes || ""; 
     document.getElementById("form-origin-game").value = p.originGame || currentGameId;
     
-    document.getElementById("btn-delete-pkmn").style.display = "block"; 
     document.getElementById("btn-owndex-link").style.display = "block";
     document.getElementById("modal-title").innerText = `Ficha Técnica: ${p.nickname || p.species}`;
     
@@ -1433,6 +1515,14 @@ async function savePokemon() {
         alert("A espécie é obrigatória!"); 
         return; 
     }
+
+    if (id) {
+        const existing = pokemonDatabase.find(p => p.id === id);
+        if (existing && existing.isLocked) {
+            alert("Este espécime está trancado e não pode ser editado nem gravado!");
+            return;
+        }
+    }
     
     // Validate EVs before saving
     if (!validateEVs()) {
@@ -1476,6 +1566,49 @@ async function savePokemon() {
         document.getElementById("form-move3").value.trim(), 
         document.getElementById("form-move4").value.trim()
     ].filter(m => m !== "");
+
+    // Generational moveset check
+    const movesVal = validateMovesGeneration(moves, currentGameId);
+    if (!movesVal.valid) {
+        alert(`Validação Geracional: O ataque "${movesVal.move}" pertence à Geração ${movesVal.moveGen}, mas este jogo (${GAMES_DB.find(g => g.id === currentGameId)?.name}) só suporta até à Geração ${movesVal.targetGen}.`);
+        return;
+    }
+
+    // Resolve pokedex ID locally or fallback
+    let pokedexId = 1;
+    const lowerSpecies = species.toLowerCase().trim();
+    let localDexId = POKEMON_NAMES_ALL.findIndex(name => name && name.toLowerCase().trim() === lowerSpecies);
+    if (localDexId === -1) {
+        localDexId = POKEMON_NAMES_ALL.findIndex(name => {
+            if (!name) return false;
+            const cleanA = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+            const cleanB = lowerSpecies.replace(/[^a-z0-9]/g, "");
+            return cleanA === cleanB;
+        });
+    }
+    if (localDexId !== -1) {
+        pokedexId = localDexId;
+    } else {
+        try {
+            const cleanName = species.toLowerCase().trim()
+                .replace(/[\s']/g, "-")
+                .replace(/\./g, "")
+                .replace(/-+$/, "");
+            const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${cleanName}`);
+            if (res.ok) { 
+                const data = await res.json(); 
+                pokedexId = data.id;
+            }
+        } catch (err) { 
+            console.log(err); 
+        }
+    }
+
+    // Dexit Check
+    if (!isPokemonAllowedInGame(pokedexId, currentGameId)) {
+        alert(`Dexit: O Pokémon ${species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}).`);
+        return;
+    }
     
     // Collect selected ribbons from checklist + custom ones
     const checkedRibbons = ALL_RIBBONS
@@ -1504,6 +1637,23 @@ async function savePokemon() {
         }
     }
     
+    const slotType = targetPokemon ? targetPokemon.slotType : "box";
+    if (slotType === "team") {
+        const candidatePkmn = {
+            id: id || "temp_id",
+            species,
+            pokedexId,
+            item,
+            nature,
+            moves
+        };
+        const activeTeamVal = validateActiveTeamRules(candidatePkmn);
+        if (!activeTeamVal.valid) {
+            alert(activeTeamVal.reason);
+            return;
+        }
+    }
+    
     if (!targetPokemon) {
         targetPokemon = { 
             id: id || "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5), 
@@ -1517,6 +1667,7 @@ async function savePokemon() {
     }
 
     targetPokemon.species = species; 
+    targetPokemon.pokedexId = pokedexId;
     targetPokemon.nickname = nickname; 
     targetPokemon.level = level; 
     targetPokemon.gender = gender;
@@ -1534,21 +1685,6 @@ async function savePokemon() {
     targetPokemon.evolutionNotes = evolutionNotes;
     targetPokemon.originGame = originGame;
 
-    try {
-        // Correct name cleaning matching standard PokeAPI schemas
-        const cleanName = species.toLowerCase().trim()
-            .replace(/[\s']/g, "-")
-            .replace(/\./g, "")
-            .replace(/-+$/, "");
-        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${cleanName}`);
-        if (res.ok) { 
-            const data = await res.json(); 
-            targetPokemon.pokedexId = data.id; 
-        }
-    } catch (err) { 
-        console.log(err); 
-    }
-
     localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     closeModal();
     renderAll();
@@ -1557,6 +1693,13 @@ async function savePokemon() {
 function deletePokemon() {
     const id = document.getElementById("form-id").value; 
     if (!id) return;
+    
+    const existing = pokemonDatabase.find(p => p.id === id);
+    if (existing && existing.isLocked) {
+        alert("Este espécime está trancado e não pode ser eliminado!");
+        return;
+    }
+    
     if (confirm("Tens a certeza absoluta que queres eliminar este espécime?")) {
         pokemonDatabase = pokemonDatabase.filter(p => p.id !== id);
         localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
@@ -1913,6 +2056,219 @@ function parseGen1Gen2DVsAndMoves(u8, structOffset, movesOffset, dvsOffset) {
     return { moves, ivs };
 }
 
+function deduplicateParsedPokemon(list) {
+    const seen = new Set();
+    return list.filter(p => {
+        const movesKey = (p.moves || []).slice(0).sort().join(",");
+        const ivsKey = p.ivs ? `${p.ivs.hp},${p.ivs.atk},${p.ivs.def},${p.ivs.spe},${p.ivs.spa},${p.ivs.spd}` : "";
+        const hash = `${p.pokedexId}_${p.level}_${p.otId}_${(p.otName || "").toLowerCase().trim()}_${(p.nickname || "").toLowerCase().trim()}_${movesKey}_${ivsKey}`;
+        if (seen.has(hash)) {
+            return false;
+        }
+        seen.add(hash);
+        return true;
+    });
+}
+
+function getAbilityFromSlots(abilities, slot) {
+    if (!abilities || abilities.length === 0) return "";
+    const match = abilities.find(a => a.slot === slot && !a.is_hidden);
+    if (match) return formatAbilityName(match.ability.name);
+    const normalAbilities = abilities.filter(a => !a.is_hidden);
+    if (normalAbilities.length > 0) return formatAbilityName(normalAbilities[0].ability.name);
+    return formatAbilityName(abilities[0].ability.name);
+}
+
+function formatAbilityName(name) {
+    return name.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
+}
+
+const ABILITY_ID_CACHE = {};
+async function resolveAbilityName(abilityId) {
+    if (abilityId === 0 || !abilityId) return "";
+    if (ABILITY_ID_CACHE[abilityId]) return ABILITY_ID_CACHE[abilityId];
+    try {
+        const res = await fetch(`https://pokeapi.co/api/v2/ability/${abilityId}`);
+        if (res.ok) {
+            const data = await res.json();
+            const cleanName = formatAbilityName(data.name);
+            ABILITY_ID_CACHE[abilityId] = cleanName;
+            return cleanName;
+        }
+    } catch(e) {}
+    return "";
+}
+
+async function enrichImportedPokemonList(list) {
+    for (let p of list) {
+        if (!p.nature && p.saveMeta && p.saveMeta.gen) {
+            const gen = p.saveMeta.gen;
+            if (gen === 1 || gen === 2) {
+                const exp = p.exp || 0;
+                p.nature = GEN3_NATURES[exp % 25];
+            } else if (gen === 3 || gen === 4 || gen === 5) {
+                const pid = p.saveMeta.pid || 0;
+                p.nature = GEN3_NATURES[pid % 25];
+            }
+        }
+        if ((!p.gender || p.gender === "⚲") && p.saveMeta && p.saveMeta.gen) {
+            const gen = p.saveMeta.gen;
+            if (gen === 1 || gen === 2) {
+                const atkDv = p.atkDv !== undefined ? p.atkDv : 15;
+                p.gender = getGenderFromDv(p.pokedexId, atkDv);
+            } else if (gen === 3) {
+                const pid = p.saveMeta.pid || 0;
+                p.gender = getGenderFromPid(p.pokedexId, pid);
+            }
+        }
+        
+        try {
+            const speciesClean = p.species.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/\s+/g, "-").trim();
+            const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesClean}`);
+            if (res.ok) {
+                const data = await res.json();
+                p.type1 = data.types[0].type.name;
+                p.type2 = data.types[1] ? data.types[1].type.name : "";
+                
+                if (!p.ability) {
+                    if (p.saveMeta && p.saveMeta.gen) {
+                        const gen = p.saveMeta.gen;
+                        if (gen === 3) {
+                            const pid = p.saveMeta.pid || 0;
+                            const slot = (pid % 2 === 0) ? 1 : 2;
+                            p.ability = getAbilityFromSlots(data.abilities, slot);
+                        } else if (gen >= 4 && p.abilityId !== undefined) {
+                            p.ability = await resolveAbilityName(p.abilityId);
+                        }
+                    }
+                    if (!p.ability) {
+                        p.ability = getAbilityFromSlots(data.abilities, 1);
+                    }
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao enriquecer dados de " + p.species, e);
+        }
+    }
+    renderSaveImportList();
+}
+
+const GEN3_NATURES = ["Hardy", "Lonely", "Brave", "Adamant", "Naughty", "Bold", "Docile", "Relaxed", "Impish", "Lax", "Timid", "Hasty", "Serious", "Jolly", "Naive", "Modest", "Mild", "Quiet", "Bashful", "Rash", "Calm", "Gentle", "Sassy", "Careful", "Quirky"];
+
+function getGenderFromDv(pokedexId, atkDv) {
+    const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251];
+    if (genderless.includes(pokedexId)) return "⚲";
+    
+    const onlyFemale = [29,30,31,113,115,124,238,241,242];
+    if (onlyFemale.includes(pokedexId)) return "♀️";
+    
+    const onlyMale = [32,33,34,106,107,128,236,237];
+    if (onlyMale.includes(pokedexId)) return "♂️";
+    
+    const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197];
+    if (starters.includes(pokedexId)) {
+        return (atkDv < 2) ? "♀️" : "♂️";
+    }
+    
+    const ratio25 = [58,59,66,67,68,125,126,239,240];
+    if (ratio25.includes(pokedexId)) {
+        return (atkDv < 4) ? "♀️" : "♂️";
+    }
+    
+    const ratio75 = [35,36,37,38,39,40,209,210];
+    if (ratio75.includes(pokedexId)) {
+        return (atkDv < 12) ? "♀️" : "♂️";
+    }
+    
+    return (atkDv < 8) ? "♀️" : "♂️";
+}
+
+function getGenderFromPid(pokedexId, pid) {
+    const genderByte = pid & 0xFF;
+    const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251, 292,337,338,343,344,374,375,376,377,378,379,382,383,384,385,386];
+    if (genderless.includes(pokedexId)) return "⚲";
+    
+    const onlyFemale = [29,30,31,113,115,124,238,241,242, 380];
+    if (onlyFemale.includes(pokedexId)) return "♀️";
+    
+    const onlyMale = [32,33,34,106,107,128,236,237, 313,381];
+    if (onlyMale.includes(pokedexId)) return "♂️";
+    
+    const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197, 252,253,254,255,256,257,258,259,260, 345,346,347,348, 360];
+    if (starters.includes(pokedexId)) {
+        return (genderByte < 31) ? "♀️" : "♂️";
+    }
+    
+    const ratio25 = [58,59,66,67,68,125,126,239,240, 296,297];
+    if (ratio25.includes(pokedexId)) {
+        return (genderByte < 64) ? "♀️" : "♂️";
+    }
+    
+    const ratio75 = [35,36,37,38,39,40,209,210, 298,300,301,311,314];
+    if (ratio75.includes(pokedexId)) {
+        return (genderByte < 191) ? "♀️" : "♂️";
+    }
+    
+    return (genderByte < 127) ? "♀️" : "♂️";
+}
+
+function parseGen1Box(u8, boxOffset, sourceName, gen1BoxIndex) {
+    const boxParsed = [];
+    if (boxOffset + 1122 > u8.length) return boxParsed;
+    
+    const boxCount = u8[boxOffset];
+    if (boxCount > 0 && boxCount <= 20) {
+        for (let i = 0; i < boxCount; i++) {
+            const internalId = u8[boxOffset + 1 + i];
+            const pokedexId = GEN1_INTERNAL_TO_DEX[internalId];
+            if (!pokedexId) continue;
+            
+            const structOffset = boxOffset + 22 + (i * 33);
+            const level = u8[structOffset + 3];
+            
+            const nickOffset = boxOffset + 902 + (i * 11);
+            const nickname = decodeGen1String(u8.subarray(nickOffset, nickOffset + 11));
+            
+            const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
+            const otOffset = boxOffset + 682 + (i * 11);
+            const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+            
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
+            
+            const dvsOffset = 27;
+            const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
+            const exp = u8[structOffset + 14] * 65536 + u8[structOffset + 15] * 256 + u8[structOffset + 16];
+            
+            const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 8, 27);
+            
+            boxParsed.push({
+                sourceSlot: `${sourceName} #${i+1}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5,
+                otName: otName,
+                otId: otId,
+                moves: moves,
+                ivs: ivs,
+                nature: GEN3_NATURES[exp % 25],
+                gender: getGenderFromDv(pokedexId, atkDv),
+                ability: "", // Mapeada na PokeAPI depois
+                type1: "normal",
+                type2: "",
+                saveMeta: {
+                    gen: 1,
+                    isParty: false,
+                    boxIndex: gen1BoxIndex,
+                    structOffset: structOffset,
+                    index: i
+                }
+            });
+        }
+    }
+    return boxParsed;
+}
+
 function parseGen1Save(buffer) {
     const u8 = new Uint8Array(buffer);
     const parsedList = [];
@@ -1938,6 +2294,10 @@ function parseGen1Save(buffer) {
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
             
+            const dvsOffset = 27;
+            const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
+            const exp = u8[structOffset + 14] * 65536 + u8[structOffset + 15] * 256 + u8[structOffset + 16];
+            
             const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 8, 27);
             
             parsedList.push({
@@ -1950,6 +2310,11 @@ function parseGen1Save(buffer) {
                 otId: otId,
                 moves: moves,
                 ivs: ivs,
+                nature: GEN3_NATURES[exp % 25],
+                gender: getGenderFromDv(pokedexId, atkDv),
+                ability: "",
+                type1: "normal",
+                type2: "",
                 saveMeta: {
                     gen: 1,
                     isParty: true,
@@ -1961,45 +2326,19 @@ function parseGen1Save(buffer) {
     }
 
     // Parse Active Box (offset 0x30C0)
-    const boxCount = u8[0x30C0];
-    if (boxCount > 0 && boxCount <= 20) {
-        for (let i = 0; i < boxCount; i++) {
-            const internalId = u8[0x30C1 + i];
-            const pokedexId = GEN1_INTERNAL_TO_DEX[internalId];
-            if (!pokedexId) continue;
-            
-            const structOffset = 0x30D6 + (i * 33);
-            const level = u8[structOffset + 3];
-            
-            const nickOffset = 0x3446 + (i * 11);
-            const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
-            const nickname = decodeGen1String(nickBytes);
-            
-            const otId = u8[structOffset + 12] * 256 + u8[structOffset + 13];
-            const otOffset = 0x336A + (i * 11);
-            const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
-            
-            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || "Desconhecido");
-            
-            const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 8, 27);
-            
-            parsedList.push({
-                sourceSlot: `Box Ativa Gen 1 #${i+1}`,
-                pokedexId,
-                species: speciesName,
-                nickname: nickname || speciesName,
-                level: level || 5,
-                otName: otName,
-                otId: otId,
-                moves: moves,
-                ivs: ivs,
-                saveMeta: {
-                    gen: 1,
-                    isParty: false,
-                    structOffset: structOffset,
-                    index: i
-                }
-            });
+    parsedList.push(...parseGen1Box(u8, 0x30C0, "Box Ativa Gen 1", -1));
+
+    // Parse Stored Boxes (SRAM Bank 2 e Bank 3)
+    if (u8.length >= 0x8000) {
+        // Caixas 1-6 no Bank 2 (0x4000)
+        for (let b = 0; b < 6; b++) {
+            const boxOffset = 0x4000 + (b * 1122);
+            parsedList.push(...parseGen1Box(u8, boxOffset, `Box ${b+1}`, b));
+        }
+        // Caixas 7-12 no Bank 3 (0x6000)
+        for (let b = 0; b < 6; b++) {
+            const boxOffset = 0x6000 + (b * 1122);
+            parsedList.push(...parseGen1Box(u8, boxOffset, `Box ${b+7}`, b+6));
         }
     }
 
@@ -2023,51 +2362,136 @@ function parseGen2Save(buffer) {
         count = countGS;
         isCrystal = false;
     } else {
-        return [];
+        if (u8.length >= 0x8000) {
+            isCrystal = (u8[0x2D82] <= 6 && u8[0x2D82] > 0);
+        } else {
+            return [];
+        }
     }
     
     const listOffset = isCrystal ? 0x2D83 : 0x2D0D;
     const structStart = isCrystal ? 0x2D8A : 0x2D14;
     const nickStart = isCrystal ? 0x2EEC : 0x2E76;
     
-    for (let i = 0; i < count; i++) {
-        const pokedexId = u8[listOffset + i];
-        if (pokedexId === 0 || pokedexId > 251) continue;
-        
-        const structOffset = structStart + (i * 48);
-        const level = u8[structOffset + 32];
-        
-        const nickOffset = nickStart + (i * 11);
-        const nickBytes = u8.subarray(nickOffset, nickOffset + 11);
-        const nickname = decodeGen1String(nickBytes);
-        
-        const otId = u8[structOffset + 6] * 256 + u8[structOffset + 7];
-        const otStart = isCrystal ? 0x2EAA : 0x2E34;
-        const otOffset = otStart + (i * 11);
-        const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
-        
-        const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
-        
-        const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
-        
-        parsedList.push({
-            sourceSlot: isCrystal ? `Equipa Crystal #${i+1}` : `Equipa Gold/Silver #${i+1}`,
-            pokedexId,
-            species: speciesName,
-            nickname: nickname || speciesName,
-            level: level || 5,
-            otName: otName,
-            otId: otId,
-            moves: moves,
-            ivs: ivs,
-            saveMeta: {
-                gen: 2,
-                isCrystal: isCrystal,
-                isParty: true,
-                structOffset: structOffset,
-                index: i
+    if (count >= 1 && count <= 6) {
+        for (let i = 0; i < count; i++) {
+            const pokedexId = u8[listOffset + i];
+            if (pokedexId === 0 || pokedexId > 251) continue;
+            
+            const structOffset = structStart + (i * 48);
+            const level = u8[structOffset + 32];
+            
+            const nickOffset = nickStart + (i * 11);
+            const nickname = decodeGen1String(u8.subarray(nickOffset, nickOffset + 11));
+            
+            const otId = u8[structOffset + 6] * 256 + u8[structOffset + 7];
+            const otStart = isCrystal ? 0x2EAA : 0x2E34;
+            const otOffset = otStart + (i * 11);
+            const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+            
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+            
+            const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
+            
+            const dvsOffset = 21;
+            const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
+            const exp = u8[structOffset + 8] * 65536 + u8[structOffset + 9] * 256 + u8[structOffset + 10];
+            
+            parsedList.push({
+                sourceSlot: isCrystal ? `Equipa Crystal #${i+1}` : `Equipa Gold/Silver #${i+1}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5,
+                otName: otName,
+                otId: otId,
+                moves: moves,
+                ivs: ivs,
+                nature: GEN3_NATURES[exp % 25],
+                gender: getGenderFromDv(pokedexId, atkDv),
+                ability: "",
+                type1: "normal",
+                type2: "",
+                saveMeta: {
+                    gen: 2,
+                    isCrystal: isCrystal,
+                    isParty: true,
+                    structOffset: structOffset,
+                    index: i
+                }
+            });
+        }
+    }
+    
+    // Parse Stored Boxes (SRAM Bank 2 e Bank 3)
+    if (u8.length >= 0x8000) {
+        function parseGen2Box(boxOffset, boxName, boxIdx) {
+            const list = [];
+            if (boxOffset + 1104 > u8.length) return list;
+            
+            const boxCount = u8[boxOffset];
+            if (boxCount > 0 && boxCount <= 20) {
+                for (let i = 0; i < boxCount; i++) {
+                    const pokedexId = u8[boxOffset + 1 + i];
+                    if (pokedexId === 0 || pokedexId === 0xFF || pokedexId > 251) continue;
+                    
+                    const structOffset = boxOffset + 22 + (i * 32);
+                    const level = u8[structOffset + 31];
+                    
+                    const otOffset = boxOffset + 662 + (i * 11);
+                    const otName = decodeGen1String(u8.subarray(otOffset, otOffset + 11));
+                    const otId = u8[structOffset + 6] * 256 + u8[structOffset + 7];
+                    
+                    const nickOffset = boxOffset + 882 + (i * 11);
+                    const nickname = decodeGen1String(u8.subarray(nickOffset, nickOffset + 11));
+                    
+                    const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+                    
+                    const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
+                    
+                    const dvsOffset = 21;
+                    const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
+                    const exp = u8[structOffset + 8] * 65536 + u8[structOffset + 9] * 256 + u8[structOffset + 10];
+                    
+                    list.push({
+                        sourceSlot: `${boxName} #${i+1}`,
+                        pokedexId,
+                        species: speciesName,
+                        nickname: nickname || speciesName,
+                        level: level || 5,
+                        otName: otName,
+                        otId: otId,
+                        moves: moves,
+                        ivs: ivs,
+                        nature: GEN3_NATURES[exp % 25],
+                        gender: getGenderFromDv(pokedexId, atkDv),
+                        ability: "",
+                        type1: "normal",
+                        type2: "",
+                        saveMeta: {
+                            gen: 2,
+                            isCrystal: isCrystal,
+                            isParty: false,
+                            boxIndex: boxIdx,
+                            structOffset: structOffset,
+                            index: i
+                        }
+                    });
+                }
             }
-        });
+            return list;
+        }
+        
+        // Caixas 1-7 no Bank 2 (0x4000)
+        for (let b = 0; b < 7; b++) {
+            const boxOffset = 0x4000 + (b * 1104);
+            parsedList.push(...parseGen2Box(boxOffset, `Box ${b+1}`, b));
+        }
+        // Caixas 8-14 no Bank 3 (0x6000)
+        for (let b = 0; b < 7; b++) {
+            const boxOffset = 0x6000 + (b * 1104);
+            parsedList.push(...parseGen2Box(boxOffset, `Box ${b+8}`, b+7));
+        }
     }
     
     return parsedList;
@@ -2075,6 +2499,7 @@ function parseGen2Save(buffer) {
 
 function parseGen3Save(buffer) {
     const u8 = new Uint8Array(buffer);
+    const parsedList = [];
     
     let maxSaveIndex0 = -1;
     let maxSaveIndex1 = -1;
@@ -2116,139 +2541,266 @@ function parseGen3Save(buffer) {
         }
     }
     
-    if (!activeSectors[1]) {
-        return [];
+    // Parse Active Team (Section 1)
+    if (activeSectors[1]) {
+        const section1 = activeSectors[1];
+        let teamCount = 0;
+        let listOffset = 0;
+        
+        const countRSE = section1[0x0234] | (section1[0x0235] << 8) | (section1[0x0236] << 16) | (section1[0x0237] << 24);
+        const countFRLG = section1[0x0034] | (section1[0x0035] << 8) | (section1[0x0036] << 16) | (section1[0x0037] << 24);
+        
+        if (countRSE >= 1 && countRSE <= 6) {
+            teamCount = countRSE;
+            listOffset = 0x0238;
+        } else if (countFRLG >= 1 && countFRLG <= 6) {
+            teamCount = countFRLG;
+            listOffset = 0x0038;
+        } else {
+            teamCount = countRSE;
+            listOffset = 0x0238;
+        }
+        
+        for (let i = 0; i < teamCount; i++) {
+            const structOffset = listOffset + (i * 100);
+            if (structOffset + 100 > section1.length) break;
+            
+            const pid = section1[structOffset] |
+                        (section1[structOffset + 1] << 8) |
+                        (section1[structOffset + 2] << 16) |
+                        (section1[structOffset + 3] << 24);
+                        
+            const otid = section1[structOffset + 4] |
+                         (section1[structOffset + 5] << 8) |
+                         (section1[structOffset + 6] << 16) |
+                         (section1[structOffset + 7] << 24);
+                         
+            const nickBytes = section1.subarray(structOffset + 8, structOffset + 18);
+            const nickname = decodeGen3String(nickBytes);
+            
+            const key = pid ^ otid;
+            const decryptedWords = new Uint32Array(12);
+            for (let j = 0; j < 12; j++) {
+                const wordOffset = structOffset + 0x20 + j * 4;
+                const encryptedWord = section1[wordOffset] |
+                                      (section1[wordOffset + 1] << 8) |
+                                      (section1[wordOffset + 2] << 16) |
+                                      (section1[wordOffset + 3] << 24);
+                decryptedWords[j] = encryptedWord ^ key;
+            }
+            
+            const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+            const shuffleIndex = pid % 24;
+            const order = blockOrders[shuffleIndex];
+            
+            let blockG = null;
+            let blockA = null;
+            let blockM = null;
+            for (let b = 0; b < 4; b++) {
+                const blockType = order[b];
+                if (blockType === 0) blockG = decryptedBytes.subarray(b * 12, b * 12 + 12);
+                else if (blockType === 1) blockA = decryptedBytes.subarray(b * 12, b * 12 + 12);
+                else if (blockType === 3) blockM = decryptedBytes.subarray(b * 12, b * 12 + 12);
+            }
+            
+            if (!blockG) continue;
+            
+            const pokedexId = blockG[0] | (blockG[1] << 8);
+            if (pokedexId === 0 || pokedexId > 386) continue;
+            
+            const level = section1[structOffset + 84];
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+            
+            const otId = otid & 0xFFFF;
+            const otNameBytes = section1.subarray(structOffset + 20, structOffset + 20 + 7);
+            const otName = decodeGen3String(otNameBytes);
+            
+            let itemName = "";
+            const itemId = blockG[2] | (blockG[3] << 8);
+            itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+            
+            const moves = [];
+            if (blockA) {
+                const u16BlockA = new Uint16Array(blockA.buffer, blockA.byteOffset, 6);
+                for (let m = 0; m < 4; m++) {
+                    const moveId = u16BlockA[m];
+                    const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                    moves.push(formatMoveNameForDisplay(rawName));
+                }
+            }
+            
+            let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+            if (blockM) {
+                const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
+                ivs = {
+                    hp: ivWord & 0x1F,
+                    atk: (ivWord >> 5) & 0x1F,
+                    def: (ivWord >> 10) & 0x1F,
+                    spe: (ivWord >> 15) & 0x1F,
+                    spa: (ivWord >> 20) & 0x1F,
+                    spd: (ivWord >> 25) & 0x1F
+                };
+            }
+            
+            parsedList.push({
+                sourceSlot: `Equipa GBA #${i+1}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5,
+                otName: otName,
+                otId: otId,
+                item: itemName,
+                moves: moves,
+                ivs: ivs,
+                nature: GEN3_NATURES[pid % 25],
+                gender: getGenderFromPid(pokedexId, pid),
+                ability: "",
+                type1: "normal",
+                type2: "",
+                saveMeta: {
+                    gen: 3,
+                    isParty: true,
+                    structOffset: structOffset,
+                    index: i,
+                    pid: pid,
+                    otid: otid,
+                    shuffleIndex: shuffleIndex
+                }
+            });
+        }
     }
     
-    const section1 = activeSectors[1];
-    
-    let teamCount = 0;
-    let listOffset = 0;
-    
-    const countRSE = section1[0x0234] | (section1[0x0235] << 8) | (section1[0x0236] << 16) | (section1[0x0237] << 24);
-    const countFRLG = section1[0x0034] | (section1[0x0035] << 8) | (section1[0x0036] << 16) | (section1[0x0037] << 24);
-    
-    if (countRSE >= 1 && countRSE <= 6) {
-        teamCount = countRSE;
-        listOffset = 0x0238;
-    } else if (countFRLG >= 1 && countFRLG <= 6) {
-        teamCount = countFRLG;
-        listOffset = 0x0038;
-    } else {
-        teamCount = countRSE;
-        listOffset = 0x0238;
+    // Parse Stored Boxes (Section 5 a 13)
+    const pcBuffer = new Uint8Array(33744);
+    let pcOffset = 0;
+    let hasPC = true;
+    for (let id = 5; id <= 13; id++) {
+        const sec = activeSectors[id];
+        if (!sec) {
+            hasPC = false;
+            break;
+        }
+        const len = (id === 13) ? 2000 : 3968;
+        pcBuffer.set(sec.subarray(0, len), pcOffset);
+        pcOffset += len;
     }
     
-    const parsedList = [];
-    
-    for (let i = 0; i < teamCount; i++) {
-        const structOffset = listOffset + (i * 100);
-        if (structOffset + 100 > section1.length) break;
-        
-        const pid = section1[structOffset] |
-                    (section1[structOffset + 1] << 8) |
-                    (section1[structOffset + 2] << 16) |
-                    (section1[structOffset + 3] << 24);
-                    
-        const otid = section1[structOffset + 4] |
-                     (section1[structOffset + 5] << 8) |
-                     (section1[structOffset + 6] << 16) |
-                     (section1[structOffset + 7] << 24);
-                     
-        const nickBytes = section1.subarray(structOffset + 8, structOffset + 18);
-        const nickname = decodeGen3String(nickBytes);
-        
-        const key = pid ^ otid;
-        const decryptedWords = new Uint32Array(12);
-        for (let j = 0; j < 12; j++) {
-            const wordOffset = structOffset + 0x20 + j * 4;
-            const encryptedWord = section1[wordOffset] |
-                                  (section1[wordOffset + 1] << 8) |
-                                  (section1[wordOffset + 2] << 16) |
-                                  (section1[wordOffset + 3] << 24);
-            decryptedWords[j] = encryptedWord ^ key;
-        }
-        
-        const decryptedBytes = new Uint8Array(decryptedWords.buffer);
-        const shuffleIndex = pid % 24;
-        const order = blockOrders[shuffleIndex];
-        
-        let blockG = null;
-        let blockA = null;
-        let blockM = null;
-        for (let b = 0; b < 4; b++) {
-            const blockType = order[b];
-            if (blockType === 0) {
-                blockG = decryptedBytes.subarray(b * 12, b * 12 + 12);
-            } else if (blockType === 1) {
-                blockA = decryptedBytes.subarray(b * 12, b * 12 + 12);
-            } else if (blockType === 3) {
-                blockM = decryptedBytes.subarray(b * 12, b * 12 + 12);
+    if (hasPC) {
+        for (let i = 0; i < 420; i++) {
+            const structOffset = 4 + (i * 80);
+            
+            const pid = pcBuffer[structOffset] |
+                        (pcBuffer[structOffset + 1] << 8) |
+                        (pcBuffer[structOffset + 2] << 16) |
+                        (pcBuffer[structOffset + 3] << 24);
+                        
+            const otid = pcBuffer[structOffset + 4] |
+                         (pcBuffer[structOffset + 5] << 8) |
+                         (pcBuffer[structOffset + 6] << 16) |
+                         (pcBuffer[structOffset + 7] << 24);
+            
+            if (pid === 0 && otid === 0) continue;
+            
+            const nickBytes = pcBuffer.subarray(structOffset + 8, structOffset + 18);
+            const nickname = decodeGen3String(nickBytes);
+            
+            const key = pid ^ otid;
+            const decryptedWords = new Uint32Array(12);
+            for (let j = 0; j < 12; j++) {
+                const wordOffset = structOffset + 32 + j * 4;
+                const encryptedWord = pcBuffer[wordOffset] |
+                                      (pcBuffer[wordOffset + 1] << 8) |
+                                      (pcBuffer[wordOffset + 2] << 16) |
+                                      (pcBuffer[wordOffset + 3] << 24);
+                decryptedWords[j] = encryptedWord ^ key;
             }
-        }
-        
-        if (!blockG) continue;
-        
-        const pokedexId = blockG[0] | (blockG[1] << 8);
-        if (pokedexId === 0 || pokedexId > 386) continue;
-        
-        const level = section1[structOffset + 84];
-        const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
-        
-        const otId = otid & 0xFFFF;
-        const otNameBytes = section1.subarray(structOffset + 20, structOffset + 20 + 7);
-        const otName = decodeGen3String(otNameBytes);
-        
-        let itemName = "";
-        const itemId = blockG[2] | (blockG[3] << 8);
-        const rawItem = REVERSE_ITEMS_MAP_GEN3[itemId] || "";
-        itemName = formatItemNameForDisplay(rawItem);
-        
-        const moves = [];
-        if (blockA) {
-            // Note: blockA.byteOffset is used to map correctly the subarray's underlying ArrayBuffer window
-            const u16BlockA = new Uint16Array(blockA.buffer, blockA.byteOffset, 6);
-            for (let m = 0; m < 4; m++) {
-                const moveId = u16BlockA[m];
-                const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
-                moves.push(formatMoveNameForDisplay(rawName));
+            
+            const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+            const shuffleIndex = pid % 24;
+            const order = blockOrders[shuffleIndex];
+            
+            let blockG = null;
+            let blockA = null;
+            let blockM = null;
+            for (let b = 0; b < 4; b++) {
+                const blockType = order[b];
+                if (blockType === 0) blockG = decryptedBytes.subarray(b * 12, b * 12 + 12);
+                else if (blockType === 1) blockA = decryptedBytes.subarray(b * 12, b * 12 + 12);
+                else if (blockType === 3) blockM = decryptedBytes.subarray(b * 12, b * 12 + 12);
             }
-        }
-        
-        let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
-        if (blockM) {
-            const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
-            ivs = {
-                hp: ivWord & 0x1F,
-                atk: (ivWord >> 5) & 0x1F,
-                def: (ivWord >> 10) & 0x1F,
-                spe: (ivWord >> 15) & 0x1F,
-                spa: (ivWord >> 20) & 0x1F,
-                spd: (ivWord >> 25) & 0x1F
-            };
-        }
-        
-        parsedList.push({
-            sourceSlot: `Equipa GBA #${i+1}`,
-            pokedexId,
-            species: speciesName,
-            nickname: nickname || speciesName,
-            level: level || 5,
-            otName: otName,
-            otId: otId,
-            item: itemName,
-            moves: moves,
-            ivs: ivs,
-            saveMeta: {
-                gen: 3,
-                isParty: true,
-                structOffset: structOffset,
-                index: i,
-                pid: pid,
-                otid: otid,
-                shuffleIndex: shuffleIndex
+            
+            if (!blockG) continue;
+            
+            const pokedexId = blockG[0] | (blockG[1] << 8);
+            if (pokedexId === 0 || pokedexId > 386) continue;
+            
+            const exp = blockG[4] | (blockG[5] << 8) | (blockG[6] << 16) | (blockG[7] << 24);
+            const level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
+            const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
+            
+            const otId = otid & 0xFFFF;
+            const otNameBytes = pcBuffer.subarray(structOffset + 20, structOffset + 20 + 7);
+            const otName = decodeGen3String(otNameBytes);
+            
+            let itemName = "";
+            const itemId = blockG[2] | (blockG[3] << 8);
+            itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+            
+            const moves = [];
+            if (blockA) {
+                const u16BlockA = new Uint16Array(blockA.buffer, blockA.byteOffset, 6);
+                for (let m = 0; m < 4; m++) {
+                    const moveId = u16BlockA[m];
+                    const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                    moves.push(formatMoveNameForDisplay(rawName));
+                }
             }
-        });
+            
+            let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+            if (blockM) {
+                const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
+                ivs = {
+                    hp: ivWord & 0x1F,
+                    atk: (ivWord >> 5) & 0x1F,
+                    def: (ivWord >> 10) & 0x1F,
+                    spe: (ivWord >> 15) & 0x1F,
+                    spa: (ivWord >> 20) & 0x1F,
+                    spd: (ivWord >> 25) & 0x1F
+                };
+            }
+            
+            const boxNum = Math.floor(i / 30) + 1;
+            const slotNum = (i % 30) + 1;
+            
+            parsedList.push({
+                sourceSlot: `Box ${boxNum} Slot ${slotNum}`,
+                pokedexId,
+                species: speciesName,
+                nickname: nickname || speciesName,
+                level: level || 5,
+                otName: otName,
+                otId: otId,
+                item: itemName,
+                moves: moves,
+                ivs: ivs,
+                nature: GEN3_NATURES[pid % 25],
+                gender: getGenderFromPid(pokedexId, pid),
+                ability: "",
+                type1: "normal",
+                type2: "",
+                saveMeta: {
+                    gen: 3,
+                    isParty: false,
+                    pcStructOffset: structOffset,
+                    boxIndex: boxNum - 1,
+                    index: slotNum - 1,
+                    pid: pid,
+                    otid: otid,
+                    shuffleIndex: shuffleIndex
+                }
+            });
+        }
     }
     
     return parsedList;
@@ -2683,17 +3235,20 @@ function applyBulkSettings() {
     const targetGameId = gameSelect.value;
     const targetTrainerId = trainerSelect.value;
     
-    const gameSelects = document.querySelectorAll(".import-row-game");
-    const trainerSelects = document.querySelectorAll(".import-row-trainer");
-    
-    gameSelects.forEach(sel => {
-        sel.value = targetGameId;
-        const idx = parseInt(sel.getAttribute("data-idx"));
-        updateImportRowTrainers(idx, targetGameId);
-    });
-    
-    trainerSelects.forEach(sel => {
-        sel.value = targetTrainerId;
+    tempImportList.forEach((p, idx) => {
+        const cb = document.querySelector(`.import-row-checkbox[data-idx="${idx}"]`);
+        if (cb && cb.checked) {
+            p.targetGameId = targetGameId;
+            p.targetTrainerId = targetTrainerId;
+            
+            const rowGameSelect = document.querySelector(`.import-row-game[data-idx="${idx}"]`);
+            if (rowGameSelect) rowGameSelect.value = targetGameId;
+            
+            updateImportRowTrainers(idx, targetGameId);
+            
+            const rowTrainerSelect = document.getElementById(`import-row-trainer-${idx}`);
+            if (rowTrainerSelect) rowTrainerSelect.value = targetTrainerId;
+        }
     });
 }
 
@@ -2713,6 +3268,64 @@ function openSaveImportModal() {
 function closeSaveImportModal() {
     const modal = document.getElementById("save-import-modal");
     if (modal) modal.classList.remove("active");
+}
+
+let lastCheckedIndex = null;
+function handleImportCheckboxClick(event, idx) {
+    const checkboxes = document.querySelectorAll(".import-row-checkbox");
+    const arr = Array.from(checkboxes);
+    const targetCb = arr.find(cb => parseInt(cb.getAttribute("data-idx")) === idx);
+    
+    if (event.shiftKey && lastCheckedIndex !== null) {
+        const lastCb = arr.find(cb => parseInt(cb.getAttribute("data-idx")) === lastCheckedIndex);
+        if (lastCb && targetCb) {
+            const lastDomIdx = arr.indexOf(lastCb);
+            const targetDomIdx = arr.indexOf(targetCb);
+            const start = Math.min(lastDomIdx, targetDomIdx);
+            const end = Math.max(lastDomIdx, targetDomIdx);
+            const checked = targetCb.checked;
+            for (let i = start; i <= end; i++) {
+                arr[i].checked = checked;
+            }
+        }
+    }
+    lastCheckedIndex = idx;
+}
+
+function extractTrainerFromSave(u8, gen, activeSlotStartSector) {
+    let name = "Treinador";
+    let tid = "00000";
+    if (gen === 1) {
+        if (u8.length >= 0x3000) {
+            name = decodeGen1String(u8.subarray(0x2598, 0x2598 + 11)) || "Treinador";
+            const idVal = (u8[0x2605] << 8) | u8[0x2606];
+            tid = String(idVal).padStart(5, '0');
+        }
+    } else if (gen === 2) {
+        if (u8.length >= 0x3000) {
+            name = decodeGen1String(u8.subarray(0x200B, 0x200B + 11)) || "Treinador";
+            const idVal = (u8[0x2009] << 8) | u8[0x200A];
+            tid = String(idVal).padStart(5, '0');
+        }
+    } else if (gen === 3) {
+        const numSectors = Math.floor(u8.length / 4096);
+        let sec0 = null;
+        for (let i = 0; i < 14 && i < numSectors; i++) {
+            const offset = (activeSlotStartSector + i) * 4096;
+            const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+            if (sig === 0x08012025 && u8[offset + 0x0FF4] === 0) {
+                sec0 = u8.subarray(offset, offset + 4096);
+                break;
+            }
+        }
+        if (sec0) {
+            name = decodeGen3String(sec0.subarray(0, 7)) || "Treinador";
+            const idVal = (sec0[0x0A] | (sec0[0x0B] << 8)) & 0xFFFF;
+            tid = String(idVal).padStart(5, '0');
+        }
+    }
+    name = name.replace(/@/g, "").trim();
+    return { name: name || "Treinador", tid };
 }
 
 function handleSaveFileSelect(e) {
@@ -2808,42 +3421,64 @@ function handleSaveFileSelect(e) {
                 exportBtn.style.display = (detectedGen >= 1 && detectedGen <= 3) ? "block" : "none";
             }
             
-            // Auto-register any new trainers found in the save
-            let trainersChanged = false;
-            parsed.forEach(p => {
-                if (p.otName) {
-                    const cleanOt = p.otName.toLowerCase().trim();
-                    const formattedOtId = p.otId !== undefined && p.otId !== null ? String(p.otId).padStart(5, '0') : "00000";
-                    
-                    const exists = trainersList.some(t => {
-                        if (t.gameId !== currentGameId) return false;
-                        if (t.name.toLowerCase().trim() !== cleanOt) return false;
-                        const cleanTid = String(t.tid || "").padStart(5, '0');
-                        return cleanTid === formattedOtId;
-                    });
-                    
-                    if (!exists) {
-                        const newTrainerId = "trainer_" + currentGameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-                        trainersList.push({
-                            id: newTrainerId,
-                            gameId: currentGameId,
-                            name: p.otName,
-                            tid: formattedOtId,
-                            sid: "00000"
-                        });
-                        trainersChanged = true;
-                    }
-                }
+            let defaultGameId = currentGameId;
+            if (detectedGen === 1) {
+                const curGame = GAMES_DB.find(g => g.id === currentGameId);
+                if (!curGame || curGame.gen !== 1) defaultGameId = "red";
+            } else if (detectedGen === 2) {
+                defaultGameId = isCrystal ? "crystal" : "gold";
+            } else if (detectedGen === 3) {
+                const curGame = GAMES_DB.find(g => g.id === currentGameId);
+                if (!curGame || curGame.gen !== 3) defaultGameId = "ruby";
+            }
+            
+            const saveTrainer = extractTrainerFromSave(u8, detectedGen, activeSlotStartSector);
+            let matchedTrainer = trainersList.find(t => {
+                return t.gameId === defaultGameId && 
+                       t.name.toLowerCase().trim() === saveTrainer.name.toLowerCase().trim() && 
+                       String(t.tid || "").padStart(5, '0') === saveTrainer.tid;
             });
-            if (trainersChanged) {
+            
+            if (!matchedTrainer) {
+                const newTrainerId = "trainer_" + defaultGameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+                matchedTrainer = {
+                    id: newTrainerId,
+                    gameId: defaultGameId,
+                    name: saveTrainer.name,
+                    tid: saveTrainer.tid,
+                    sid: "00000"
+                };
+                trainersList.push(matchedTrainer);
                 localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
                 updateTrainerSelect();
+            }
+            
+            const saveTrainerId = matchedTrainer.id;
+            
+            const totalParsed = parsed.length;
+            const uniqueList = deduplicateParsedPokemon(parsed);
+            const uniqueCount = uniqueList.length;
+            parsed = uniqueList;
+            
+            parsed.forEach(p => {
+                p.targetGameId = defaultGameId;
+                p.targetTrainerId = saveTrainerId;
+            });
+            
+            const auditEl = document.getElementById("save-import-audit");
+            if (auditEl) {
+                auditEl.textContent = `🔍 Auditoria do Save: Foram encontrados ${totalParsed} Pokémon no save. ${uniqueCount} espécimes únicos mapeados com 100% de leitura garantida.`;
+                auditEl.style.display = "block";
             }
             
             tempImportList = parsed;
             populateBulkImportSelectors();
             renderSaveImportList();
             document.getElementById("save-import-results").style.display = "block";
+            
+            enrichImportedPokemonList(parsed).then(() => {
+                renderSaveImportList();
+            });
         } catch (err) {
             alert("Erro ao ler ficheiro de save: " + err.message);
         }
@@ -2856,41 +3491,8 @@ function renderSaveImportList() {
     if (!tbody) return;
     
     tbody.innerHTML = tempImportList.map((p, idx) => {
-        let selectedGameId = currentGameId;
-        let selectedTrainerId = `trainer_${selectedGameId}_default`;
-        
-        if (p.otName) {
-            const cleanOt = p.otName.toLowerCase().trim();
-            const formattedOtId = p.otId !== undefined && p.otId !== null ? String(p.otId).padStart(5, '0') : "00000";
-            
-            let matchedTrainer = trainersList.find(t => {
-                if (t.name.toLowerCase().trim() !== cleanOt) return false;
-                const cleanTid = String(t.tid || "").padStart(5, '0');
-                return cleanTid === formattedOtId;
-            });
-            
-            if (!matchedTrainer) {
-                matchedTrainer = trainersList.find(t => t.name.toLowerCase().trim() === cleanOt);
-            }
-            
-            if (!matchedTrainer) {
-                // Auto-create for selectedGameId (currentGameId)
-                const newTrainerId = "trainer_" + selectedGameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
-                matchedTrainer = {
-                    id: newTrainerId,
-                    gameId: selectedGameId,
-                    name: p.otName,
-                    tid: formattedOtId,
-                    sid: "00000"
-                };
-                trainersList.push(matchedTrainer);
-                localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
-                updateTrainerSelect();
-            }
-            
-            selectedGameId = matchedTrainer.gameId;
-            selectedTrainerId = matchedTrainer.id;
-        }
+        let selectedGameId = p.targetGameId || currentGameId;
+        let selectedTrainerId = p.targetTrainerId || `trainer_${selectedGameId}_default`;
         
         const gameOptionsHtml = GAMES_DB.map(g => `<option value="${g.id}" ${g.id === selectedGameId ? 'selected' : ''}>${g.name}</option>`).join("");
         const gameTrainers = trainersList.filter(t => t.gameId === selectedGameId);
@@ -2903,13 +3505,14 @@ function renderSaveImportList() {
         
         return `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
-                <td style="padding: 8px;"><input type="checkbox" class="import-row-checkbox" data-idx="${idx}" checked></td>
+                <td style="padding: 8px;"><input type="checkbox" class="import-row-checkbox" data-idx="${idx}" checked onclick="handleImportCheckboxClick(event, ${idx})"></td>
                 <td style="padding: 8px; color: var(--text-muted); font-size: 0.7rem;">${p.sourceSlot}</td>
                 <td style="padding: 8px; display: flex; align-items: center; gap: 6px;">
                     <img src="${spriteUrl}" alt="${p.species}" style="width: 28px; height: 28px;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'">
                     <div>
                         <strong style="color: #fff;">${p.nickname}</strong>
                         <div style="font-size: 0.65rem; color: var(--text-muted);">${p.species}</div>
+                        <div style="font-size: 0.6rem; color: var(--text-muted); font-weight: bold; opacity: 0.85;">S: ${p.gender || "⚲"} | N: ${p.nature || "Nenhuma"} | H: ${p.ability || "Nenhuma"}</div>
                     </div>
                 </td>
                 <td style="padding: 8px; font-weight: bold; color: #fff;">${p.level}</td>
@@ -2919,7 +3522,7 @@ function renderSaveImportList() {
                     </select>
                 </td>
                 <td style="padding: 8px;">
-                    <select class="import-row-trainer" id="import-row-trainer-${idx}" style="padding: 4px; border-radius: 4px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; width: 100%;">
+                    <select class="import-row-trainer" id="import-row-trainer-${idx}" onchange="updateImportRowTrainerSelection(${idx}, this.value)" style="padding: 4px; border-radius: 4px; background: rgba(0,0,0,0.5); color:#fff; border: 1px solid rgba(255,255,255,0.1); font-size: 0.7rem; width: 100%;">
                         ${trainerOptionsHtml}
                     </select>
                 </td>
@@ -2928,11 +3531,22 @@ function renderSaveImportList() {
     }).join("");
 }
 
+function updateImportRowTrainerSelection(idx, trainerId) {
+    const p = tempImportList[idx];
+    if (p) {
+        p.targetTrainerId = trainerId;
+    }
+}
+
 function updateImportRowTrainers(idx, gameId) {
+    const p = tempImportList[idx];
+    if (p) {
+        p.targetGameId = gameId;
+    }
+    
     const select = document.getElementById(`import-row-trainer-${idx}`);
     if (!select) return;
     
-    const p = tempImportList[idx];
     let selectedTrainerId = `trainer_${gameId}_default`;
     
     if (p && p.otName) {
@@ -2951,7 +3565,6 @@ function updateImportRowTrainers(idx, gameId) {
         }
         
         if (!matchedTrainer) {
-            // Dynamically create a trainer profile for this game!
             const newTrainerId = "trainer_" + gameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
             matchedTrainer = {
                 id: newTrainerId,
@@ -2966,6 +3579,10 @@ function updateImportRowTrainers(idx, gameId) {
         }
         
         selectedTrainerId = matchedTrainer.id;
+    }
+    
+    if (p) {
+        p.targetTrainerId = selectedTrainerId;
     }
     
     const gameTrainers = trainersList.filter(t => t.gameId === gameId);
@@ -2992,14 +3609,13 @@ function applyAutoRibbons(pokemon, targetGameId) {
     const game = GAMES_DB.find(g => g.id === targetGameId);
     if (!game) return;
 
-    // Champion Ribbons based on destination game/generation
     let ribbonToAdd = "";
     if (["ruby", "sapphire", "emerald", "omegaruby", "alphasapphire"].includes(targetGameId)) {
         ribbonToAdd = "champion_hoenn";
     } else if (["diamond", "pearl", "platinum", "brilliantdiamond", "shiningpearl"].includes(targetGameId)) {
         ribbonToAdd = "champion_sinnoh";
     } else if (["heartgold", "soulsilver"].includes(targetGameId)) {
-        ribbonToAdd = "legend"; // Red Defeat Ribbon in HGSS
+        ribbonToAdd = "legend";
     } else if (["x", "y"].includes(targetGameId)) {
         ribbonToAdd = "champion_kalos";
     } else if (["sun", "moon", "ultrasun", "ultramoon"].includes(targetGameId)) {
@@ -3016,7 +3632,6 @@ function applyAutoRibbons(pokemon, targetGameId) {
         pokemon.ribbons.push(ribbonToAdd);
     }
 
-    // Level 100 Ribbons
     if (pokemon.level === 100) {
         if (game.gen >= 4) {
             if (!pokemon.ribbons.includes("footprint")) {
@@ -3040,11 +3655,8 @@ function executeSaveImport() {
             const p = tempImportList[idx];
             if (!p) return;
             
-            const gameSelect = document.querySelector(`.import-row-game[data-idx="${idx}"]`);
-            const trainerSelect = document.getElementById(`import-row-trainer-${idx}`);
-            
-            const targetGameId = gameSelect ? gameSelect.value : currentGameId;
-            const targetTrainerId = trainerSelect ? trainerSelect.value : `trainer_${targetGameId}_default`;
+            const targetGameId = p.targetGameId || currentGameId;
+            const targetTrainerId = p.targetTrainerId || `trainer_${targetGameId}_default`;
             
             const isParty = p.saveMeta && p.saveMeta.isParty === true;
             const slotType = isParty ? "team" : "box";
@@ -3075,7 +3687,6 @@ function executeSaveImport() {
                 saveMeta: p.saveMeta || null
             };
             
-            // Auto-Stamp ribbons if enabled
             if (autoRibbonsEnabled) {
                 const isParty = p.sourceSlot && (
                     p.sourceSlot.includes("Equipa") || 
@@ -6845,9 +7456,6 @@ function exportModifiedSave() {
         return;
     }
 
-    // Usando as funções globais de tradução getEnglishMoveName e getEnglishItemName
-    
-    
     const workingBuffer = uploadedSaveBuffer.slice(0);
     const u8 = new Uint8Array(workingBuffer);
     
@@ -6886,279 +7494,352 @@ function exportModifiedSave() {
         return;
     }
     
-    let modifyCount = 0;
-    
-    savablePokemon.forEach(pkmn => {
-        const meta = pkmn.saveMeta;
+    // 1. Validate moves generation for all savable Pokemon
+    for (const pkmn of savablePokemon) {
+        const moves = pkmn.moves || [];
+        const movesVal = validateMovesGeneration(moves, uploadedSaveGen);
+        if (!movesVal.valid) {
+            alert(`Validação Geracional: O ataque "${movesVal.move}" do Pokémon ${pkmn.nickname || pkmn.species} pertence à Geração ${movesVal.moveGen}, mas este save (${GAMES_DB.find(g => g.gen === uploadedSaveGen)?.name || 'Geração ' + uploadedSaveGen}) só suporta até à Geração ${movesVal.targetGen}.`);
+            return;
+        }
+    }
+
+    // 2. Compile diff report
+    const diffReport = compileSaveDiffReport(savablePokemon, uploadedSaveBuffer);
+    if (diffReport.length === 0) {
+        alert("Não existem alterações detetadas para gravar.");
+        return;
+    }
+
+    // 3. Trigger backup download of original save
+    const timestamp = new Date().toISOString().replace(/[-:T]/g, "").split(".")[0];
+    const backupBlob = new Blob([uploadedSaveBuffer], {type: "application/octet-stream"});
+    const backupLink = document.createElement("a");
+    backupLink.href = URL.createObjectURL(backupBlob);
+    backupLink.download = `save_backup_${timestamp}.sav`;
+    document.body.appendChild(backupLink);
+    backupLink.click();
+    document.body.removeChild(backupLink);
+
+    // 4. Populate diff-list-container
+    const container = document.getElementById("diff-list-container");
+    container.innerHTML = diffReport.map(diff => {
+        let itemsHtml = "";
+        if (diff.itemChanged) {
+            itemsHtml = `
+                <div style="font-size: 0.7rem; margin-top: 4px;">
+                    <strong>Item:</strong> 
+                    <span style="color: #ef4444; text-decoration: line-through;">${diff.origItem}</span> 
+                    ➔ 
+                    <span style="color: #10b981;">${diff.newItem}</span>
+                </div>
+            `;
+        }
         
-        if (meta.gen === 1) {
-            const structOffset = meta.structOffset;
-            const moves = pkmn.moves || [];
+        let movesHtml = "";
+        if (diff.movesChanged) {
+            movesHtml = `
+                <div style="font-size: 0.7rem; margin-top: 4px;">
+                    <strong>Moveset:</strong><br>
+                    <span style="color: #ef4444; text-decoration: line-through;">${diff.origMoves}</span><br>
+                    ➔<br>
+                    <span style="color: #10b981;">${diff.newMoves}</span>
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 6px; padding: 8px;">
+                <div style="font-size: 0.75rem; font-weight: bold; color: var(--game-color); display: flex; align-items: center; gap: 6px;">
+                    <span>${diff.nickname} (${diff.species})</span>
+                </div>
+                ${itemsHtml}
+                ${movesHtml}
+            </div>
+        `;
+    }).join("");
+
+    // Show modal
+    document.getElementById("diff-modal").classList.add("active");
+
+    // 5. Bind btn-confirm-diff-save to process modifications on confirm
+    const btnConfirm = document.getElementById("btn-confirm-diff-save");
+    btnConfirm.onclick = () => {
+        let modifyCount = 0;
+        
+        savablePokemon.forEach(pkmn => {
+            const meta = pkmn.saveMeta;
             
-            for (let m = 0; m < 4; m++) {
-                const moveName = getEnglishMoveName(moves[m]);
-                const moveId = BINARY_MOVES_MAP[moveName] || 0;
-                u8[structOffset + 8 + m] = moveId;
-                
-                if (moveId > 0) {
-                    u8[structOffset + 29 + m] = 20; // PP
-                } else {
-                    u8[structOffset + 29 + m] = 0;
-                }
-            }
-            
-            // Grava DVs (Individual Values divididos por 2)
-            const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
-            const atkDv = Math.max(0, Math.min(15, Math.floor((ivs.atk || 31) / 2)));
-            const defDv = Math.max(0, Math.min(15, Math.floor((ivs.def || 31) / 2)));
-            const speDv = Math.max(0, Math.min(15, Math.floor((ivs.spe || 31) / 2)));
-            const spcDv = Math.max(0, Math.min(15, Math.floor((ivs.spa || 31) / 2)));
-            
-            u8[structOffset + 27] = (atkDv << 4) | defDv;
-            u8[structOffset + 28] = (speDv << 4) | spcDv;
-            
-            if (meta.isParty === false) {
-                // If it is in the Active Box, recalculate the Active Box checksum at 0x3522
-                let boxSum = 0;
-                for (let i = 0x30C0; i < 0x3522; i++) {
-                    boxSum += u8[i];
-                }
-                u8[0x3522] = (~boxSum) & 0xFF;
-            }
-            
-            modifyCount++;
-        } 
-        else if (meta.gen === 2) {
-            // Write to both primary slot and backup slot (which is primary offset + 0x4000)
-            const offsets = [meta.structOffset, meta.structOffset + 0x4000];
-            
-            offsets.forEach(structOffset => {
-                const itemName = getEnglishItemName(pkmn.item);
-                const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
-                u8[structOffset + 1] = itemId;
-                
+            if (meta.gen === 1) {
+                const structOffset = meta.structOffset;
                 const moves = pkmn.moves || [];
+                
                 for (let m = 0; m < 4; m++) {
                     const moveName = getEnglishMoveName(moves[m]);
                     const moveId = BINARY_MOVES_MAP[moveName] || 0;
-                    u8[structOffset + 2 + m] = moveId;
+                    u8[structOffset + 8 + m] = moveId;
                     
                     if (moveId > 0) {
-                        u8[structOffset + 23 + m] = 20; // PP
+                        u8[structOffset + 29 + m] = 20; // PP
                     } else {
-                        u8[structOffset + 23 + m] = 0;
+                        u8[structOffset + 29 + m] = 0;
                     }
                 }
                 
-                // Grava DVs (Individual Values)
+                // Grava DVs (Individual Values divididos por 2)
                 const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
                 const atkDv = Math.max(0, Math.min(15, Math.floor((ivs.atk || 31) / 2)));
                 const defDv = Math.max(0, Math.min(15, Math.floor((ivs.def || 31) / 2)));
                 const speDv = Math.max(0, Math.min(15, Math.floor((ivs.spe || 31) / 2)));
                 const spcDv = Math.max(0, Math.min(15, Math.floor((ivs.spa || 31) / 2)));
                 
-                u8[structOffset + 21] = (atkDv << 4) | defDv;
-                u8[structOffset + 22] = (speDv << 4) | spcDv;
-            });
-            
-            modifyCount++;
-        }
-        else if (meta.gen === 3) {
-            let sectorIndex = -1;
-            for (let s = 0; s < 14; s++) {
-                const sIdx = uploadedSaveActiveSectorStart + s;
-                const offset = sIdx * 4096;
-                const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-                if (sig === 0x08012025 && u8[offset + 0x0FF4] === 1) {
-                    sectorIndex = sIdx;
-                    break;
+                u8[structOffset + 27] = (atkDv << 4) | defDv;
+                u8[structOffset + 28] = (speDv << 4) | spcDv;
+                
+                if (meta.isParty === false) {
+                    // If it is in the Active Box, recalculate the Active Box checksum at 0x3522
+                    let boxSum = 0;
+                    for (let i = 0x30C0; i < 0x3522; i++) {
+                        boxSum += u8[i];
+                    }
+                    u8[0x3522] = (~boxSum) & 0xFF;
                 }
-            }
-            
-            if (sectorIndex === -1) return;
-            
-            const sectorOffset = sectorIndex * 4096;
-            const structOffset = sectorOffset + meta.structOffset;
-            
-            const pid = meta.pid;
-            const otid = meta.otid;
-            const key = pid ^ otid;
-            const shuffleIndex = meta.shuffleIndex;
-            const order = blockOrders[shuffleIndex];
-            
-            const decryptedWords = new Uint32Array(12);
-            for (let j = 0; j < 12; j++) {
-                const wordOffset = structOffset + 0x20 + j * 4;
-                const encryptedWord = u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24);
-                decryptedWords[j] = encryptedWord ^ key;
-            }
-            const decryptedBytes = new Uint8Array(decryptedWords.buffer);
-            
-            let blockGIdx = -1;
-            let blockAIdx = -1;
-            let blockMIdx = -1;
-            for (let b = 0; b < 4; b++) {
-                if (order[b] === 0) blockGIdx = b;
-                if (order[b] === 1) blockAIdx = b;
-                if (order[b] === 3) blockMIdx = b;
-            }
-            
-            if (blockGIdx !== -1) {
-                const gOffset = blockGIdx * 12;
-                const itemName = getEnglishItemName(pkmn.item);
-                const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
-                decryptedBytes[gOffset + 2] = itemId & 0xFF;
-                decryptedBytes[gOffset + 3] = (itemId >> 8) & 0xFF;
-            }
-            
-            if (blockAIdx !== -1) {
-                const aOffset = blockAIdx * 12;
-                const moves = pkmn.moves || [];
-                for (let m = 0; m < 4; m++) {
-                    const moveName = getEnglishMoveName(moves[m]);
-                    const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                
+                modifyCount++;
+            } 
+            else if (meta.gen === 2) {
+                // Write to both primary slot and backup slot (which is primary offset + 0x4000)
+                const offsets = [meta.structOffset, meta.structOffset + 0x4000];
+                
+                offsets.forEach(structOffset => {
+                    const itemName = getEnglishItemName(pkmn.item);
+                    const itemId = BINARY_ITEMS_MAP_GEN2[itemName] || 0;
+                    u8[structOffset + 1] = itemId;
                     
-                    decryptedBytes[aOffset + m * 2] = moveId & 0xFF;
-                    decryptedBytes[aOffset + m * 2 + 1] = (moveId >> 8) & 0xFF;
+                    const moves = pkmn.moves || [];
+                    for (let m = 0; m < 4; m++) {
+                        const moveName = getEnglishMoveName(moves[m]);
+                        const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                        u8[structOffset + 2 + m] = moveId;
+                        
+                        if (moveId > 0) {
+                            u8[structOffset + 23 + m] = 20; // PP
+                        } else {
+                            u8[structOffset + 23 + m] = 0;
+                        }
+                    }
                     
-                    if (moveId > 0) {
-                        decryptedBytes[aOffset + 8 + m] = 20;
-                    } else {
-                        decryptedBytes[aOffset + 8 + m] = 0;
+                    // Grava DVs (Individual Values)
+                    const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+                    const atkDv = Math.max(0, Math.min(15, Math.floor((ivs.atk || 31) / 2)));
+                    const defDv = Math.max(0, Math.min(15, Math.floor((ivs.def || 31) / 2)));
+                    const speDv = Math.max(0, Math.min(15, Math.floor((ivs.spe || 31) / 2)));
+                    const spcDv = Math.max(0, Math.min(15, Math.floor((ivs.spa || 31) / 2)));
+                    
+                    u8[structOffset + 21] = (atkDv << 4) | defDv;
+                    u8[structOffset + 22] = (speDv << 4) | spcDv;
+                });
+                
+                modifyCount++;
+            }
+            else if (meta.gen === 3) {
+                let sectorIndex = -1;
+                for (let s = 0; s < 14; s++) {
+                    const sIdx = uploadedSaveActiveSectorStart + s;
+                    const offset = sIdx * 4096;
+                    const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
+                    if (sig === 0x08012025 && u8[offset + 0x0FF4] === 1) {
+                        sectorIndex = sIdx;
+                        break;
                     }
                 }
-            }
-            
-            if (blockMIdx !== -1) {
-                const mOffset = blockMIdx * 12;
-                let ivWord = decryptedBytes[mOffset + 4] |
-                             (decryptedBytes[mOffset + 5] << 8) |
-                             (decryptedBytes[mOffset + 6] << 16) |
-                             (decryptedBytes[mOffset + 7] << 24);
+                
+                if (sectorIndex === -1) return;
+                
+                const sectorOffset = sectorIndex * 4096;
+                const structOffset = sectorOffset + meta.structOffset;
+                
+                const pid = meta.pid;
+                const otid = meta.otid;
+                const key = pid ^ otid;
+                const shuffleIndex = meta.shuffleIndex;
+                const order = blockOrders[shuffleIndex];
+                
+                const decryptedWords = new Uint32Array(12);
+                for (let j = 0; j < 12; j++) {
+                    const wordOffset = structOffset + 0x20 + j * 4;
+                    const encryptedWord = u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24);
+                    decryptedWords[j] = encryptedWord ^ key;
+                }
+                const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+                
+                let blockGIdx = -1;
+                let blockAIdx = -1;
+                let blockMIdx = -1;
+                for (let b = 0; b < 4; b++) {
+                    if (order[b] === 0) blockGIdx = b;
+                    if (order[b] === 1) blockAIdx = b;
+                    if (order[b] === 3) blockMIdx = b;
+                }
+                
+                if (blockGIdx !== -1) {
+                    const gOffset = blockGIdx * 12;
+                    const itemName = getEnglishItemName(pkmn.item);
+                    const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+                    decryptedBytes[gOffset + 2] = itemId & 0xFF;
+                    decryptedBytes[gOffset + 3] = (itemId >> 8) & 0xFF;
+                }
+                
+                if (blockAIdx !== -1) {
+                    const aOffset = blockAIdx * 12;
+                    const moves = pkmn.moves || [];
+                    for (let m = 0; m < 4; m++) {
+                        const moveName = getEnglishMoveName(moves[m]);
+                        const moveId = BINARY_MOVES_MAP[moveName] || 0;
+                        
+                        decryptedBytes[aOffset + m * 2] = moveId & 0xFF;
+                        decryptedBytes[aOffset + m * 2 + 1] = (moveId >> 8) & 0xFF;
+                        
+                        if (moveId > 0) {
+                            decryptedBytes[aOffset + 8 + m] = 20;
+                        } else {
+                            decryptedBytes[aOffset + 8 + m] = 0;
+                        }
+                    }
+                }
+                
+                if (blockMIdx !== -1) {
+                    const mOffset = blockMIdx * 12;
+                    let ivWord = decryptedBytes[mOffset + 4] |
+                                 (decryptedBytes[mOffset + 5] << 8) |
+                                 (decryptedBytes[mOffset + 6] << 16) |
+                                 (decryptedBytes[mOffset + 7] << 24);
+                                 
+                    const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
+                    const hpIv = Math.max(0, Math.min(31, ivs.hp !== undefined ? ivs.hp : 31));
+                    const atkIv = Math.max(0, Math.min(31, ivs.atk !== undefined ? ivs.atk : 31));
+                    const defIv = Math.max(0, Math.min(31, ivs.def !== undefined ? ivs.def : 31));
+                    const speIv = Math.max(0, Math.min(31, ivs.spe !== undefined ? ivs.spe : 31));
+                    const spaIv = Math.max(0, Math.min(31, ivs.spa !== undefined ? ivs.spa : 31));
+                    const spdIv = Math.max(0, Math.min(31, ivs.spd !== undefined ? ivs.spd : 31));
+                    
+                    ivWord = (ivWord & 0xC0000000) |
+                             hpIv |
+                             (atkIv << 5) |
+                             (defIv << 10) |
+                             (speIv << 15) |
+                             (spaIv << 20) |
+                             (spdIv << 25);
                              
-                const ivs = pkmn.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
-                const hpIv = Math.max(0, Math.min(31, ivs.hp !== undefined ? ivs.hp : 31));
-                const atkIv = Math.max(0, Math.min(31, ivs.atk !== undefined ? ivs.atk : 31));
-                const defIv = Math.max(0, Math.min(31, ivs.def !== undefined ? ivs.def : 31));
-                const speIv = Math.max(0, Math.min(31, ivs.spe !== undefined ? ivs.spe : 31));
-                const spaIv = Math.max(0, Math.min(31, ivs.spa !== undefined ? ivs.spa : 31));
-                const spdIv = Math.max(0, Math.min(31, ivs.spd !== undefined ? ivs.spd : 31));
+                    decryptedBytes[mOffset + 4] = ivWord & 0xFF;
+                    decryptedBytes[mOffset + 5] = (ivWord >> 8) & 0xFF;
+                    decryptedBytes[mOffset + 6] = (ivWord >> 16) & 0xFF;
+                    decryptedBytes[mOffset + 7] = (ivWord >> 24) & 0xFF;
+                }
                 
-                ivWord = (ivWord & 0xC0000000) |
-                         hpIv |
-                         (atkIv << 5) |
-                         (defIv << 10) |
-                         (speIv << 15) |
-                         (spaIv << 20) |
-                         (spdIv << 25);
-                         
-                decryptedBytes[mOffset + 4] = ivWord & 0xFF;
-                decryptedBytes[mOffset + 5] = (ivWord >> 8) & 0xFF;
-                decryptedBytes[mOffset + 6] = (ivWord >> 16) & 0xFF;
-                decryptedBytes[mOffset + 7] = (ivWord >> 24) & 0xFF;
-            }
-            
-            // Recalculate 16-bit decrypted Pokémon checksum
-            let pkmnSum = 0;
-            const decryptedWords16 = new Uint16Array(decryptedWords.buffer);
-            for (let k = 0; k < 24; k++) {
-                pkmnSum = (pkmnSum + decryptedWords16[k]) & 0xFFFF;
-            }
-            u8[structOffset + 28] = pkmnSum & 0xFF;
-            u8[structOffset + 29] = (pkmnSum >> 8) & 0xFF;
-            
-            // Re-encrypt the 12 words of the data block and write them back
-            const encryptedWords = new Uint32Array(decryptedWords.buffer);
-            for (let j = 0; j < 12; j++) {
-                const wordOffset = structOffset + 0x20 + j * 4;
-                const encryptedWord = encryptedWords[j] ^ key;
+                // Recalculate 16-bit decrypted Pokémon checksum
+                let pkmnSum = 0;
+                const decryptedWords16 = new Uint16Array(decryptedWords.buffer);
+                for (let k = 0; k < 24; k++) {
+                    pkmnSum = (pkmnSum + decryptedWords16[k]) & 0xFFFF;
+                }
+                u8[structOffset + 28] = pkmnSum & 0xFF;
+                u8[structOffset + 29] = (pkmnSum >> 8) & 0xFF;
                 
-                u8[wordOffset] = encryptedWord & 0xFF;
-                u8[wordOffset + 1] = (encryptedWord >> 8) & 0xFF;
-                u8[wordOffset + 2] = (encryptedWord >> 16) & 0xFF;
-                u8[wordOffset + 3] = (encryptedWord >> 24) & 0xFF;
+                // Re-encrypt the 12 words of the data block and write them back
+                const encryptedWords = new Uint32Array(decryptedWords.buffer);
+                for (let j = 0; j < 12; j++) {
+                    const wordOffset = structOffset + 0x20 + j * 4;
+                    const encryptedWord = encryptedWords[j] ^ key;
+                    
+                    u8[wordOffset] = encryptedWord & 0xFF;
+                    u8[wordOffset + 1] = (encryptedWord >> 8) & 0xFF;
+                    u8[wordOffset + 2] = (encryptedWord >> 16) & 0xFF;
+                    u8[wordOffset + 3] = (encryptedWord >> 24) & 0xFF;
+                }
+                
+                // Recalculate Sector 1 Checksum
+                let sum = 0;
+                for (let j = 0; j < 0x0F80; j += 4) {
+                    const offsetInSector = sectorOffset + j;
+                    const val = u8[offsetInSector] | (u8[offsetInSector + 1] << 8) | (u8[offsetInSector + 2] << 16) | (u8[offsetInSector + 3] << 24);
+                    sum += val;
+                }
+                const checksum = ((sum & 0xFFFF) + (sum >>> 16)) & 0xFFFF;
+                
+                u8[sectorOffset + 0x0FF6] = checksum & 0xFF;
+                u8[sectorOffset + 0x0FF7] = (checksum >> 8) & 0xFF;
+                
+                modifyCount++;
             }
-            
-            // Recalculate Sector 1 Checksum
+        });
+        
+        if (uploadedSaveGen === 1) {
             let sum = 0;
-            for (let j = 0; j < 0x0F80; j += 4) {
-                const offsetInSector = sectorOffset + j;
-                const val = u8[offsetInSector] | (u8[offsetInSector + 1] << 8) | (u8[offsetInSector + 2] << 16) | (u8[offsetInSector + 3] << 24);
-                sum += val;
-            }
-            const checksum = ((sum & 0xFFFF) + (sum >>> 16)) & 0xFFFF;
-            
-            u8[sectorOffset + 0x0FF6] = checksum & 0xFF;
-            u8[sectorOffset + 0x0FF7] = (checksum >> 8) & 0xFF;
-            
-            modifyCount++;
-        }
-    });
-    
-    if (uploadedSaveGen === 1) {
-        let sum = 0;
-        for (let i = 0x2598; i < 0x3523; i++) {
-            sum += u8[i];
-        }
-        u8[0x3523] = (~sum) & 0xFF;
-    } 
-    else if (uploadedSaveGen === 2) {
-        if (uploadedSaveIsCrystal) {
-            let sum1 = 0;
-            for (let i = 0x2009; i <= 0x2B82; i++) {
-                sum1 += u8[i];
-            }
-            u8[0x2B83] = (sum1 >> 8) & 0xFF;
-            u8[0x2B84] = sum1 & 0xFF;
-            
-            let sum2 = 0;
-            for (let i = 0x2B85; i <= 0x2D0C; i++) {
-                sum2 += u8[i];
-            }
-            u8[0x2D0D] = (sum2 >> 8) & 0xFF;
-            u8[0x2D0E] = sum2 & 0xFF;
-            
-            // Also write crystal backup checksums (Bank 2)
-            let sum1Backup = 0;
-            for (let i = 0x6009; i <= 0x6B82; i++) {
-                sum1Backup += u8[i];
-            }
-            u8[0x6B83] = (sum1Backup >> 8) & 0xFF;
-            u8[0x6B84] = sum1Backup & 0xFF;
-            
-            let sum2Backup = 0;
-            for (let i = 0x6B85; i <= 0x6D0C; i++) {
-                sum2Backup += u8[i];
-            }
-            u8[0x6D0D] = (sum2Backup >> 8) & 0xFF;
-            u8[0x6D0E] = sum2Backup & 0xFF;
-        } else {
-            let sum = 0;
-            for (let i = 0x2009; i <= 0x2D0C; i++) {
+            for (let i = 0x2598; i < 0x3523; i++) {
                 sum += u8[i];
             }
-            u8[0x2D0D] = (sum >> 8) & 0xFF;
-            u8[0x2D0E] = sum & 0xFF;
-            
-            // Also write GS backup checksum (Bank 2)
-            let sumBackup = 0;
-            for (let i = 0x6009; i <= 0x6D0C; i++) {
-                sumBackup += u8[i];
+            u8[0x3523] = (~sum) & 0xFF;
+        } 
+        else if (uploadedSaveGen === 2) {
+            if (uploadedSaveIsCrystal) {
+                let sum1 = 0;
+                for (let i = 0x2009; i <= 0x2B82; i++) {
+                    sum1 += u8[i];
+                }
+                u8[0x2B83] = (sum1 >> 8) & 0xFF;
+                u8[0x2B84] = sum1 & 0xFF;
+                
+                let sum2 = 0;
+                for (let i = 0x2B85; i <= 0x2D0C; i++) {
+                    sum2 += u8[i];
+                }
+                u8[0x2D0D] = (sum2 >> 8) & 0xFF;
+                u8[0x2D0E] = sum2 & 0xFF;
+                
+                // Also write crystal backup checksums (Bank 2)
+                let sum1Backup = 0;
+                for (let i = 0x6009; i <= 0x6B82; i++) {
+                    sum1Backup += u8[i];
+                }
+                u8[0x6B83] = (sum1Backup >> 8) & 0xFF;
+                u8[0x6B84] = sum1Backup & 0xFF;
+                
+                let sum2Backup = 0;
+                for (let i = 0x6B85; i <= 0x6D0C; i++) {
+                    sum2Backup += u8[i];
+                }
+                u8[0x6D0D] = (sum2Backup >> 8) & 0xFF;
+                u8[0x6D0E] = sum2Backup & 0xFF;
+            } else {
+                let sum = 0;
+                for (let i = 0x2009; i <= 0x2D0C; i++) {
+                    sum += u8[i];
+                }
+                u8[0x2D0D] = (sum >> 8) & 0xFF;
+                u8[0x2D0E] = sum & 0xFF;
+                
+                // Also write GS backup checksum (Bank 2)
+                let sumBackup = 0;
+                for (let i = 0x6009; i <= 0x6D0C; i++) {
+                    sumBackup += u8[i];
+                }
+                u8[0x6D0D] = (sumBackup >> 8) & 0xFF;
+                u8[0x6D0E] = sumBackup & 0xFF;
             }
-            u8[0x6D0D] = (sumBackup >> 8) & 0xFF;
-            u8[0x6D0E] = sumBackup & 0xFF;
         }
-    }
-    
-    const blob = new Blob([workingBuffer], {type: "application/octet-stream"});
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = (uploadedSaveName || "savefile.sav").replace(/\.sav$/i, "_editado.sav");
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    alert(`Sucesso! Save modificado gravado com ${modifyCount} alterações.`);
+        
+        const blob = new Blob([workingBuffer], {type: "application/octet-stream"});
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = (uploadedSaveName || "savefile.sav").replace(/\.sav$/i, "_editado.sav");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        closeDiffModal();
+        alert(`Sucesso! Save modificado gravado com ${modifyCount} alterações.`);
+    };
 }
 
 function exportIndividualPkx() {
@@ -7526,6 +8207,53 @@ function getMoveGeneration(moveId) {
     return 9;
 }
 
+function getMoveIdFromName(moveName) {
+    if (!moveName) return 0;
+    const englishName = getEnglishMoveName(moveName).toLowerCase().trim().replace(/\s+/g, "-");
+    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
+        const found = Object.entries(POKEAPI_MOVE_ID_TO_NAME).find(([id, name]) => name.toLowerCase() === englishName);
+        if (found) return parseInt(found[0], 10);
+    }
+    if (typeof REVERSE_MOVES_MAP !== 'undefined') {
+        const found = Object.entries(REVERSE_MOVES_MAP).find(([id, name]) => name.toLowerCase() === englishName);
+        if (found) return parseInt(found[0], 10);
+    }
+    return 0;
+}
+
+function getMoveGenerationFromMoveName(moveName) {
+    if (!moveName) return 1;
+    const moveId = getMoveIdFromName(moveName);
+    if (moveId > 0) {
+        return getMoveGeneration(moveId);
+    }
+    return 1;
+}
+
+function validateMovesGeneration(moves, targetGameOrGen) {
+    let targetGen = 9;
+    if (typeof targetGameOrGen === "number") {
+        targetGen = targetGameOrGen;
+    } else {
+        const game = GAMES_DB.find(g => g.id === targetGameOrGen);
+        if (game) targetGen = game.gen;
+    }
+    
+    for (const move of moves) {
+        if (!move) continue;
+        const moveGen = getMoveGenerationFromMoveName(move);
+        if (moveGen > targetGen) {
+            return {
+                valid: false,
+                move: move,
+                moveGen: moveGen,
+                targetGen: targetGen
+            };
+        }
+    }
+    return { valid: true };
+}
+
 function populateMoveSelects(p) {
     if (!p) return;
     
@@ -7535,18 +8263,11 @@ function populateMoveSelects(p) {
         gen = currentGame.gen;
     }
     
-    const normSpecies = normalizeSpeciesNameForApi(p.species);
-    
-    // 1. Get current moves of this Pokemon
     const currentMoves = (p.moves || []).map(m => m ? getEnglishMoveName(m).toLowerCase() : "");
-    
-    // 2. Get recommended moves
     const recommendedList = getFourRecommendedMoves(p, gen);
     const recommendedEng = recommendedList.map(m => m.english.toLowerCase());
     
-    // 3. Let's compile and sort all moves in POKEAPI_MOVE_ID_TO_NAME
     const learnableMoves = [];
-    const blockedMoves = [];
     const otherMoves = [];
     
     if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
@@ -7574,77 +8295,38 @@ function populateMoveSelects(p) {
                     otherMoves.push(moveObj);
                 }
             } else {
-                if (canPokemonLearnMove(p, englishName, 9)) {
-                    blockedMoves.push(moveObj);
-                } else {
-                    otherMoves.push(moveObj);
-                }
+                otherMoves.push(moveObj);
             }
         });
     }
     
     const sortFn = (a, b) => a.display.localeCompare(b.display);
     learnableMoves.sort(sortFn);
-    blockedMoves.sort(sortFn);
     otherMoves.sort(sortFn);
     
-    // For each of the 4 select elements
+    let datalistHtml = "";
+    recommendedList.forEach(m => {
+        datalistHtml += `<option value="${m.display}">⭐ ${m.display} (Recomendado)</option>`;
+    });
+    learnableMoves.forEach(m => {
+        datalistHtml += `<option value="${m.display}">${m.display}</option>`;
+    });
+    otherMoves.forEach(m => {
+        const genLabel = m.gen > gen ? `Gen ${m.gen}` : "Incompatível";
+        datalistHtml += `<option value="${m.display}">${m.display} [${genLabel}]</option>`;
+    });
+    
+    const datalistEl = document.getElementById("moves-datalist");
+    if (datalistEl) {
+        datalistEl.innerHTML = datalistHtml;
+    }
+    
     for (let slotNum = 1; slotNum <= 4; slotNum++) {
-        const selectId = `form-move${slotNum}`;
-        const selectEl = document.getElementById(selectId);
-        if (!selectEl) continue;
-        
-        const activeMove = p.moves?.[slotNum - 1] || "";
-        const activeMoveEng = activeMove ? getEnglishMoveName(activeMove).toLowerCase() : "";
-        
-        let html = `<option value="">Nenhum (None)</option>`;
-        
-        // Group 1: Ataque Atual
-        if (activeMove) {
-            html += `<optgroup label="Ataque Atual">
-                <option value="${activeMove}" selected>${activeMove}</option>
-            </optgroup>`;
+        const inputId = `form-move${slotNum}`;
+        const inputEl = document.getElementById(inputId);
+        if (inputEl) {
+            inputEl.value = p.moves?.[slotNum - 1] || "";
         }
-        
-        // Group 2: Recomendados
-        if (recommendedList.length > 0) {
-            html += `<optgroup label="Ataques Recomendados">`;
-            recommendedList.forEach(m => {
-                const disp = m.display;
-                if (m.english.toLowerCase() === activeMoveEng) return;
-                html += `<option value="${disp}">${disp}</option>`;
-            });
-            html += `</optgroup>`;
-        }
-        
-        // Group 3: Aprendíveis nesta Geração
-        if (learnableMoves.length > 0) {
-            html += `<optgroup label="Aprendíveis (Geração ${gen})">`;
-            learnableMoves.forEach(m => {
-                html += `<option value="${m.display}">${m.display}</option>`;
-            });
-            html += `</optgroup>`;
-        }
-        
-        // Group 4: Bloqueados por Geração (Futuros)
-        if (blockedMoves.length > 0) {
-            html += `<optgroup label="Bloqueados por Geração (Gens ${gen + 1}-9)">`;
-            blockedMoves.forEach(m => {
-                html += `<option value="${m.display}" disabled style="color: var(--text-muted); opacity: 0.5;">${m.display} [Bloqueado - Gen ${m.gen}]</option>`;
-            });
-            html += `</optgroup>`;
-        }
-        
-        // Group 5: Outros Ataques (Não Compatíveis / Sem learnset)
-        if (otherMoves.length > 0) {
-            html += `<optgroup label="Outros Ataques (Incompatíveis/Indefinidos)">`;
-            otherMoves.forEach(m => {
-                html += `<option value="${m.display}" style="opacity: 0.7;">${m.display}</option>`;
-            });
-            html += `</optgroup>`;
-        }
-        
-        selectEl.innerHTML = html;
     }
 }
 
@@ -7664,10 +8346,10 @@ function setupEditorMovesListeners() {
                 species: currentSpecies,
                 currentGame: currentOrigin,
                 moves: [
-                    document.getElementById("form-move1").value,
-                    document.getElementById("form-move2").value,
-                    document.getElementById("form-move3").value,
-                    document.getElementById("form-move4").value
+                    document.getElementById("form-move1").value.trim(),
+                    document.getElementById("form-move2").value.trim(),
+                    document.getElementById("form-move3").value.trim(),
+                    document.getElementById("form-move4").value.trim()
                 ]
             };
             populateMoveSelects(tempP);
@@ -7676,10 +8358,10 @@ function setupEditorMovesListeners() {
                 species: currentSpecies,
                 currentGame: currentOrigin,
                 moves: [
-                    document.getElementById("form-move1").value,
-                    document.getElementById("form-move2").value,
-                    document.getElementById("form-move3").value,
-                    document.getElementById("form-move4").value
+                    document.getElementById("form-move1").value.trim(),
+                    document.getElementById("form-move2").value.trim(),
+                    document.getElementById("form-move3").value.trim(),
+                    document.getElementById("form-move4").value.trim()
                 ]
             });
         }
@@ -7693,19 +8375,19 @@ function setupEditorMovesListeners() {
         originGameSelect.addEventListener("change", onFormChange);
     }
     
-    const moveSelects = ["form-move1", "form-move2", "form-move3", "form-move4"];
-    moveSelects.forEach(id => {
-        const sel = document.getElementById(id);
-        if (sel) {
-            sel.addEventListener("change", (event) => {
-                const val = event.target.value;
+    const moveInputs = ["form-move1", "form-move2", "form-move3", "form-move4"];
+    moveInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener("input", (event) => {
+                const val = event.target.value.trim();
                 if (!val) return;
                 
                 let duplicate = false;
-                moveSelects.forEach(otherId => {
+                moveInputs.forEach(otherId => {
                     if (otherId !== id) {
-                        const otherSel = document.getElementById(otherId);
-                        if (otherSel && otherSel.value === val) {
+                        const otherInput = document.getElementById(otherId);
+                        if (otherInput && otherInput.value.trim().toLowerCase() === val.toLowerCase()) {
                             duplicate = true;
                         }
                     }
@@ -8298,4 +8980,395 @@ function getFourRecommendedMoves(pkmn, gen) {
     
     return selected;
 }
+
+function getPokemonGen(pokedexId) {
+    if (pokedexId <= 151) return 1;
+    if (pokedexId <= 251) return 2;
+    if (pokedexId <= 386) return 3;
+    if (pokedexId <= 493) return 4;
+    if (pokedexId <= 649) return 5;
+    if (pokedexId <= 721) return 6;
+    if (pokedexId <= 809) return 7;
+    if (pokedexId <= 905) return 8;
+    return 9;
+}
+
+function isPokemonAllowedInGame(pokedexId, gameId) {
+    const game = GAMES_DB.find(g => g.id === gameId);
+    if (!game) return true;
+    
+    const pkmnGen = getPokemonGen(pokedexId);
+    if (pkmnGen > game.gen) return false;
+    
+    if (gameId === "letsgopikachu" || gameId === "letsgoeevee") {
+        return pokedexId <= 151 || pokedexId === 808 || pokedexId === 809;
+    }
+    
+    if (gameId === "legendsarceus") {
+        const allowedHisuiIds = [
+            722,723,724, 155,156,157, 501,502,503,
+            58,59, 74,75,76, 95, 111,112, 122, 113,114,115, 129,130, 133,134,135,136, 137, 92,93,94, 63,64,65, 66,67,68, 46,47, 77,78, 41,42, 25,26, 81,82, 100,101,
+            196,197, 200, 201, 206, 211, 214, 215, 220,221, 223,224, 226, 234, 240, 242,
+            265,266,267,268,269, 280,281,282, 315, 339,340, 355,356, 358, 361,362,
+            387,388,389, 390,391,392, 393,394,395, 396,397,398, 399,400, 401,402, 403,404,405, 406,407, 412,413,414, 415,416, 417, 418,419, 420,421, 422,423, 424, 425,426, 427,428, 429, 431,432, 433, 434,435, 436,437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447,448, 449,450, 451,452, 453,454, 455, 456,457, 458, 459,460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,
+            540,541,542, 546,547, 548,549, 550, 627,628, 641,642, 645,
+            704,705,706, 712,713,
+            722,723,724,
+            899, 900, 901, 902, 903, 904, 905
+        ];
+        return allowedHisuiIds.includes(pokedexId);
+    }
+    
+    if (game.gen === 1) return pokedexId <= 151;
+    if (game.gen === 2) return pokedexId <= 251;
+    if (game.gen === 3) return pokedexId <= 386;
+    
+    return true;
+}
+
+function validateActiveTeamRules(candidatePkmn) {
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team" && p.id !== candidatePkmn.id);
+    
+    const duplicateSpecies = activeTeam.find(p => p.pokedexId === candidatePkmn.pokedexId);
+    if (duplicateSpecies) {
+        return {
+            valid: false,
+            reason: `Species Clause: Já tens um ${candidatePkmn.species} na equipa ativa!`
+        };
+    }
+    
+    if (candidatePkmn.item && candidatePkmn.item.trim() !== "") {
+        const candidateItem = candidatePkmn.item.toLowerCase().trim();
+        const duplicateItem = activeTeam.find(p => p.item && p.item.toLowerCase().trim() === candidateItem);
+        if (duplicateItem) {
+            return {
+                valid: false,
+                reason: `Item Clause: O item "${candidatePkmn.item}" já está a ser segurado por ${duplicateItem.nickname || duplicateItem.species} na equipa ativa!`
+            };
+        }
+    }
+    
+    const candidateMovesKey = (candidatePkmn.moves || []).slice(0).sort().join(",");
+    const duplicateBuild = activeTeam.find(p => {
+        const movesKey = (p.moves || []).slice(0).sort().join(",");
+        return p.nature === candidatePkmn.nature && movesKey === candidateMovesKey;
+    });
+    if (duplicateBuild) {
+        return {
+            valid: false,
+            reason: `Build Clause: Já tens um Pokémon com a mesma Build (Natureza + Moveset) na equipa ativa (${duplicateBuild.nickname || duplicateBuild.species})!`
+        };
+    }
+    
+    return { valid: true };
+}
+
+function saveActiveTeamAsPreset() {
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    if (activeTeam.length === 0) {
+        alert("Não há nenhum Pokémon na Equipa Ativa para gravar.");
+        return;
+    }
+    
+    const presetName = prompt("Insira o nome para este Preset de Equipa:", `Minha Equipa - ${GAMES_DB.find(g => g.id === currentGameId)?.name}`);
+    if (!presetName) return;
+    
+    const presetId = "preset_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const newPreset = {
+        id: presetId,
+        gameId: currentGameId,
+        trainerId: activeTrainerId,
+        name: presetName,
+        pokemonIds: activeTeam.map(p => p.id)
+    };
+    
+    teamPresetsList.push(newPreset);
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    renderPresets();
+    alert(`Preset "${presetName}" gravado com sucesso!`);
+}
+
+const BUILDS_LIBRARY = {
+    offensive: {
+        name: "Ofensiva (Sweeper)",
+        evs: { hp: 4, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 },
+        evsSpecial: { hp: 4, atk: 0, def: 0, spa: 252, spd: 0, spe: 252 }
+    },
+    defensive: {
+        name: "Defensiva (Wall)",
+        evs: { hp: 252, atk: 0, def: 252, spa: 0, spd: 4, spe: 0 },
+        evsSpecial: { hp: 252, atk: 0, def: 4, spa: 0, spd: 252, spe: 0 }
+    },
+    support: {
+        name: "Suporte / Utilitária",
+        evs: { hp: 252, atk: 0, def: 128, spa: 0, spd: 128, spe: 0 }
+    },
+    coverage: {
+        name: "Bulky Attacker / Coverage",
+        evs: { hp: 252, atk: 252, def: 0, spa: 0, spd: 4, spe: 0 },
+        evsSpecial: { hp: 252, atk: 0, def: 0, spa: 252, spd: 4, spe: 0 }
+    }
+};
+
+function applyBuildPreset(type) {
+    const build = BUILDS_LIBRARY[type];
+    if (!build) return;
+    
+    const isSpecial = confirm("Esta build deve focar-se em Ataque Especial (OK) ou Ataque Físico (Cancelar)?");
+    const evs = isSpecial && build.evsSpecial ? build.evsSpecial : build.evs;
+    
+    document.getElementById("ev-hp").value = evs.hp;
+    document.getElementById("ev-atk").value = evs.atk;
+    document.getElementById("ev-def").value = evs.def;
+    document.getElementById("ev-spa").value = evs.spa;
+    document.getElementById("ev-spd").value = evs.spd;
+    document.getElementById("ev-spe").value = evs.spe;
+    
+    validateEVs();
+    alert(`Build "${build.name}" aplicada! EVs atualizados.`);
+}
+
+let finishChallengeImageBase64 = null;
+
+function finishChallengeFlow(challengeId) {
+    const ch = challengesList.find(c => c.id === challengeId);
+    if (!ch) return;
+    
+    document.getElementById("finish-challenge-id").value = challengeId;
+    document.getElementById("finish-challenge-notes").value = ch.notes || "";
+    document.getElementById("finish-challenge-file").value = "";
+    document.getElementById("finish-challenge-file-name").innerText = "Nenhuma imagem selecionada";
+    finishChallengeImageBase64 = null;
+    
+    const gameId = ch.gameId || currentGameId;
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    
+    const teamListEl = document.getElementById("finish-challenge-team-list");
+    if (teamListEl) {
+        if (activeTeam.length === 0) {
+            teamListEl.innerHTML = `<span style="font-size: 0.7rem; color: #ef4444;">Nenhum Pokémon na equipa ativa para este jogo!</span>`;
+        } else {
+            teamListEl.innerHTML = activeTeam.map(p => {
+                let spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.isShiny ? 'shiny/' : ''}${p.pokedexId}.png`;
+                return `
+                    <div style="text-align: center; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 6px; padding: 4px; display: flex; flex-direction: column; align-items: center; min-width: 60px;">
+                        <img src="${spriteUrl}" alt="${p.species}" style="width: 32px; height: 32px;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png'">
+                        <span style="font-size: 0.6rem; color: #fff; font-weight: bold; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55px;">${p.nickname || p.species}</span>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+    
+    document.getElementById("finish-challenge-modal").classList.add("active");
+}
+
+function closeFinishChallengeModal() {
+    document.getElementById("finish-challenge-modal").classList.remove("active");
+}
+
+function handleFinishChallengeFileSelect(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    document.getElementById("finish-challenge-file-name").innerText = file.name;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement("canvas");
+            const ctx = canvas.getContext("2d");
+            
+            const MAX_WIDTH = 1000;
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > MAX_WIDTH) {
+                height = Math.round((height * MAX_WIDTH) / width);
+                width = MAX_WIDTH;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            finishChallengeImageBase64 = canvas.toDataURL("image/jpeg", 0.75);
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
+
+function executeFinishChallenge() {
+    const id = document.getElementById("finish-challenge-id").value;
+    const notes = document.getElementById("finish-challenge-notes").value;
+    
+    const ch = challengesList.find(c => c.id === id);
+    if (!ch) return;
+    
+    const gameId = ch.gameId || currentGameId;
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    
+    if (activeTeam.length === 0) {
+        alert("A equipa ativa está vazia! Tens de alocar Pokémon à tua equipa ativa antes de finalizar o desafio.");
+        return;
+    }
+    
+    ch.status = "completed";
+    ch.notes = notes;
+    
+    activeTeam.forEach(p => {
+        p.isLocked = true;
+    });
+    
+    if (finishChallengeImageBase64) {
+        saveHofImage(gameId, finishChallengeImageBase64)
+            .then(() => {
+                closeFinishChallengeModal();
+                renderAll();
+                renderChallengesList();
+                alert(`Desafio "${ch.title}" finalizado com sucesso! A tua equipa ativa foi trancada como vencedora 🏆.`);
+            })
+            .catch(err => {
+                console.error("Erro ao gravar HOF no IndexedDB:", err);
+                closeFinishChallengeModal();
+                renderAll();
+                renderChallengesList();
+            });
+    } else {
+        generateAutomaticHofRecord(gameId, activeTeam).then(() => {
+            closeFinishChallengeModal();
+            renderAll();
+            renderChallengesList();
+            alert(`Desafio "${ch.title}" finalizado com sucesso! A tua equipa ativa foi trancada como vencedora 🏆.`);
+        });
+    }
+}
+
+function generateAutomaticHofRecord(gameId, activeTeam) {
+    const record = {
+        id: "hof_gen_" + Date.now(),
+        type: "generated",
+        date: new Date().toLocaleDateString('pt-PT'),
+        team: activeTeam.map(p => ({
+            pokedexId: p.pokedexId,
+            species: p.species,
+            nickname: p.nickname || p.species,
+            level: p.level,
+            gender: p.gender || "⚲",
+            isShiny: p.isShiny || false
+        }))
+    };
+    return saveHofRecord(gameId, record, activeTrainerId);
+}
+
+function closeDiffModal() {
+    document.getElementById("diff-modal").classList.remove("active");
+}
+
+function compileSaveDiffReport(savablePokemon, saveBuffer) {
+    const diffs = [];
+    const saveU8 = new Uint8Array(saveBuffer);
+    
+    savablePokemon.forEach(pkmn => {
+        const meta = pkmn.saveMeta;
+        let origItem = "";
+        let origMoves = [];
+        
+        if (meta.gen === 1) {
+            const structOffset = meta.structOffset;
+            for (let m = 0; m < 4; m++) {
+                const moveId = saveU8[structOffset + 8 + m];
+                if (moveId > 0) {
+                    const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                    origMoves.push(formatMoveNameForDisplay(rawName));
+                }
+            }
+        } else if (meta.gen === 2) {
+            const structOffset = meta.structOffset;
+            const itemId = saveU8[structOffset + 1];
+            origItem = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN2[itemId] || "");
+            for (let m = 0; m < 4; m++) {
+                const moveId = saveU8[structOffset + 2 + m];
+                if (moveId > 0) {
+                    const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                    origMoves.push(formatMoveNameForDisplay(rawName));
+                }
+            }
+        } else if (meta.gen === 3) {
+            let sectorIndex = -1;
+            for (let s = 0; s < 14; s++) {
+                const sIdx = uploadedSaveActiveSectorStart + s;
+                const offset = sIdx * 4096;
+                const sig = saveU8[offset + 0x0FF8] | (saveU8[offset + 0x0FF9] << 8) | (saveU8[offset + 0x0FFA] << 16) | (saveU8[offset + 0x0FFB] << 24);
+                if (sig === 0x08012025 && saveU8[offset + 0x0FF4] === 1) {
+                    sectorIndex = sIdx;
+                    break;
+                }
+            }
+            if (sectorIndex !== -1) {
+                const sectorOffset = sectorIndex * 4096;
+                const structOffset = sectorOffset + meta.structOffset;
+                const pid = meta.pid;
+                const otid = meta.otid;
+                const key = pid ^ otid;
+                const shuffleIndex = meta.shuffleIndex;
+                const order = blockOrders[shuffleIndex];
+                
+                const decryptedWords = new Uint32Array(12);
+                for (let j = 0; j < 12; j++) {
+                    const wordOffset = structOffset + 0x20 + j * 4;
+                    const encryptedWord = saveU8[wordOffset] | (saveU8[wordOffset + 1] << 8) | (saveU8[wordOffset + 2] << 16) | (saveU8[wordOffset + 3] << 24);
+                    decryptedWords[j] = encryptedWord ^ key;
+                }
+                const decryptedBytes = new Uint8Array(decryptedWords.buffer);
+                
+                let blockGIdx = -1;
+                let blockAIdx = -1;
+                for (let b = 0; b < 4; b++) {
+                    if (order[b] === 0) blockGIdx = b;
+                    if (order[b] === 1) blockAIdx = b;
+                }
+                if (blockGIdx !== -1) {
+                    const gOffset = blockGIdx * 12;
+                    const itemId = decryptedBytes[gOffset + 2] | (decryptedBytes[gOffset + 3] << 8);
+                    origItem = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
+                }
+                if (blockAIdx !== -1) {
+                    const aOffset = blockAIdx * 12;
+                    const u16BlockA = new Uint16Array(decryptedBytes.buffer, decryptedBytes.byteOffset + aOffset, 6);
+                    for (let m = 0; m < 4; m++) {
+                        const moveId = u16BlockA[m];
+                        if (moveId > 0) {
+                            const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
+                            origMoves.push(formatMoveNameForDisplay(rawName));
+                        }
+                    }
+                }
+            }
+        }
+        
+        const itemChanged = (origItem || "").toLowerCase().trim() !== (pkmn.item || "").toLowerCase().trim();
+        const movesChanged = JSON.stringify(origMoves.map(m => m.toLowerCase().trim())) !== JSON.stringify((pkmn.moves || []).map(m => m.toLowerCase().trim()));
+        
+        if (itemChanged || movesChanged) {
+            diffs.push({
+                nickname: pkmn.nickname || pkmn.species,
+                species: pkmn.species,
+                origItem: origItem || "Nenhum",
+                newItem: pkmn.item || "Nenhum",
+                itemChanged,
+                origMoves: origMoves.length > 0 ? origMoves.join(", ") : "Nenhum",
+                newMoves: (pkmn.moves || []).length > 0 ? (pkmn.moves || []).join(", ") : "Nenhum",
+                movesChanged
+            });
+        }
+    });
+    return diffs;
+}
+    
+
 

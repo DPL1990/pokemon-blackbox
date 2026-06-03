@@ -286,9 +286,14 @@
                                     🗃️ Presets de Equipa
                                 </div>
                             </div>
-                            <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="width: 100%; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); margin-bottom: 16px; border-radius: 8px;">
-                                ✨ Dividir Box em Equipas
-                            </button>
+                            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                                <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); border-radius: 8px;">
+                                    ✨ Dividir Box
+                                </button>
+                                <button class="btn btn-action" onclick="saveActiveTeamAsPreset()" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); border-radius: 8px;">
+                                    💾 Gravar Equipa
+                                </button>
+                            </div>
                             <div id="allocation-presets-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 450px; overflow-y: auto; padding-right: 4px;">
                                 <!-- Dynamic Presets -->
                             </div>
@@ -403,6 +408,7 @@
             </div>
             
             <div class="modal-body">
+                <div id="editor-lock-warning" style="display:none; padding: 10px; margin-bottom: 12px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b; border-radius: 8px; font-size: 0.75rem; font-weight: bold; text-align: center;"></div>
                 <!-- Showdown Fast Importer -->
                 <div class="showdown-box">
                     <h4>📋 Importador Rápido (Showdown / PKHeX Text)</h4>
@@ -540,11 +546,12 @@
                     <div class="form-group">
                         <label>⚔️ Moveset</label>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <select id="form-move1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
-                            <select id="form-move2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
-                            <select id="form-move3" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
-                            <select id="form-move4" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);"></select>
+                            <input type="text" id="form-move1" list="moves-datalist" placeholder="Ataque 1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                            <input type="text" id="form-move2" list="moves-datalist" placeholder="Ataque 2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                            <input type="text" id="form-move3" list="moves-datalist" placeholder="Ataque 3" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                            <input type="text" id="form-move4" list="moves-datalist" placeholder="Ataque 4" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
                         </div>
+                        <datalist id="moves-datalist"></datalist>
                     </div>
 
                     <!-- IVs and EVs Expandable Section -->
@@ -575,6 +582,15 @@
                                     <div class="form-group" style="margin-bottom:6px;"><label>SPE</label><input type="number" id="ev-spe" min="0" max="252" value="0" onchange="validateEVs()"></div>
                                 </div>
                                 <div id="ev-warning" style="font-size: 0.6rem; color: var(--accent-danger); font-weight: 700; margin-top: 4px; display: none;">Soma dos EVs excede o limite de 510! (Atual: <span id="ev-total-span">0</span>)</div>
+                                <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
+                                    <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 6px;">📚 Biblioteca de Builds</h4>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('offensive')" style="font-size: 0.65rem; padding: 4px;">Ofensiva</button>
+                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('defensive')" style="font-size: 0.65rem; padding: 4px;">Defensiva</button>
+                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('support')" style="font-size: 0.65rem; padding: 4px;">Suporte</button>
+                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('coverage')" style="font-size: 0.65rem; padding: 4px;">Bulky/Coverage</button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </details>
@@ -839,6 +855,7 @@
 
                 <!-- Parsed Results -->
                 <div id="save-import-results" style="display: none;">
+                    <div id="save-import-audit" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; display: none;"></div>
                     <!-- Lote / Bulk Action Panel -->
                     <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
                         <span style="font-size: 0.7rem; font-weight: 700; color: #fff; text-transform: uppercase;">⚡ Ação em Lote:</span>
@@ -871,6 +888,69 @@
                         </table>
                     </div>
                     <button class="btn btn-primary" onclick="executeSaveImport()" style="width: 100%;">📥 Importar Pokémon Selecionados em Massa</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Finish Challenge (Victory) Modal -->
+    <div class="modal-overlay" id="finish-challenge-modal">
+        <div class="modal-content" style="max-width: 500px; width: 90%;">
+            <div class="modal-header">
+                <h2>🏆 Comemorar Vitória & Finalizar Desafio</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeFinishChallengeModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <div style="display:flex; flex-direction:column; gap:12px;">
+                    <input type="hidden" id="finish-challenge-id">
+                    <p style="font-size: 0.75rem; color: var(--text-muted);">
+                        Parabéns pela vitória! Ao finalizar, a tua equipa ativa atual será associada a este desafio e os seus Pokémon serão marcados como <strong>imutáveis (trancados) 🏆</strong> no currículo e Hall of Fame.
+                    </p>
+                    
+                    <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;">
+                        <h4 style="font-size: 0.75rem; font-weight: bold; color: var(--game-color); margin-bottom: 6px;">Equipa Ativa Vencedora:</h4>
+                        <div id="finish-challenge-team-list" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <!-- Dynamic small sprites -->
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Notas de Vitória (Hall of Fame Notes)</label>
+                        <textarea id="finish-challenge-notes" rows="3" placeholder="Escreve o teu comentário final de vitória, MVP da equipa, etc..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📸 Foto do Hall of Fame (Opcional)</label>
+                        <input type="file" id="finish-challenge-file" accept="image/*" style="display:none;" onchange="handleFinishChallengeFileSelect(event)">
+                        <div style="display:flex; gap:10px; align-items:center;">
+                            <button type="button" class="btn btn-action" onclick="document.getElementById('finish-challenge-file').click()" style="width:auto; padding:6px 12px; font-size:0.7rem;">📂 Selecionar Imagem</button>
+                            <span id="finish-challenge-file-name" style="font-size:0.7rem; color:var(--text-muted);">Nenhuma imagem selecionada</span>
+                        </div>
+                    </div>
+
+                    <button type="button" class="btn btn-primary" onclick="executeFinishChallenge()" style="margin-top: 6px; background: linear-gradient(135deg, #f59e0b, #d97706); border: none; font-weight: bold; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);">🏆 Confirmar Vitória & Imutabilidade</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diff Report Modal -->
+    <div class="modal-overlay" id="diff-modal">
+        <div class="modal-content" style="max-width: 600px; width: 95%;">
+            <div class="modal-header">
+                <h2>🔍 Comparação de Alterações (Diff Relatório)</h2>
+                <button class="btn btn-danger" style="width:auto; padding: 6px 12px; border-radius: 8px;" onclick="closeDiffModal()">✕</button>
+            </div>
+            <div class="modal-body">
+                <p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+                    Revise as alterações abaixo antes de gravar e exportar o save modificado.
+                </p>
+                <div id="diff-list-container" style="max-height: 300px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px;">
+                    <!-- Dynamic diff rows -->
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" class="btn btn-danger" onclick="closeDiffModal()" style="flex: 1;">Cancelar</button>
+                    <button type="button" class="btn btn-primary" id="btn-confirm-diff-save" style="flex: 2;">Confirmar & Gravar Save</button>
                 </div>
             </div>
         </div>
