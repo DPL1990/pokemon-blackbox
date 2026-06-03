@@ -1,19 +1,23 @@
 # Servidor HTTP Local para Pokemon BlackBox
 $port = 8000
-$listener = New-Object System.Net.HttpListener
+$listener = $null
 
 while ($port -lt 8010) {
     try {
-        $listener.Prefixes.Clear()
-        $listener.Prefixes.Add("http://localhost:$port/")
+        $listener = New-Object System.Net.HttpListener
+        $listener.Prefixes.Add("http://127.0.0.1:$port/")
         $listener.Start()
         break
     } catch {
+        if ($listener -ne $null) {
+            $listener.Close()
+            $listener = $null
+        }
         $port++
     }
 }
 
-if (-not $listener.IsListening) {
+if ($listener -eq $null -or -not $listener.IsListening) {
     Write-Host "Erro: Nao foi possivel iniciar o servidor em nenhuma porta entre 8000 e 8009." -ForegroundColor Red
     pause
     exit
@@ -22,13 +26,13 @@ if (-not $listener.IsListening) {
 Write-Host "=============================================" -ForegroundColor Cyan
 Write-Host "    POKEMON BLACKBOX - SERVIDOR LOCAL" -ForegroundColor Cyan
 Write-Host "=============================================" -ForegroundColor Cyan
-Write-Host "Servidor ativo em http://localhost:$port/" -ForegroundColor Green
+Write-Host "Servidor ativo em http://127.0.0.1:$port/" -ForegroundColor Green
 Write-Host "A abrir o teu navegador padrao..." -ForegroundColor Gray
 Write-Host "Pressione Ctrl+C para encerrar o servidor." -ForegroundColor Yellow
 Write-Host "=============================================" -ForegroundColor Cyan
 
 # Abre o browser automaticamente
-Start-Process "http://localhost:$port/"
+Start-Process "http://127.0.0.1:$port/"
 
 while ($listener.IsListening) {
     try {

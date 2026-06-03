@@ -191,7 +191,7 @@ const SUGGESTIONS = {
     natures: ["Adamant", "Bashful", "Bold", "Brave", "Calm", "Careful", "Docile", "Hardy", "Hasty", "Impish", "Jolly", "Lax", "Lonely", "Mild", "Modest", "Naive", "Naughty", "Quiet", "Quirky", "Rash", "Relaxed", "Sassy", "Serious", "Timid"],
     abilities: ["Adaptability", "Blaze", "Bulletproof", "Chlorophyll", "Clear Body", "Contrary", "Drizzle", "Drought", "Flame Body", "Flash Fire", "Guts", "Huge Power", "Illusion", "Infiltrator", "Inner Focus", "Insomnia", "Intimidate", "Levitate", "Magic Guard", "Moxie", "Natural Cure", "Overgrow", "Prankster", "Pressure", "Regenerator", "Rock Head", "Rough Skin", "Sand Stream", "Serene Grace", "Shadow Tag", "Shed Skin", "Sheer Force", "Sturdy", "Swift Swim", "Synchronize", "Technician", "Thick Fat", "Torrent", "Trace", "Unaware", "Water Absorb", "Wonder Guard"]
 };
-const SPECIES_TYPE_CACHE = {};
+const SPECIES_TYPE_CACHE = JSON.parse(localStorage.getItem("bb_species_type_cache")) || {};
 
 // --- SECTION IndexedDB Storage ---
 let dbInstance = null;
@@ -329,13 +329,73 @@ function deleteHofRecord(gameId, index, trainerId = activeTrainerId) {
     });
 }
 
+function getRibbonForOpponent(opponentId) {
+    switch (opponentId) {
+        case "ruby":
+        case "sapphire":
+        case "emerald":
+        case "emerald_rematch":
+        case "firered":
+        case "leafgreen":
+        case "firered_rematch":
+        case "leafgreen_rematch":
+        case "omegaruby":
+        case "alphasapphire":
+            return "Hoenn Champion Ribbon";
+            
+        case "diamond":
+        case "pearl":
+        case "platinum":
+        case "brilliantdiamond":
+        case "shiningpearl":
+        case "heartgold":
+        case "soulsilver":
+        case "heartgold_rematch":
+        case "soulsilver_rematch":
+            return "Sinnoh Champion Ribbon";
+            
+        case "johto_red":
+            return "Legend Ribbon (Red Defeat)";
+            
+        case "x":
+        case "y":
+            return "Kalos Champion Ribbon";
+            
+        case "sun":
+        case "moon":
+        case "ultrasun":
+        case "ultramoon":
+            return "Alola Champion Ribbon";
+            
+        case "sword":
+        case "shield":
+            return "Galar Champion Ribbon";
+            
+        case "legendsarceus":
+            return "Pioneer Ribbon (Hisui)";
+            
+        case "scarlet":
+        case "violet":
+            return "Paldea Champion Ribbon";
+            
+        default:
+            return null;
+    }
+}
+
 function generateHofFromActiveTeam() {
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
     if (activeTeam.length === 0) {
         alert("A tua equipa ativa para este cartucho está vazia! Adiciona Pokémon à equipa primeiro.");
         return;
     }
     activeTeam.sort((a, b) => a.slotIndex - b.slotIndex);
+    
+    // Obter o nome do oponente selecionado
+    const opponentSelect = document.getElementById("allocation-opponent-select");
+    const opponentName = opponentSelect && opponentSelect.selectedIndex >= 0
+        ? opponentSelect.options[opponentSelect.selectedIndex].text
+        : (GAMES_DB.find(g => g.id === currentGameId)?.name || "Pokémon");
     
     // Alerta de carregamento
     const btn = window.event ? (window.event.target || window.event.srcElement) : null;
@@ -419,11 +479,10 @@ function generateHofFromActiveTeam() {
         ctx.textAlign = "center";
         ctx.fillText("🏆 HALL OF FAME 🏆", 400, 60);
         
-        // Nome do jogo campeão
+        // Nome do oponente/desafio campeão
         ctx.fillStyle = accentColor;
         ctx.font = "900 15px 'Outfit', system-ui, -apple-system, sans-serif";
-        const gameName = GAMES_DB.find(g => g.id === currentGameId)?.name || "Pokémon";
-        ctx.fillText(gameName.toUpperCase(), 400, 92);
+        ctx.fillText(opponentName.toUpperCase(), 400, 92);
         
         // Grelha de Pokémon (3 colunas, 2 linhas)
         const colWidth = 230;
@@ -482,10 +541,22 @@ function generateHofFromActiveTeam() {
             id: "hof_gen_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5),
             type: "upload", // Salvo diretamente como upload para renderizar como imagem estática
             data: base64Data,
-            title: `Campeão: ${gameName}`,
+            title: opponentName,
             date: new Date().toLocaleDateString('pt-PT')
         };
         
+        // Atribuir a fita automaticamente se aplicável
+        const ribbonToGrant = getRibbonForOpponent(currentAllocationOpponentId);
+        if (ribbonToGrant) {
+            activeTeam.forEach(p => {
+                if (!p.ribbons) p.ribbons = [];
+                if (!p.ribbons.includes(ribbonToGrant)) {
+                    p.ribbons.push(ribbonToGrant);
+                }
+            });
+            localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        }
+
         saveHofRecord(currentGameId, record).then(() => {
             getHofRecords(currentGameId).then(records => {
                 activeHofIndex = records.length - 1;
@@ -714,7 +785,7 @@ function renderAll() {
     // Render Active Team Slots (Exactly 6 slots)
     teamContainer.innerHTML = "";
     for (let i = 0; i < 6; i++) {
-        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.trainerId === activeTrainerId && pkmn.slotType === "team" && pkmn.slotIndex === i);
+        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.slotType === "team" && pkmn.slotIndex === i);
         if (p) {
             teamContainer.innerHTML += createSlotHTML(p, i, "team");
         } else {
@@ -937,7 +1008,7 @@ function updateStats() {
     
     const teamEl = document.getElementById("stat-team");
     if (teamEl) {
-        teamEl.innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team").length}/6`;
+        teamEl.innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team").length}/6`;
     }
 }
 
@@ -950,15 +1021,9 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
     
     const draggedPkmn = pokemonDatabase[pkmnIndex]; 
 
-    // Dexit Check for target Game (currentGameId)
-    if (!isPokemonAllowedInGame(draggedPkmn.pokedexId || 1, currentGameId)) {
-        alert(`Dexit: O Pokémon ${draggedPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser movido para as suas caixas.`);
-        return;
-    }
-
-    // Validate drop to active team from other trainers/games
-    if (targetSlotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
-        alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+    // Validate drop to active team from other games
+    if (targetSlotType === "team" && draggedPkmn.currentGame !== currentGameId) {
+        alert("Este Pokémon pertence a outra Versão e não pode ser colocado na equipa ativa deste cartucho.");
         return;
     }
 
@@ -968,19 +1033,23 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
         if (targetPkmnIndex !== -1) {
             const targetPkmn = pokemonDatabase[targetPkmnIndex];
             
-            // Check Dexit for swapped Pokemon
-            if (!isPokemonAllowedInGame(targetPkmn.pokedexId || 1, currentGameId)) {
-                alert(`Dexit: O Pokémon ${targetPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}).`);
+            // Check Dexit if target is moving to team
+            if (targetPkmn.slotType === "team" && !isPokemonAllowedInGame(draggedPkmn.pokedexId || 1, currentGameId)) {
+                alert(`Dexit: O Pokémon ${draggedPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser colocado na equipa ativa.`);
+                return;
+            }
+            if (draggedPkmn.slotType === "team" && !isPokemonAllowedInGame(targetPkmn.pokedexId || 1, currentGameId)) {
+                alert(`Dexit: O Pokémon ${targetPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser colocado na equipa ativa.`);
                 return;
             }
 
             // Validate drops to team for swap operations
-            if (targetPkmn.slotType === "team" && (draggedPkmn.currentGame !== currentGameId || draggedPkmn.trainerId !== activeTrainerId)) {
-                alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+            if (targetPkmn.slotType === "team" && draggedPkmn.currentGame !== currentGameId) {
+                alert("Este Pokémon pertence a outra Versão e não pode ser colocado na equipa ativa deste cartucho.");
                 return;
             }
-            if (draggedPkmn.slotType === "team" && (targetPkmn.currentGame !== currentGameId || targetPkmn.trainerId !== activeTrainerId)) {
-                alert("Este Pokémon pertence a outro Treinador/Versão e não pode ser colocado na equipa ativa deste cartucho.");
+            if (draggedPkmn.slotType === "team" && targetPkmn.currentGame !== currentGameId) {
+                alert("Este Pokémon pertence a outra Versão e não pode ser colocado na equipa ativa deste cartucho.");
                 return;
             }
             
@@ -1006,11 +1075,9 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
             if (draggedPkmn.slotType !== targetPkmn.slotType) {
                 if (targetPkmn.slotType === "team") {
                     draggedPkmn.currentGame = currentGameId;
-                    draggedPkmn.trainerId = activeTrainerId;
                 }
                 if (draggedPkmn.slotType === "team") {
                     targetPkmn.currentGame = currentGameId;
-                    targetPkmn.trainerId = activeTrainerId;
                 }
             }
             
@@ -1024,6 +1091,12 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
     } else {
         // Placing in empty slot
         if (targetSlotType === "team") {
+            // Check Dexit for dragged Pokemon
+            if (!isPokemonAllowedInGame(draggedPkmn.pokedexId || 1, currentGameId)) {
+                alert(`Dexit: O Pokémon ${draggedPkmn.species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser colocado na equipa ativa.`);
+                return;
+            }
+
             const candidatePkmn = { ...draggedPkmn, slotType: "team" };
             const teamVal = validateActiveTeamRules(candidatePkmn);
             if (!teamVal.valid) {
@@ -1032,8 +1105,7 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
             }
 
             draggedPkmn.currentGame = currentGameId; 
-            draggedPkmn.trainerId = activeTrainerId;
-            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
+            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
             if (blocking) { 
                 blocking.slotType = "box"; 
                 blocking.slotIndex = 0; 
@@ -1387,13 +1459,18 @@ function openModalForEdit(id) {
     document.getElementById("form-species").value = p.species; 
     document.getElementById("form-nickname").value = p.nickname || "";
     document.getElementById("form-level").value = p.level || 50; 
-    document.getElementById("form-gender").value = p.gender || "⚲"; 
+    document.getElementById("form-gender").value = normalizeGender(p.gender); 
     document.getElementById("form-nature").value = p.nature || "";
     document.getElementById("form-ability").value = p.ability || ""; 
     document.getElementById("form-type1").value = p.type1 || "normal"; 
     document.getElementById("form-type2").value = p.type2 || "";
     document.getElementById("form-ball").value = p.ball || "poke"; 
     document.getElementById("form-item").value = p.item || ""; 
+    
+    // Auto-fetch missing types or ability in the background
+    if (!p.type2 && (!p.type1 || p.type1 === "normal") || !p.ability) {
+        fetchMissingSpeciesData(p.species);
+    }
     
     // Populate IVs & EVs
     document.getElementById("iv-hp").value = p.ivs?.hp !== undefined ? p.ivs.hp : 31;
@@ -1532,7 +1609,7 @@ async function savePokemon() {
 
     const nickname = document.getElementById("form-nickname").value.trim();
     const level = parseInt(document.getElementById("form-level").value, 10) || 50;
-    const gender = document.getElementById("form-gender").value;
+    const gender = normalizeGender(document.getElementById("form-gender").value);
     const nature = document.getElementById("form-nature").value.trim();
     const ability = document.getElementById("form-ability").value.trim();
     const type1 = document.getElementById("form-type1").value;
@@ -1604,12 +1681,6 @@ async function savePokemon() {
         }
     }
 
-    // Dexit Check
-    if (!isPokemonAllowedInGame(pokedexId, currentGameId)) {
-        alert(`Dexit: O Pokémon ${species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}).`);
-        return;
-    }
-    
     // Collect selected ribbons from checklist + custom ones
     const checkedRibbons = ALL_RIBBONS
         .filter(r => document.getElementById(`ribbon-chk-${r.id}`).checked)
@@ -1639,6 +1710,12 @@ async function savePokemon() {
     
     const slotType = targetPokemon ? targetPokemon.slotType : "box";
     if (slotType === "team") {
+        // Dexit Check
+        if (!isPokemonAllowedInGame(pokedexId, currentGameId)) {
+            alert(`Dexit: O Pokémon ${species} não é compatível com esta versão (${GAMES_DB.find(g => g.id === currentGameId)?.name}) e não pode ser colocado na equipa ativa.`);
+            return;
+        }
+
         const candidatePkmn = {
             id: id || "temp_id",
             species,
@@ -1754,11 +1831,11 @@ async function parseShowdownText() {
         }
         
         if (idPart.includes("(M)")) { 
-            pkmn.gender = "♂️"; 
+            pkmn.gender = "♂"; 
             idPart = idPart.replace("(M)", "").trim(); 
         }
         if (idPart.includes("(F)")) { 
-            pkmn.gender = "♀️"; 
+            pkmn.gender = "♀"; 
             idPart = idPart.replace("(F)", "").trim(); 
         }
         
@@ -2116,38 +2193,64 @@ async function enrichImportedPokemonList(list) {
             if (gen === 1 || gen === 2) {
                 const atkDv = p.atkDv !== undefined ? p.atkDv : 15;
                 p.gender = getGenderFromDv(p.pokedexId, atkDv);
-            } else if (gen === 3) {
+            } else if (gen === 3 || gen === 4 || gen === 5) {
                 const pid = p.saveMeta.pid || 0;
                 p.gender = getGenderFromPid(p.pokedexId, pid);
             }
         }
+        p.gender = normalizeGender(p.gender);
         
-        try {
-            const speciesClean = p.species.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/\s+/g, "-").trim();
-            const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesClean}`);
-            if (res.ok) {
-                const data = await res.json();
-                p.type1 = data.types[0].type.name;
-                p.type2 = data.types[1] ? data.types[1].type.name : "";
-                
-                if (!p.ability) {
-                    if (p.saveMeta && p.saveMeta.gen) {
-                        const gen = p.saveMeta.gen;
-                        if (gen === 3) {
-                            const pid = p.saveMeta.pid || 0;
-                            const slot = (pid % 2 === 0) ? 1 : 2;
-                            p.ability = getAbilityFromSlots(data.abilities, slot);
-                        } else if (gen >= 4 && p.abilityId !== undefined) {
-                            p.ability = await resolveAbilityName(p.abilityId);
+        // Resolve individual ability first if gen >= 4
+        if (!p.ability && p.saveMeta && p.saveMeta.gen >= 4 && p.abilityId !== undefined) {
+            p.ability = await resolveAbilityName(p.abilityId);
+        }
+        
+        const speciesClean = p.species.toLowerCase().replace(/[^a-z0-9-]/g, "").replace(/\s+/g, "-").trim();
+        let cached = SPECIES_TYPE_CACHE[speciesClean];
+        if (cached && cached.t1) {
+            p.type1 = cached.t1;
+            p.type2 = cached.t2 || "";
+            if (!p.ability && cached.ability) {
+                p.ability = cached.ability;
+            }
+        }
+        
+        // If types or ability are still missing, fetch from PokeAPI
+        if (!p.type1 || !p.ability) {
+            // Delay to prevent hitting PokeAPI rate limits
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            try {
+                const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${speciesClean}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    p.type1 = data.types[0].type.name;
+                    p.type2 = data.types[1] ? data.types[1].type.name : "";
+                    
+                    if (!p.ability) {
+                        if (p.saveMeta && p.saveMeta.gen) {
+                            const gen = p.saveMeta.gen;
+                            if (gen === 3) {
+                                const pid = p.saveMeta.pid || 0;
+                                const slot = (pid % 2 === 0) ? 1 : 2;
+                                p.ability = getAbilityFromSlots(data.abilities, slot);
+                            }
+                        }
+                        if (!p.ability) {
+                            p.ability = getAbilityFromSlots(data.abilities, 1);
                         }
                     }
-                    if (!p.ability) {
-                        p.ability = getAbilityFromSlots(data.abilities, 1);
-                    }
+                    
+                    SPECIES_TYPE_CACHE[speciesClean] = {
+                        t1: p.type1,
+                        t2: p.type2,
+                        ability: p.ability
+                    };
+                    localStorage.setItem("bb_species_type_cache", JSON.stringify(SPECIES_TYPE_CACHE));
                 }
+            } catch (e) {
+                console.error("Erro ao enriquecer dados de " + p.species, e);
             }
-        } catch (e) {
-            console.error("Erro ao enriquecer dados de " + p.species, e);
         }
     }
     renderSaveImportList();
@@ -2155,61 +2258,71 @@ async function enrichImportedPokemonList(list) {
 
 const GEN3_NATURES = ["Hardy", "Lonely", "Brave", "Adamant", "Naughty", "Bold", "Docile", "Relaxed", "Impish", "Lax", "Timid", "Hasty", "Serious", "Jolly", "Naive", "Modest", "Mild", "Quiet", "Bashful", "Rash", "Calm", "Gentle", "Sassy", "Careful", "Quirky"];
 
+function normalizeGender(g) {
+    if (!g) return "⚲";
+    const s = String(g);
+    if (s.includes("♂")) return "♂";
+    if (s.includes("♀")) return "♀";
+    return "⚲";
+}
+
 function getGenderFromDv(pokedexId, atkDv) {
     const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251];
     if (genderless.includes(pokedexId)) return "⚲";
     
     const onlyFemale = [29,30,31,113,115,124,238,241,242];
-    if (onlyFemale.includes(pokedexId)) return "♀️";
+    if (onlyFemale.includes(pokedexId)) return "♀";
     
     const onlyMale = [32,33,34,106,107,128,236,237];
-    if (onlyMale.includes(pokedexId)) return "♂️";
+    if (onlyMale.includes(pokedexId)) return "♂";
     
     const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197];
     if (starters.includes(pokedexId)) {
-        return (atkDv < 2) ? "♀️" : "♂️";
+        return (atkDv < 2) ? "♀" : "♂";
     }
     
     const ratio25 = [58,59,66,67,68,125,126,239,240];
     if (ratio25.includes(pokedexId)) {
-        return (atkDv < 4) ? "♀️" : "♂️";
+        return (atkDv < 4) ? "♀" : "♂";
     }
     
     const ratio75 = [35,36,37,38,39,40,209,210];
     if (ratio75.includes(pokedexId)) {
-        return (atkDv < 12) ? "♀️" : "♂️";
+        return (atkDv < 12) ? "♀" : "♂";
     }
     
-    return (atkDv < 8) ? "♀️" : "♂️";
+    return (atkDv < 8) ? "♀" : "♂";
 }
 
 function getGenderFromPid(pokedexId, pid) {
     const genderByte = pid & 0xFF;
-    const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251, 292,337,338,343,344,374,375,376,377,378,379,382,383,384,385,386];
+    const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251, 292,337,338,343,344,374,375,376,377,378,379,382,383,384,385,386,
+                        436, 437, 479, 480, 481, 482, 483, 484, 486, 487, 489, 490, 491, 492, 493, 494, 599, 600, 601, 615, 622, 623, 638, 639, 640, 643, 644, 646, 647, 648, 649];
     if (genderless.includes(pokedexId)) return "⚲";
     
-    const onlyFemale = [29,30,31,113,115,124,238,241,242, 380];
-    if (onlyFemale.includes(pokedexId)) return "♀️";
+    const onlyFemale = [29,30,31,113,115,124,238,241,242, 380, 413, 440, 478, 488, 548, 549, 629, 630];
+    if (onlyFemale.includes(pokedexId)) return "♀";
     
-    const onlyMale = [32,33,34,106,107,128,236,237, 313,381];
-    if (onlyMale.includes(pokedexId)) return "♂️";
+    const onlyMale = [32,33,34,106,107,128,236,237, 313, 381, 414, 475, 627, 628, 641, 642, 645];
+    if (onlyMale.includes(pokedexId)) return "♂";
     
-    const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197, 252,253,254,255,256,257,258,259,260, 345,346,347,348, 360];
+    const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197, 252,253,254,255,256,257,258,259,260, 345,346,347,348, 360,
+                      387, 388, 389, 390, 391, 392, 393, 394, 395, 408, 409, 410, 411, 447, 448, 468, 495, 496, 497, 498, 499, 500, 501, 502, 503, 564, 565, 566, 567, 570, 571];
     if (starters.includes(pokedexId)) {
-        return (genderByte < 31) ? "♀️" : "♂️";
+        return (genderByte < 31) ? "♀" : "♂";
     }
     
-    const ratio25 = [58,59,66,67,68,125,126,239,240, 296,297];
+    const ratio25 = [58,59,66,67,68,125,126,239,240, 296,297, 466, 467, 532, 533, 534];
     if (ratio25.includes(pokedexId)) {
-        return (genderByte < 64) ? "♀️" : "♂️";
+        return (genderByte < 64) ? "♀" : "♂";
     }
     
-    const ratio75 = [35,36,37,38,39,40,209,210, 298,300,301,311,314];
+    const ratio75 = [35,36,37,38,39,40,209,210, 298,300,301,311,314, 546, 547, 572, 573, 574, 575, 576];
     if (ratio75.includes(pokedexId)) {
-        return (genderByte < 191) ? "♀️" : "♂️";
+        return (genderByte < 191) ? "♀" : "♂";
     }
     
-    return (genderByte < 127) ? "♀️" : "♂️";
+    return (genderByte < 127) ? "♀" : "♂";
 }
 
 function parseGen1Box(u8, boxOffset, sourceName, gen1BoxIndex) {
@@ -2859,10 +2972,17 @@ function parseGen4Gen5Save(buffer) {
             const pokedexId = blockA[0];
             if (pokedexId === 0 || pokedexId > 649) continue;
             
+            const originGame = blockC[15] >> 8;
+            const isGen5 = (originGame >= 20 && originGame <= 23);
+            
             const exp = blockA[4] | (blockA[5] << 16);
             const otId = blockA[2];
+            const secretId = blockA[3];
             const nickname = decodeUTF16String(blockC.subarray(0, 11));
-            const otName = decodeUTF16String(blockD.subarray(4, 12));
+            
+            // Gen 5: OT Name starts at index 0 of Block D. Gen 4: starts at index 4.
+            const otNameWords = isGen5 ? blockD.subarray(0, 8) : blockD.subarray(4, 12);
+            const otName = decodeUTF16String(otNameWords);
             
             let level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
             let isParty = false;
@@ -2899,6 +3019,27 @@ function parseGen4Gen5Save(buffer) {
                 spd: (ivWord >> 25) & 0x1F
             };
             
+            // Nature
+            let natureName = "";
+            if (isGen5) {
+                const natureVal = blockB[10] & 0xFF;
+                if (natureVal < 25) {
+                    natureName = GEN3_NATURES[natureVal];
+                }
+            }
+            if (!natureName) {
+                natureName = GEN3_NATURES[pid % 25] || "Hardy";
+            }
+            
+            // Gender
+            const genderVal = getGenderFromPid(pokedexId, pid);
+            
+            // Shiny
+            const isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
+            
+            // Ability
+            const abilityId = blockA[6] >> 8;
+            
             parsedList.push({
                 sourceSlot: isParty ? `Equipa (Gen 4/5)` : `Box (Gen 4/5)`,
                 pokedexId,
@@ -2910,10 +3051,16 @@ function parseGen4Gen5Save(buffer) {
                 item: itemName,
                 moves: moves,
                 ivs: ivs,
+                gender: genderVal,
+                nature: natureName,
+                isShiny: isShiny,
+                abilityId: abilityId,
                 saveMeta: {
-                    gen: 4, // or 5, we can mark as 4/5
+                    gen: isGen5 ? 5 : 4,
                     isParty: isParty,
-                    structOffset: offset
+                    structOffset: offset,
+                    pid: pid,
+                    abilityId: abilityId
                 }
             });
             
@@ -3292,9 +3439,38 @@ function handleImportCheckboxClick(event, idx) {
     lastCheckedIndex = idx;
 }
 
-function extractTrainerFromSave(u8, gen, activeSlotStartSector) {
+function extractTrainerFromSave(u8, gen, activeSlotStartSector, parsedPokemonList) {
     let name = "Treinador";
     let tid = "00000";
+    
+    // For Gen 4 and Gen 5, let's find the most common trainer in the parsed list!
+    if ((gen === 4 || gen === 5) && parsedPokemonList && parsedPokemonList.length > 0) {
+        const counts = {};
+        parsedPokemonList.forEach(p => {
+            if (p.otName && p.otId !== undefined) {
+                const formattedId = String(p.otId).padStart(5, '0');
+                const key = `${p.otName.trim()}||${formattedId}`;
+                counts[key] = (counts[key] || 0) + 1;
+            }
+        });
+        
+        let maxCount = 0;
+        let bestKey = "";
+        for (const key in counts) {
+            if (counts[key] > maxCount) {
+                maxCount = counts[key];
+                bestKey = key;
+            }
+        }
+        
+        if (bestKey) {
+            const parts = bestKey.split("||");
+            name = parts[0];
+            tid = parts[1];
+            return { name, tid };
+        }
+    }
+    
     if (gen === 1) {
         if (u8.length >= 0x3000) {
             name = decodeGen1String(u8.subarray(0x2598, 0x2598 + 11)) || "Treinador";
@@ -3432,7 +3608,7 @@ function handleSaveFileSelect(e) {
                 if (!curGame || curGame.gen !== 3) defaultGameId = "ruby";
             }
             
-            const saveTrainer = extractTrainerFromSave(u8, detectedGen, activeSlotStartSector);
+            const saveTrainer = extractTrainerFromSave(u8, detectedGen, activeSlotStartSector, parsed);
             let matchedTrainer = trainersList.find(t => {
                 return t.gameId === defaultGameId && 
                        t.name.toLowerCase().trim() === saveTrainer.name.toLowerCase().trim() && 
@@ -3669,7 +3845,7 @@ function executeSaveImport() {
                 nickname: p.nickname,
                 level: p.level,
                 isShiny: p.isShiny || false,
-                gender: p.gender || "⚲",
+                gender: normalizeGender(p.gender || "⚲"),
                 nature: p.nature || "",
                 ability: p.ability || "",
                 type1: p.type1 || "normal",
@@ -3733,9 +3909,62 @@ async function fetchPokemonTypes(sp) {
                 t2: d.types[1] ? d.types[1].type.name : "" 
             }; 
             SPECIES_TYPE_CACHE[cl] = t; 
+            localStorage.setItem("bb_species_type_cache", JSON.stringify(SPECIES_TYPE_CACHE));
             applyTypes(t); 
         }
     } catch (e) {}
+}
+
+async function fetchMissingSpeciesData(speciesName) {
+    if (!speciesName) return;
+    const cl = speciesName.toLowerCase().trim()
+        .replace(/[\s']/g, "-")
+        .replace(/\./g, "")
+        .replace(/-+$/, "");
+    
+    if (SPECIES_TYPE_CACHE[cl]) {
+        const cached = SPECIES_TYPE_CACHE[cl];
+        const t1El = document.getElementById("form-type1");
+        const t2El = document.getElementById("form-type2");
+        const abEl = document.getElementById("form-ability");
+        
+        if (t1El && (!t1El.value || t1El.value === "normal") && !t2El.value) {
+            t1El.value = cached.t1;
+            t2El.value = cached.t2 || "";
+        }
+        if (abEl && !abEl.value && cached.ability) {
+            abEl.value = cached.ability;
+        }
+        return;
+    }
+    
+    try {
+        const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${cl}`);
+        if (res.ok) {
+            const d = await res.json();
+            const t1 = d.types[0].type.name;
+            const t2 = d.types[1] ? d.types[1].type.name : "";
+            
+            const normalAbilities = d.abilities.filter(a => !a.is_hidden);
+            const abilityName = normalAbilities.length > 0 ? formatAbilityName(normalAbilities[0].ability.name) : "";
+            
+            const cached = { t1, t2, ability: abilityName };
+            SPECIES_TYPE_CACHE[cl] = cached;
+            localStorage.setItem("bb_species_type_cache", JSON.stringify(SPECIES_TYPE_CACHE));
+            
+            const t1El = document.getElementById("form-type1");
+            const t2El = document.getElementById("form-type2");
+            const abEl = document.getElementById("form-ability");
+            
+            if (t1El && (!t1El.value || t1El.value === "normal") && !t2El.value) {
+                t1El.value = t1;
+                t2El.value = t2;
+            }
+            if (abEl && !abEl.value && abilityName) {
+                abEl.value = abilityName;
+            }
+        }
+    } catch(e) {}
 }
 
 function applyTypes(t) { 
@@ -6251,9 +6480,10 @@ function changeAllocationOpponent(opponentId) {
     renderAllocationTab();
 }
 
-function saveRecommendedAsPreset() {
-    if (currentAllocationRecommendation.length === 0) {
-        alert("Não há nenhuma equipa recomendada calculada para gravar.");
+function saveActiveTeamAsOpponentPreset() {
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
+    if (activeTeam.length === 0) {
+        alert("A tua equipa ativa está vazia. Não é possível gravar um preset vazio.");
         return;
     }
     
@@ -6267,17 +6497,69 @@ function saveRecommendedAsPreset() {
     const newPreset = {
         id: presetId,
         gameId: currentGameId,
-        trainerId: activeTrainerId,
+        opponentId: opponentId,
         name: presetName,
-        pokemonIds: currentAllocationRecommendation.map(p => p.id)
+        pokemonIds: activeTeam.map(p => p.id)
     };
     
     teamPresetsList.push(newPreset);
     localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
     
     renderPresets();
+    updateOpponentPresetsList();
     
     alert(`Preset "${presetName}" gravado com sucesso!`);
+}
+
+function updateOpponentPresetsList() {
+    const container = document.getElementById("opponent-preset-container");
+    const select = document.getElementById("opponent-preset-select");
+    if (!container || !select) return;
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const filteredPresets = teamPresetsList.filter(tp => tp.gameId === currentGameId && tp.opponentId === opponentId);
+    
+    if (filteredPresets.length > 0) {
+        container.style.display = "flex";
+        select.innerHTML = `
+            <option value="" disabled selected>-- Escolhe um Preset --</option>
+            ` + filteredPresets.map(tp => `<option value="${tp.id}">${tp.name}</option>`).join("");
+    } else {
+        container.style.display = "none";
+        select.innerHTML = "";
+    }
+}
+
+function loadOpponentPreset(presetId) {
+    if (!presetId) return;
+    const preset = teamPresetsList.find(tp => tp.id === presetId);
+    if (!preset) return;
+    
+    if (!confirm(`Desejas carregar o preset "${preset.name}"? Isso irá substituir a tua equipa ativa atual.`)) {
+        document.getElementById("opponent-preset-select").value = "";
+        return;
+    }
+    
+    pokemonDatabase.forEach(p => {
+        if (p.currentGame === currentGameId) {
+            p.slotType = "box";
+        }
+    });
+    
+    preset.pokemonIds.forEach((id, index) => {
+        const found = pokemonDatabase.find(p => p.id === id);
+        if (found) {
+            found.slotType = "team";
+            found.slotIndex = index;
+        }
+    });
+    
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    renderAll();
+    
+    // Reset selection select
+    document.getElementById("opponent-preset-select").value = "";
+    alert(`Preset "${preset.name}" ativado com sucesso!`);
 }
 
 function getRecommendedAllocation() {
@@ -6367,7 +6649,7 @@ function applyRecommendedAllocation() {
     }
     
     pokemonDatabase.forEach(p => {
-        if (p.currentGame === currentGameId && p.trainerId === activeTrainerId) {
+        if (p.currentGame === currentGameId) {
             p.slotType = "box";
         }
     });
@@ -6420,6 +6702,55 @@ function renderAllocationTab() {
         }).join("");
     }
     
+    // Render current active team inside #allocation-current-team-grid
+    const currentActiveTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
+    currentActiveTeam.sort((a, b) => (a.slotIndex || 0) - (b.slotIndex || 0));
+    
+    const currentTeamGrid = document.getElementById("allocation-current-team-grid");
+    if (currentTeamGrid) {
+        if (currentActiveTeam.length === 0) {
+            currentTeamGrid.innerHTML = `<div style="grid-column: span 6; text-align: center; padding: 20px; font-size: 0.8rem; color: var(--text-muted);">A tua equipa ativa está vazia. Adiciona Pokémon à equipa na Box!</div>`;
+        } else {
+            currentTeamGrid.innerHTML = currentActiveTeam.map((p, index) => {
+                const getSprite = (pkmn) => {
+                    const id = pkmn.pokedexId || 1;
+                    if (currentSpriteStyle === "classic") {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/shiny/${id}.png`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
+                    } else if (currentSpriteStyle === "3d-home") {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/shiny/${id}.png`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${id}.png`;
+                    } else {
+                        return pkmn.isShiny
+                            ? `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/shiny/${id}.gif`
+                            : `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${id}.gif`;
+                    }
+                };
+                
+                const typeBadges = [p.type1];
+                if (p.type2) typeBadges.push(p.type2);
+                const typeBadgesHtml = typeBadges.map(t => `<span class="type-badge t-${t}" style="font-size: 0.55rem; padding: 2px 4px; border-radius: 4px; text-transform: uppercase;">${t}</span>`);
+                
+                return `
+                    <div class="glass-panel slot" style="padding: 12px; text-align: center; border-radius: 12px; background: rgba(0,0,0,0.1); border: 1px solid rgba(255,255,255,0.03);">
+                        <span style="font-size: 0.55rem; font-weight: 800; background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.3); color: var(--game-color); padding: 1px 4px; border-radius: 4px; display: inline-flex; align-items: center; gap: 2px; margin-bottom: 4px;">
+                            Slot ${index + 1}
+                        </span>
+                        <div style="width: 60px; height: 60px; margin: 0 auto; display: flex; align-items: center; justify-content: center;">
+                            <img src="${getSprite(p)}" style="max-width: 100%; max-height: 100%; object-fit: contain;" onerror="this.src='https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.pokedexId}.png'">
+                        </div>
+                        <h4 style="font-size: 0.8rem; margin: 4px 0 2px 0; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${p.nickname || p.species}</h4>
+                        <div style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 4px;">Nível ${p.level}</div>
+                        <div style="display: flex; gap: 2px; justify-content: center;">${typeBadgesHtml.join(" ")}</div>
+                    </div>
+                `;
+            }).join("");
+        }
+    }
+    
+    // Render recommended team inside #allocation-team-grid
     const recommendations = getRecommendedAllocation();
     
     const teamGrid = document.getElementById("allocation-team-grid");
@@ -6467,8 +6798,11 @@ function renderAllocationTab() {
         }
     }
     
-    const activeTeam = recommendations.map(rec => rec.pokemon);
-    renderWeaknessAnalysis(activeTeam, gen);
+    // Analyze active team weaknesses
+    renderWeaknessAnalysis(currentActiveTeam, gen);
+    
+    // Update opponent presets list dropdown and general presets list
+    updateOpponentPresetsList();
     renderPresets();
 }
 
@@ -7067,7 +7401,7 @@ function renderPresets() {
     const container = document.getElementById("allocation-presets-container");
     if (!container) return;
     
-    const activePresets = teamPresetsList.filter(tp => tp.gameId === currentGameId && tp.trainerId === activeTrainerId);
+    const activePresets = teamPresetsList.filter(tp => tp.gameId === currentGameId);
     
     if (activePresets.length === 0) {
         container.innerHTML = `
@@ -7143,7 +7477,7 @@ function loadPreset(presetId) {
     }
     
     pokemonDatabase.forEach(p => {
-        if (p.currentGame === currentGameId && p.trainerId === activeTrainerId) {
+        if (p.currentGame === currentGameId) {
             p.slotType = "box";
         }
     });
@@ -8993,49 +9327,247 @@ function getPokemonGen(pokedexId) {
     return 9;
 }
 
+const PRE_EVOLUTIONS_MAP = {
+    // Gen 1
+    2: 1, 3: 2, // Ivysaur -> Bulbasaur, Venusaur -> Ivysaur
+    5: 4, 6: 5, // Charmeleon -> Charmander, Charizard -> Charmeleon
+    8: 7, 9: 8, // Wartortle -> Squirtle, Blastoise -> Wartortle
+    11: 10, 12: 11, // Metapod -> Caterpie, Butterfree -> Metapod
+    14: 13, 15: 14, // Kakuna -> Weedle, Beedrill -> Kakuna
+    17: 16, 18: 17, // Pidgeotto -> Pidgey, Pidgeot -> Pidgeotto
+    20: 19, // Raticate -> Rattata
+    22: 21, // Fearow -> Spearow
+    24: 23, // Arbok -> Ekans
+    26: 25, // Raichu -> Pikachu
+    28: 27, // Sandslash -> Sandshrew
+    30: 29, 31: 30, // Nidorina -> NidoranF, Nidoqueen -> Nidorina
+    33: 32, 34: 33, // Nidorino -> NidoranM, Nidoking -> Nidorino
+    36: 35, // Clefable -> Clefairy
+    38: 37, // Ninetales -> Vulpix
+    40: 39, // Wigglytuff -> Jigglypuff
+    42: 41, // Golbat -> Zubat
+    44: 43, 45: 44, 46: 44, // Gloom -> Oddish, Vileplume -> Gloom, Bellossom -> Gloom
+    47: 46, // Parasect -> Paras
+    49: 48, // Venomoth -> Venonat
+    51: 50, // Dugtrio -> Diglett
+    53: 52, // Persian -> Meowth
+    55: 54, // Golduck -> Psyduck
+    57: 56, // Primeape -> Mankey
+    59: 58, // Arcanine -> Growlithe
+    61: 60, 62: 61, 186: 61, // Poliwhirl -> Poliwag, Poliwrath -> Poliwhirl, Politoed -> Poliwhirl
+    64: 63, 65: 64, // Kadabra -> Abra, Alakazam -> Kadabra
+    67: 66, 68: 67, // Machoke -> Machop, Machamp -> Machoke
+    70: 69, 71: 70, // Weepinbell -> Bellsprout, Victreebel -> Weepinbell
+    73: 72, // Tentacruel -> Tentacool
+    75: 74, 76: 75, // Graveler -> Geodude, Golem -> Graveler
+    78: 77, // Rapidash -> Ponyta
+    80: 79, 199: 79, // Slowbro -> Slowpoke, Slowking -> Slowpoke
+    82: 81, 462: 82, // Magneton -> Magnemite, Magnezone -> Magneton
+    85: 84, // Dodrio -> Doduo
+    87: 86, // Dewgong -> Seel
+    89: 88, // Muk -> Grimer
+    91: 90, // Cloyster -> Shellder
+    93: 92, 94: 93, // Haunter -> Gastly, Gengar -> Haunter
+    95: 95, 208: 95, // Steelix -> Onix
+    97: 96, // Hypno -> Drowzee
+    99: 98, // Kingler -> Krabby
+    101: 100, // Electrode -> Voltorb
+    103: 102, // Exeggutor -> Exeggcute
+    105: 104, // Marowak -> Cubone
+    110: 109, // Weezing -> Koffing
+    112: 111, 464: 112, // Rhydon -> Rhyhorn, Rhyperior -> Rhydon
+    117: 116, 230: 117, // Seadra -> Horsea, Kingdra -> Seadra
+    119: 118, // Seaking -> Goldeen
+    121: 120, // Starmie -> Staryu
+    130: 129, // Gyarados -> Magikarp
+    134: 133, 135: 133, 136: 133, 196: 133, 197: 133, 470: 133, 471: 133, 700: 133, // Eeveelutions -> Eevee
+    139: 138, // Omastar -> Omanyte
+    141: 140, // Kabutops -> Kabuto
+    149: 148, 148: 147, // Dragonite -> Dragonair, Dragonair -> Dratini
+
+    // Baby Pokemons from Gen 2 and Gen 4
+    25: 172, 35: 173, 39: 174, 176: 175, // Pikachu -> Pichu, Clefairy -> Cleffa, Jigglypuff -> Igglybuff, Togetic -> Togepi
+    183: 298, 202: 360, // Marill -> Azurill, Wobbuffet -> Wynaut
+    315: 406, 185: 438, 122: 439, 113: 440, 143: 446, 226: 458, // Roselia -> Budew, Sudowoodo -> Bonsly, Mr. Mime -> Mime Jr., Chansey -> Happiny, Snorlax -> Munchlax, Mantine -> Mantyke
+    125: 239, 126: 240, // Electabuzz -> Elekid, Magmar -> Magby
+    124: 238, // Jynx -> Smoochum
+
+    // Gen 2
+    153: 152, 154: 153, // Bayleef -> Chikorita, Meganium -> Bayleef
+    156: 155, 157: 156, // Quilava -> Cyndaquil, Typhlosion -> Quilava
+    159: 158, 160: 159, // Croconaw -> Totodile, Feraligatr -> Croconaw
+    162: 161, // Furret -> Sentret
+    164: 163, // Noctowl -> Hoothoot
+    166: 165, // Ledian -> Ledyba
+    168: 167, // Ariados -> Spinarak
+    169: 42, // Crobat -> Golbat
+    171: 170, // Lanturn -> Chinchou
+    178: 177, // Xatu -> Natu
+    180: 179, 181: 180, // Flaaffy -> Mareep, Ampharos -> Flaaffy
+    184: 183, // Azumarill -> Marill
+    188: 187, 189: 188, // Skiploom -> Hoppip, Jumpluff -> Skiploom
+    192: 191, // Sunflora -> Sunkern
+    195: 194, 980: 194, // Quagsire -> Wooper, Clodsire -> Wooper
+    205: 204, // Forretress -> Pineco
+    210: 209, // Granbull -> Snubbull
+    212: 123, 900: 123, // Scizor -> Scyther, Kleavor -> Scyther
+    217: 216, 901: 217, // Ursaring -> Teddiursa, Ursaluna -> Ursaring
+    219: 218, // Magcargo -> Slugma
+    221: 220, 473: 221, // Piloswine -> Swinub, Mamoswine -> Piloswine
+    224: 223, // Octillery -> Remoraid
+    229: 228, // Houndoom -> Houndour
+    232: 231, // Donphan -> Phanpy
+    233: 137, 474: 233, // Porygon2 -> Porygon, Porygon-Z -> Porygon2
+    242: 113, 242: 440, // Blissey -> Chansey / Happiny
+    247: 246, 248: 247, // Pupitar -> Larvitar, Tyranitar -> Pupitar
+
+    // Gen 3
+    253: 252, 254: 253, // Grovyle -> Treecko, Sceptile -> Grovyle
+    256: 255, 257: 256, // Combusken -> Torchic, Blaziken -> Combusken
+    259: 258, 260: 259, // Marshtomp -> Mudkip, Swampert -> Marshtomp
+    262: 261, // Mightyena -> Poochyena
+    264: 263, // Linoone -> Zigzagoon
+    266: 265, 267: 266, 268: 265, 269: 268, // Silcoon -> Wurmple, Beautifly -> Silcoon, Cascoon -> Wurmple, Dustox -> Cascoon
+    271: 270, 272: 271, // Lombre -> Lotad, Ludicolo -> Lombre
+    274: 273, 275: 274, // Nuzleaf -> Seedot, Shiftry -> Nuzleaf
+    277: 276, // Swellow -> Taillow
+    279: 278, // Pelipper -> Wingull
+    281: 280, 282: 281, 475: 281, // Kirlia -> Ralts, Gardevoir -> Kirlia, Gallade -> Kirlia
+    284: 283, // Masquerain -> Surskit
+    286: 285, // Breloom -> Shroomish
+    288: 287, 289: 288, // Vigoroth -> Slakoth, Slaking -> Vigoroth
+    291: 290, 292: 290, // Ninjask -> Nincada, Shedinja -> Nincada
+    294: 293, 295: 294, // Loudred -> Whismur, Exploud -> Loudred
+    297: 296, // Hariyama -> Makuhita
+    301: 300, // Delcatty -> Skitty
+    305: 304, 306: 305, // Lairon -> Aron, Aggron -> Lairon
+    308: 307, // Medicham -> Meditite
+    310: 309, // Manectric -> Electrike
+    315: 315, 407: 315, // Roserade -> Roselia
+    317: 316, // Swalot -> Gulpin
+    319: 318, // Sharpedo -> Carvanha
+    321: 320, // Wailord -> Wailmer
+    323: 322, // Camerupt -> Numel
+    326: 325, // Grumpig -> Spoink
+    329: 328, 330: 329, // Vibrava -> Trapinch, Flygon -> Vibrava
+    332: 331, // Cacturne -> Cacnea
+    334: 333, // Altaria -> Swablu
+    340: 339, // Whiscash -> Barboach
+    342: 341, // Crawdaunt -> Corphish
+    344: 343, // Claydol -> Baltoy
+    346: 345, // Cradily -> Lileep
+    348: 347, // Armaldo -> Anorith
+    350: 349, // Milotic -> Feebas
+    354: 353, // Banette -> Shuppet
+    356: 355, 477: 356, // Dusclops -> Duskull, Dusknoir -> Dusclops
+    362: 361, 478: 361, // Glalie -> Snorunt, Froslass -> Snorunt
+    364: 363, 365: 364, // Sealeo -> Spheal, Walrein -> Sealeo
+    367: 366, 368: 366, // Huntail -> Clamperl, Gorebyss -> Clamperl
+    372: 371, 373: 372, // Shelgon -> Bagon, Salamence -> Shelgon
+    375: 374, 376: 375, // Metang -> Beldum, Metagross -> Metang
+
+    // Gen 4
+    388: 387, 389: 388, // Grotle -> Turtwig, Torterra -> Grotle
+    391: 390, 392: 391, // Monferno -> Chimchar, Infernape -> Monferno
+    394: 393, 395: 394, // Prinplup -> Piplup, Empoleon -> Prinplup
+    397: 396, 398: 397, // Staravia -> Starly, Staraptor -> Staravia
+    400: 399, // Bibarel -> Bidoof
+    402: 401, // Kricketune -> Kricketot
+    404: 403, 405: 404, // Luxio -> Shinx, Luxray -> Luxio
+    409: 408, // Rampardos -> Cranidos
+    411: 410, // Bastiodon -> Shieldon
+    413: 412, 414: 412, // Wormadam -> Burmy, Mothim -> Burmy
+    416: 415, // Vespiquen -> Combee
+    419: 418, // Floatzel -> Buizel
+    421: 420, // Cherrim -> Cherubi
+    423: 422, // Gastrodon -> Shellos
+    424: 190, // Ambipom -> Aipom
+    426: 425, // Drifblim -> Drifloon
+    428: 427, // Lopunny -> Buneary
+    429: 200, // Mismagius -> Misdreavus
+    430: 198, // Honchkrow -> Murkrow
+    432: 431, // Purugly -> Glameow
+    435: 434, // Skuntank -> Stunky
+    437: 436, // Bronzong -> Bronzor
+    444: 443, 445: 444, // Gabite -> Gible, Garchomp -> Gabite
+    448: 447, // Lucario -> Riolu
+    450: 449, // Hippowdon -> Hippopotas
+    452: 451, // Drapion -> Skorupi
+    454: 453, // Toxicroak -> Croagunk
+    457: 456, // Lumineon -> Finneon
+    460: 459, // Abomasnow -> Snover
+    461: 215, 903: 215, // Weavile -> Sneasel, Sneasler -> Sneasel (Hisuian)
+    463: 108, // Lickilicky -> Lickitung
+    465: 114, // Tangrowth -> Tangela
+    466: 125, // Electivire -> Electabuzz
+    467: 126, // Magmortar -> Magmar
+    468: 176, // Togekiss -> Togetic
+    469: 193, // Yanmega -> Yanma
+    472: 207, // Gliscor -> Gligar
+    476: 299, // Probopass -> Nosepass
+
+    // Gen 8/9 extra pre-evos from older ones:
+    899: 234, // Wyrdeer -> Stantler
+    979: 57,  // Annihilape -> Primeape
+    981: 203, // Farigiraf -> Girafarig
+    982: 206, // Dudunsparce -> Dunsparce
+    983: 625, // Kingambit -> Bisharp
+    1018: 884, // Archaludon -> Duraludon
+    1019: 1011, // Hydrapple -> Dipplin
+    1011: 840  // Dipplin -> Applin
+};
+
 function isPokemonAllowedInGame(pokedexId, gameId) {
     const game = GAMES_DB.find(g => g.id === gameId);
     if (!game) return true;
     
-    const pkmnGen = getPokemonGen(pokedexId);
-    if (pkmnGen > game.gen) return false;
-    
-    if (gameId === "letsgopikachu" || gameId === "letsgoeevee") {
-        return pokedexId <= 151 || pokedexId === 808 || pokedexId === 809;
+    // Auxiliary function to check compatibility directly
+    const checkAllowedDirectly = (id) => {
+        const pkmnGen = getPokemonGen(id);
+        if (pkmnGen > game.gen) return false;
+        
+        if (gameId === "letsgopikachu" || gameId === "letsgoeevee") {
+            return id <= 151 || id === 808 || id === 809;
+        }
+        
+        if (gameId === "legendsarceus") {
+            const allowedHisuiIds = [
+                722,723,724, 155,156,157, 501,502,503,
+                58,59, 74,75,76, 95, 111,112, 122, 113,114,115, 129,130, 133,134,135,136, 137, 92,93,94, 63,64,65, 66,67,68, 46,47, 77,78, 41,42, 25,26, 81,82, 100,101,
+                196,197, 200, 201, 206, 211, 214, 215, 220,221, 223,224, 226, 234, 240, 242,
+                265,266,267,268,269, 280,281,282, 315, 339,340, 355,356, 358, 361,362,
+                387,388,389, 390,391,392, 393,394,395, 396,397,398, 399,400, 401,402, 403,404,405, 406,407, 412,413,414, 415,416, 417, 418,419, 420,421, 422,423, 424, 425,426, 427,428, 429, 431,432, 433, 434,435, 436,437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447,448, 449,450, 451,452, 453,454, 455, 456,457, 458, 459,460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,
+                540,541,542, 546,547, 548,549, 550, 627,628, 641,642, 645,
+                704,705,706, 712,713,
+                722,723,724,
+                899, 900, 901, 902, 903, 904, 905
+            ];
+            return allowedHisuiIds.includes(id);
+        }
+        
+        if (game.gen === 1) return id <= 151;
+        if (game.gen === 2) return id <= 251;
+        if (game.gen === 3) return id <= 386;
+        
+        return true;
+    };
+
+    if (checkAllowedDirectly(pokedexId)) return true;
+
+    // Check pre-evolutions recursively
+    let currentId = pokedexId;
+    while (PRE_EVOLUTIONS_MAP[currentId]) {
+        currentId = PRE_EVOLUTIONS_MAP[currentId];
+        if (checkAllowedDirectly(currentId)) {
+            return true;
+        }
     }
-    
-    if (gameId === "legendsarceus") {
-        const allowedHisuiIds = [
-            722,723,724, 155,156,157, 501,502,503,
-            58,59, 74,75,76, 95, 111,112, 122, 113,114,115, 129,130, 133,134,135,136, 137, 92,93,94, 63,64,65, 66,67,68, 46,47, 77,78, 41,42, 25,26, 81,82, 100,101,
-            196,197, 200, 201, 206, 211, 214, 215, 220,221, 223,224, 226, 234, 240, 242,
-            265,266,267,268,269, 280,281,282, 315, 339,340, 355,356, 358, 361,362,
-            387,388,389, 390,391,392, 393,394,395, 396,397,398, 399,400, 401,402, 403,404,405, 406,407, 412,413,414, 415,416, 417, 418,419, 420,421, 422,423, 424, 425,426, 427,428, 429, 431,432, 433, 434,435, 436,437, 438, 439, 440, 441, 442, 443, 444, 445, 446, 447,448, 449,450, 451,452, 453,454, 455, 456,457, 458, 459,460, 461, 462, 463, 464, 465, 466, 467, 468, 469, 470, 471, 472, 473, 474, 475, 476, 477, 478, 479, 480, 481, 482, 483, 484, 485, 486, 487, 488, 490, 491, 492, 493,
-            540,541,542, 546,547, 548,549, 550, 627,628, 641,642, 645,
-            704,705,706, 712,713,
-            722,723,724,
-            899, 900, 901, 902, 903, 904, 905
-        ];
-        return allowedHisuiIds.includes(pokedexId);
-    }
-    
-    if (game.gen === 1) return pokedexId <= 151;
-    if (game.gen === 2) return pokedexId <= 251;
-    if (game.gen === 3) return pokedexId <= 386;
-    
-    return true;
+
+    return false;
 }
 
 function validateActiveTeamRules(candidatePkmn) {
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team" && p.id !== candidatePkmn.id);
-    
-    const duplicateSpecies = activeTeam.find(p => p.pokedexId === candidatePkmn.pokedexId);
-    if (duplicateSpecies) {
-        return {
-            valid: false,
-            reason: `Species Clause: Já tens um ${candidatePkmn.species} na equipa ativa!`
-        };
-    }
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team" && p.id !== candidatePkmn.id);
     
     if (candidatePkmn.item && candidatePkmn.item.trim() !== "") {
         const candidateItem = candidatePkmn.item.toLowerCase().trim();
@@ -9048,25 +9580,44 @@ function validateActiveTeamRules(candidatePkmn) {
         }
     }
     
-    const candidateMovesKey = (candidatePkmn.moves || []).slice(0).sort().join(",");
-    const duplicateBuild = activeTeam.find(p => {
-        const movesKey = (p.moves || []).slice(0).sort().join(",");
-        return p.nature === candidatePkmn.nature && movesKey === candidateMovesKey;
-    });
-    if (duplicateBuild) {
-        return {
-            valid: false,
-            reason: `Build Clause: Já tens um Pokémon com a mesma Build (Natureza + Moveset) na equipa ativa (${duplicateBuild.nickname || duplicateBuild.species})!`
-        };
-    }
-    
     return { valid: true };
 }
 
+let isSavingOpponentPreset = false;
+
+function chooseAndSavePreset(isOpponentPreset = false) {
+    isSavingOpponentPreset = isOpponentPreset;
+    
+    // Bind dynamic click events
+    document.getElementById("btn-choice-save-active").onclick = () => {
+        closeSavePresetChoiceModal();
+        if (isSavingOpponentPreset) {
+            saveActiveTeamAsOpponentPreset();
+        } else {
+            saveActiveTeamAsPreset();
+        }
+    };
+    
+    document.getElementById("btn-choice-save-recommended").onclick = () => {
+        closeSavePresetChoiceModal();
+        if (isSavingOpponentPreset) {
+            saveRecommendedTeamAsOpponentPreset();
+        } else {
+            saveRecommendedTeamAsPreset();
+        }
+    };
+    
+    document.getElementById("save-preset-choice-modal").classList.add("active");
+}
+
+function closeSavePresetChoiceModal() {
+    document.getElementById("save-preset-choice-modal").classList.remove("active");
+}
+
 function saveActiveTeamAsPreset() {
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
     if (activeTeam.length === 0) {
-        alert("Não há nenhum Pokémon na Equipa Ativa para gravar.");
+        alert("A tua equipa ativa está vazia. Não é possível gravar um preset vazio.");
         return;
     }
     
@@ -9077,7 +9628,6 @@ function saveActiveTeamAsPreset() {
     const newPreset = {
         id: presetId,
         gameId: currentGameId,
-        trainerId: activeTrainerId,
         name: presetName,
         pokemonIds: activeTeam.map(p => p.id)
     };
@@ -9086,6 +9636,63 @@ function saveActiveTeamAsPreset() {
     localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
     
     renderPresets();
+    alert(`Preset "${presetName}" gravado com sucesso!`);
+}
+
+function saveRecommendedTeamAsPreset() {
+    if (currentAllocationRecommendation.length === 0) {
+        alert("Não há nenhuma equipa recomendada calculada para gravar.");
+        return;
+    }
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const league = LEAGUE_OPPONENTS[opponentId] || LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const presetName = prompt("Insira o nome para este Preset de Equipa:", `Equipa Contra: ${league.name.replace(/🏆 |⚡ |⛰️ |💎 |🎼 /, "")}`);
+    if (!presetName) return;
+    
+    const presetId = "preset_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const newPreset = {
+        id: presetId,
+        gameId: currentGameId,
+        name: presetName,
+        pokemonIds: currentAllocationRecommendation.map(p => p.id)
+    };
+    
+    teamPresetsList.push(newPreset);
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    renderPresets();
+    alert(`Preset "${presetName}" gravado com sucesso!`);
+}
+
+function saveRecommendedTeamAsOpponentPreset() {
+    if (currentAllocationRecommendation.length === 0) {
+        alert("Não há nenhuma equipa recomendada calculada para gravar.");
+        return;
+    }
+    
+    const opponentId = currentAllocationOpponentId || currentGameId;
+    const league = LEAGUE_OPPONENTS[opponentId] || LEAGUE_OPPONENTS[currentGameId] || LEAGUE_OPPONENTS["red"];
+    
+    const presetName = prompt("Insira o nome para este Preset de Equipa:", `Equipa Contra: ${league.name.replace(/🏆 |⚡ |⛰️ |💎 |🎼 /, "")}`);
+    if (!presetName) return;
+    
+    const presetId = "preset_" + Date.now() + "_" + Math.random().toString(36).substr(2, 5);
+    const newPreset = {
+        id: presetId,
+        gameId: currentGameId,
+        opponentId: opponentId,
+        name: presetName,
+        pokemonIds: currentAllocationRecommendation.map(p => p.id)
+    };
+    
+    teamPresetsList.push(newPreset);
+    localStorage.setItem("bb_team_presets", JSON.stringify(teamPresetsList));
+    
+    renderPresets();
+    updateOpponentPresetsList();
+    
     alert(`Preset "${presetName}" gravado com sucesso!`);
 }
 
@@ -9142,7 +9749,7 @@ function finishChallengeFlow(challengeId) {
     finishChallengeImageBase64 = null;
     
     const gameId = ch.gameId || currentGameId;
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.slotType === "team");
     
     const teamListEl = document.getElementById("finish-challenge-team-list");
     if (teamListEl) {
@@ -9210,7 +9817,7 @@ function executeFinishChallenge() {
     if (!ch) return;
     
     const gameId = ch.gameId || currentGameId;
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.trainerId === activeTrainerId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === gameId && p.slotType === "team");
     
     if (activeTeam.length === 0) {
         alert("A equipa ativa está vazia! Tens de alocar Pokémon à tua equipa ativa antes de finalizar o desafio.");

@@ -191,43 +191,7 @@
 
                 <!-- Trainer Resume Tab Content -->
                 <div id="tab-content-resume" style="display: none; padding-top: 10px;">
-                    <div class="dashboard-two-columns">
-                        <!-- Left Column: Mural de Honra -->
-                        <div class="glass-panel" style="padding: 16px;">
-                            <div class="panel-title" style="justify-content: space-between; display: flex; align-items: center; width: 100%;">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                                    🏆 Mural de Honra
-                                </div>
-                                <!-- Navegação de múltiplos HOFs -->
-                                <div id="hof-navigation" style="display: none; align-items: center; gap: 6px;">
-                                    <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(-1)">◀</button>
-                                    <span id="hof-counter" style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); min-width: 30px; text-align: center;">1/1</span>
-                                    <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(1)">▶</button>
-                                </div>
-                            </div>
-                            
-                            <div id="hof-display-area" style="position: relative; width: 100%; height: 190px; margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
-                                <!-- Placeholder, imagem ou cartão 3D gerado aqui dinamicamente -->
-                            </div>
-
-                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                                <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="generateHofFromActiveTeam()">
-                                    ⚡ Gerar da Equipa
-                                </button>
-                                <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="document.getElementById('hof-input').click()">
-                                    📷 Subir Imagem
-                                </button>
-                                <button class="btn btn-danger" id="btn-delete-hof" style="display: none; grid-column: span 2; font-size: 0.7rem; font-weight: 800; padding: 6px;" onclick="deleteActiveHof()">
-                                    🗑️ Eliminar este Mural
-                                </button>
-                            </div>
-                            
-                            <input type="file" id="hof-input" accept="image/*" style="display: none;" onchange="handleHofUpload(event)" />
-                        </div>
-
-                        <!-- Right Column: Stats, Timeline & Challenges -->
-                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                    <div style="display: flex; flex-direction: column; gap: 20px;">
                             <!-- Stats Badges (smaller and cleaner) -->
                             <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
                                 <div class="glass-panel" style="padding: 12px; text-align: center; border: 1px solid rgba(255,255,255,0.04); background: rgba(255,255,255,0.01); margin-bottom: 0;">
@@ -274,28 +238,64 @@
                             </div>
                         </div>
                     </div>
-                </div>
 
                 <!-- Tática & Alocação Tab Content -->
                 <div id="tab-content-allocation" style="display: none; padding-top: 10px;">
                     <div class="dashboard-two-columns">
-                        <!-- Left Column: Presets de Equipa -->
-                        <div class="glass-panel" style="padding: 16px;">
-                            <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 14px; width: 100%;">
-                                <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem;">
-                                    🗃️ Presets de Equipa
+                        <!-- Left Column: Presets & Mural de Honra -->
+                        <div style="display: flex; flex-direction: column; gap: 20px;">
+                            <!-- Presets Panel -->
+                            <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                <div class="panel-title" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; margin-bottom: 14px; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 8px; font-size: 0.8rem;">
+                                        🗃️ Presets de Equipa
+                                    </div>
+                                </div>
+                                <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+                                    <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); border-radius: 8px;">
+                                        ✨ Dividir Box
+                                    </button>
+                                    <button class="btn btn-action" onclick="chooseAndSavePreset(false)" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); border-radius: 8px;">
+                                        💾 Gravar Equipa
+                                    </button>
+                                </div>
+                                <div id="allocation-presets-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 450px; overflow-y: auto; padding-right: 4px;">
+                                    <!-- Dynamic Presets -->
                                 </div>
                             </div>
-                            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
-                                <button class="btn btn-action" onclick="generateAndShowBoxPartition()" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); border-radius: 8px;">
-                                    ✨ Dividir Box
-                                </button>
-                                <button class="btn btn-action" onclick="saveActiveTeamAsPreset()" style="flex: 1; padding: 8px 12px; font-size: 0.75rem; font-weight: 800; background: rgba(99, 102, 241, 0.08); border-color: rgba(99, 102, 241, 0.25); border-radius: 8px;">
-                                    💾 Gravar Equipa
-                                </button>
-                            </div>
-                            <div id="allocation-presets-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 450px; overflow-y: auto; padding-right: 4px;">
-                                <!-- Dynamic Presets -->
+
+                            <!-- Mural de Honra Panel -->
+                            <div class="glass-panel" id="tactical-hof-panel" style="padding: 16px;">
+                                <div class="panel-title" style="justify-content: space-between; display: flex; align-items: center; width: 100%;">
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                                        🏆 Mural de Honra
+                                    </div>
+                                    <!-- Navegação de múltiplos HOFs -->
+                                    <div id="hof-navigation" style="display: none; align-items: center; gap: 6px;">
+                                        <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(-1)">◀</button>
+                                        <span id="hof-counter" style="font-size: 0.65rem; font-weight: 800; color: var(--text-muted); min-width: 30px; text-align: center;">1/1</span>
+                                        <button class="btn btn-action" style="width: auto; padding: 2px 8px; font-size: 0.65rem;" onclick="navigateHof(1)">▶</button>
+                                    </div>
+                                </div>
+                                
+                                <div id="hof-display-area" style="position: relative; width: 100%; height: 190px; margin-bottom: 12px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2);">
+                                    <!-- Placeholder, imagem ou cartão 3D gerado aqui dinamicamente -->
+                                </div>
+
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                    <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="generateHofFromActiveTeam()">
+                                        ⚡ Gerar da Equipa
+                                    </button>
+                                    <button class="btn btn-action" style="font-size: 0.7rem; font-weight: 800; padding: 8px 4px;" onclick="document.getElementById('hof-input').click()">
+                                        📷 Subir Imagem
+                                    </button>
+                                    <button class="btn btn-danger" id="btn-delete-hof" style="display: none; grid-column: span 2; font-size: 0.7rem; font-weight: 800; padding: 6px;" onclick="deleteActiveHof()">
+                                        🗑️ Eliminar este Mural
+                                    </button>
+                                </div>
+                                
+                                <input type="file" id="hof-input" accept="image/*" style="display: none;" onchange="handleHofUpload(event)" />
                             </div>
                         </div>
 
@@ -311,16 +311,23 @@
                                         <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">
                                             Análise tática dos adversários baseada na Box do teu Treinador.
                                         </p>
-                                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
-                                            <label style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin-bottom: 0;">Oponente / Desafio:</label>
-                                            <select id="allocation-opponent-select" onchange="changeAllocationOpponent(this.value)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; width: 220px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff;"></select>
+                                        <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <label style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin-bottom: 0;">Oponente / Desafio:</label>
+                                                <select id="allocation-opponent-select" onchange="changeAllocationOpponent(this.value)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; width: 220px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff;"></select>
+                                            </div>
+                                            <div id="opponent-preset-container" style="display: none; align-items: center; gap: 8px; margin-left: 8px;">
+                                                <label style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); white-space: nowrap; margin-bottom: 0;">Carregar Preset Salvo:</label>
+                                                <select id="opponent-preset-select" onchange="loadOpponentPreset(this.value)" style="padding: 4px 8px; font-size: 0.75rem; border-radius: 6px; width: 180px; background: rgba(0,0,0,0.3); border: 1px solid var(--border-color); color: #fff;">
+                                                </select>
+                                            </div>
                                         </div>
                                     </div>
                                     <div style="display: flex; gap: 8px;">
                                         <button class="btn btn-primary" id="btn-apply-allocation" onclick="applyRecommendedAllocation()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; box-shadow: 0 0 15px var(--game-color-glow); border-radius: 8px;">
                                             ⚡ Alocar Equipa
                                         </button>
-                                        <button class="btn btn-action" id="btn-save-allocation-preset" onclick="saveRecommendedAsPreset()" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #fff;">
+                                        <button class="btn btn-action" id="btn-save-allocation-preset" onclick="chooseAndSavePreset(true)" style="width: auto; padding: 8px 16px; font-weight: 800; font-size: 0.75rem; border-radius: 8px; border: 1px solid var(--border-color); background: rgba(255,255,255,0.05); color: #fff;">
                                             💾 Gravar Preset
                                         </button>
                                     </div>
@@ -341,13 +348,26 @@
                                         </div>
                                     </div>
 
-                                    <!-- Recommended Counter-Squad -->
-                                    <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
-                                        <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
-                                            🎯 Frota Recomendada (Seleção Tática)
+                                    <!-- Side-by-Side Comparison Panels -->
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                                        <!-- Column 1: Equipa Atual (Ativa) -->
+                                        <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                            <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                                🛡️ Equipa Atual (Ativa)
+                                            </div>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px;" id="allocation-current-team-grid">
+                                                <!-- Dynamic current team cards -->
+                                            </div>
                                         </div>
-                                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px;" id="allocation-team-grid">
-                                            <!-- Dynamic 6 recommended Pokémon -->
+
+                                        <!-- Column 2: Equipa Recomendada (Frota Tática) -->
+                                        <div class="glass-panel" style="padding: 16px; margin-bottom: 0;">
+                                            <div class="panel-title" style="margin-bottom: 12px; font-size: 0.8rem; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+                                                🎯 Equipa Recomendada (Frota Tática)
+                                            </div>
+                                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 8px;" id="allocation-team-grid">
+                                                <!-- Dynamic recommended cards -->
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -444,8 +464,8 @@
                             <label>Género</label>
                             <select id="form-gender">
                                 <option value="⚲">⚲ Nenhum</option>
-                                <option value="♂️">♂️ Macho</option>
-                                <option value="♀️">♀️ Fêmea</option>
+                                <option value="♂">♂ Macho</option>
+                                <option value="♀">♀ Fêmea</option>
                             </select>
                         </div>
                         <div class="form-group">
@@ -1189,6 +1209,25 @@
             <div class="modal-footer" style="margin-top: 16px; display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color); padding-top: 12px;">
                 <button class="btn btn-action" onclick="closePartitionModal()" style="width: auto; padding: 8px 16px;">Cancelar</button>
                 <button class="btn btn-primary" onclick="saveGeneratedPartitionPresets()" style="width: auto; padding: 8px 20px;">💾 Guardar Todos os Presets</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Preset Choice Modal -->
+    <div class="modal-overlay" id="save-preset-choice-modal">
+        <div class="modal-content" style="max-width: 400px; padding: 24px; text-align: center;">
+            <h3 style="font-size: 1.2rem; font-weight: 800; color: #fff; margin-bottom: 12px;">💾 Gravar Preset de Equipa</h3>
+            <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 24px;">Qual das equipas desejas gravar como um novo preset?</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn btn-primary" id="btn-choice-save-active" style="padding: 12px; font-weight: 800;">
+                    🛡️ Equipa Ativa (Atual)
+                </button>
+                <button class="btn btn-success" id="btn-choice-save-recommended" style="padding: 12px; font-weight: 800; background: linear-gradient(135deg, var(--accent-success) 0%, rgba(16, 185, 129, 0.6) 100%); color: #fff; box-shadow: 0 4px 14px var(--accent-success-glow);">
+                    🎯 Equipa Recomendada (Tática)
+                </button>
+                <button class="btn btn-action" onclick="closeSavePresetChoiceModal()" style="padding: 10px; margin-top: 8px;">
+                    Cancelar
+                </button>
             </div>
         </div>
     </div>
