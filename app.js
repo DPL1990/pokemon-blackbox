@@ -2307,7 +2307,7 @@ function getGenderFromPid(pokedexId, pid) {
     if (onlyMale.includes(pokedexId)) return "♂";
     
     const starters = [1,2,3,4,5,6,7,8,9,133,134,135,136,138,139,140,141,142,143,152,153,154,155,156,157,158,159,160,175,176,196,197, 252,253,254,255,256,257,258,259,260, 345,346,347,348, 360,
-                      387, 388, 389, 390, 391, 392, 393, 394, 395, 408, 409, 410, 411, 447, 448, 468, 495, 496, 497, 498, 499, 500, 501, 502, 503, 564, 565, 566, 567, 570, 571];
+                      387, 388, 389, 390, 391, 392, 393, 394, 395, 408, 409, 410, 411, 446, 447, 448, 468, 470, 471, 495, 496, 497, 498, 499, 500, 501, 502, 503, 511, 512, 513, 514, 515, 516, 564, 565, 566, 567, 570, 571];
     if (starters.includes(pokedexId)) {
         return (genderByte < 31) ? "♀" : "♂";
     }
@@ -2317,7 +2317,7 @@ function getGenderFromPid(pokedexId, pid) {
         return (genderByte < 64) ? "♀" : "♂";
     }
     
-    const ratio75 = [35,36,37,38,39,40,209,210, 298,300,301,311,314, 546, 547, 572, 573, 574, 575, 576];
+    const ratio75 = [35,36,37,38,39,40,209,210, 298,300,301,311,314, 572, 573, 574, 575, 576];
     if (ratio75.includes(pokedexId)) {
         return (genderByte < 191) ? "♀" : "♂";
     }
@@ -3089,9 +3089,11 @@ function parseDecryptedPKM(buffer, fileName) {
     let itemName = "";
     let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
     let rawSaveMeta = null;
+    let genderVal = "⚲";
     
     if (size === 100) {
         // PK3
+        const pid = u32[0];
         pokedexId = u16[32 / 2];
         const nickBytes = u8.subarray(8, 18);
         nickname = decodeGen3String(nickBytes);
@@ -3121,9 +3123,17 @@ function parseDecryptedPKM(buffer, fileName) {
             spd: (ivWord >> 25) & 0x1F
         };
         
-        rawSaveMeta = { gen: 3, isIndividual: true, rawBytes: u8.slice(0) };
+        genderVal = getGenderFromPid(pokedexId, pid);
+        
+        rawSaveMeta = { 
+            gen: 3, 
+            isIndividual: true, 
+            pid: pid, 
+            rawBytes: u8.slice(0) 
+        };
     } else if (size === 136 || size === 220 || size === 236) {
         // PK4 / PK5
+        const pid = u32[0];
         pokedexId = u16[8 / 2];
         exp = u32[16 / 4];
         const nickWords = u16.subarray(72 / 2, 72 / 2 + 11);
@@ -3138,7 +3148,11 @@ function parseDecryptedPKM(buffer, fileName) {
         } else {
             level = Math.max(1, Math.min(100, Math.round(Math.pow(exp, 1/3))));
         }
-        sourceSlot = `Ficheiro PK${size === 236 ? '4/5 Party' : '4/5 Box'}`;
+        
+        const originGame = u8[0x5F];
+        const isGen5 = (size === 220) || (size === 136 && originGame >= 20 && originGame <= 23);
+        const detectedGen = isGen5 ? 5 : 4;
+        sourceSlot = `Ficheiro PK${detectedGen}${size === 220 || size === 236 ? ' Party' : ' Box'}`;
         
         const itemId = u16[10 / 2];
         itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
@@ -3159,7 +3173,14 @@ function parseDecryptedPKM(buffer, fileName) {
             spd: (ivWord >> 25) & 0x1F
         };
         
-        rawSaveMeta = { gen: size === 236 ? 4 : 5, isIndividual: true, rawBytes: u8.slice(0) };
+        genderVal = getGenderFromPid(pokedexId, pid);
+        
+        rawSaveMeta = { 
+            gen: detectedGen, 
+            isIndividual: true, 
+            pid: pid, 
+            rawBytes: u8.slice(0) 
+        };
     } else if (size === 232 || size === 260) {
         // PK6 / PK7
         pokedexId = u16[0x08 / 2];
@@ -3197,6 +3218,11 @@ function parseDecryptedPKM(buffer, fileName) {
             spd: (ivWord >> 25) & 0x1F
         };
         
+        const genderByte = u8[0x1D];
+        const isFemale = (genderByte & 0x02) !== 0;
+        const isGenderless = (genderByte & 0x04) !== 0;
+        genderVal = isGenderless ? "⚲" : (isFemale ? "♀" : "♂");
+        
         rawSaveMeta = { gen: size === 260 ? 6 : 7, isIndividual: true, rawBytes: u8.slice(0) };
     } else if (size === 328 || size === 344) {
         // PK8 / PK9
@@ -3231,6 +3257,11 @@ function parseDecryptedPKM(buffer, fileName) {
             spd: (ivWord >> 25) & 0x1F
         };
         
+        const genderByte = u8[0x1D];
+        const isFemale = (genderByte & 0x02) !== 0;
+        const isGenderless = (genderByte & 0x04) !== 0;
+        genderVal = isGenderless ? "⚲" : (isFemale ? "♀" : "♂");
+        
         rawSaveMeta = { gen: size === 328 ? 8 : 9, isIndividual: true, rawBytes: u8.slice(0) };
     } else {
         return null;
@@ -3253,6 +3284,7 @@ function parseDecryptedPKM(buffer, fileName) {
         item: itemName,
         moves: moves,
         ivs: ivs,
+        gender: genderVal,
         saveMeta: rawSaveMeta
     }];
 }
