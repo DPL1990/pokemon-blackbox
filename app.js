@@ -1,3 +1,7 @@
+// LIMPEZA TEMPORÁRIA PARA GITHUB PAGES: Limpa o LocalStorage e recarrega a página limpa
+localStorage.clear();
+alert("Todos os dados locais do BlackBox em GitHub Pages foram limpos com sucesso! Por favor, diz-me 'já está' no chat para eu remover esta linha e poderes usar a app normalmente.");
+
 const GAMES_DB = [
     { id: "red", name: "Pokémon Red", gen: 1 }, { id: "blue", name: "Pokémon Blue", gen: 1 }, { id: "yellow", name: "Pokémon Yellow", gen: 1 },
     { id: "gold", name: "Pokémon Gold", gen: 2 }, { id: "silver", name: "Pokémon Silver", gen: 2 }, { id: "crystal", name: "Pokémon Crystal", gen: 2 },
