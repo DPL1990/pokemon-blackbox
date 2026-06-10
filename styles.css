@@ -2093,4 +2093,17 @@ body.theme-home input {
     z-index: 10;
 }
 
+/* Save Import Trainer Association Panel styling */
+#save-import-trainer-association {
+    background: rgba(16, 185, 129, 0.02) !important;
+    border: 1px dashed rgba(16, 185, 129, 0.3) !important;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.05);
+    transition: all 0.3s ease;
+}
+
+#save-import-trainer-association:hover {
+    border-color: rgba(16, 185, 129, 0.5) !important;
+    box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
+}
+
 

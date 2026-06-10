@@ -564,7 +564,10 @@
                     </div>
 
                     <div class="form-group">
-                        <label>⚔️ Moveset</label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                            <label style="margin-bottom: 0;">⚔️ Moveset</label>
+                            <button type="button" class="btn btn-action" id="btn-toggle-alt-moves" onclick="toggleEditorMovesetView()" style="width: auto; font-size: 0.65rem; padding: 2px 8px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); height: 20px; line-height: 14px; margin: 0;">🔄 Mostrar Conjunto Alternativo</button>
+                        </div>
                         <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             <input type="text" id="form-move1" list="moves-datalist" placeholder="Ataque 1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
                             <input type="text" id="form-move2" list="moves-datalist" placeholder="Ataque 2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
@@ -761,28 +764,7 @@
     <datalist id="moves-list"></datalist>
     
     <!-- Autocomplete Held Items list -->
-    <datalist id="items-list">
-        <option value="Leftovers"></option>
-        <option value="Life Orb"></option>
-        <option value="Choice Band"></option>
-        <option value="Choice Specs"></option>
-        <option value="Choice Scarf"></option>
-        <option value="Focus Sash"></option>
-        <option value="Assault Vest"></option>
-        <option value="Heavy-Duty Boots"></option>
-        <option value="Rocky Helmet"></option>
-        <option value="Eviolite"></option>
-        <option value="Black Sludge"></option>
-        <option value="Expert Belt"></option>
-        <option value="Light Ball"></option>
-        <option value="Shed Shell"></option>
-        <option value="Smooth Rock"></option>
-        <option value="Damp Rock"></option>
-        <option value="Heat Rock"></option>
-        <option value="Icy Rock"></option>
-        <option value="Sitrus Berry"></option>
-        <option value="Lum Berry"></option>
-    </datalist>
+    <datalist id="items-list"></datalist>
     
     <!-- Floating Multi-Action Bar -->
     <div class="floating-action-bar" id="multi-action-bar">
@@ -876,6 +858,42 @@
                 <!-- Parsed Results -->
                 <div id="save-import-results" style="display: none;">
                     <div id="save-import-audit" style="margin-bottom: 12px; padding: 10px; border-radius: 8px; font-size: 0.75rem; background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.2); color: #10b981; display: none;"></div>
+                    
+                    <!-- Associação de Treinador -->
+                    <div id="save-import-trainer-association" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                        <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 0.85rem; color: #fff; display: flex; align-items: center; gap: 6px;">
+                            👤 Associação de Treinador
+                        </h4>
+                        <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 12px;">
+                            Detetámos o treinador <strong id="save-detected-trainer-info" style="color: #fff;">-</strong> no ficheiro de save.
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 10px;">
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; cursor: pointer; color: #fff;">
+                                <input type="radio" name="import-trainer-option" id="import-trainer-opt-new" checked onchange="toggleImportTrainerOptions()">
+                                Criar um Novo Treinador com estes dados
+                            </label>
+                            <div id="import-trainer-new-fields" style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px; padding-left: 24px; margin-bottom: 6px;">
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label style="font-size:0.65rem; color: var(--text-muted);">Nome</label>
+                                    <input type="text" id="import-new-trainer-name" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff;">
+                                </div>
+                                <div class="form-group" style="margin-bottom:0;">
+                                    <label style="font-size:0.65rem; color: var(--text-muted);">TID</label>
+                                    <input type="text" id="import-new-trainer-tid" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: #fff;" maxlength="6">
+                                </div>
+                            </div>
+                            
+                            <label style="display: flex; align-items: center; gap: 8px; font-size: 0.75rem; cursor: pointer; color: #fff;">
+                                <input type="radio" name="import-trainer-option" id="import-trainer-opt-existing" onchange="toggleImportTrainerOptions()">
+                                Associar a um Treinador Existente
+                            </label>
+                            <div id="import-trainer-existing-field" style="padding-left: 24px; display: none;">
+                                <select id="import-existing-trainer-select" onchange="handleImportExistingTrainerChange()" style="padding: 6px; font-size: 0.75rem; width: 100%; border-radius: 6px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid var(--border-color);">
+                                    <!-- Populated dynamically -->
+                                </select>
+                            </div>
+                        </div>
+                    </div>
                     <!-- Lote / Bulk Action Panel -->
                     <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
                         <span style="font-size: 0.7rem; font-weight: 700; color: #fff; text-transform: uppercase;">⚡ Ação em Lote:</span>
@@ -1233,7 +1251,14 @@
     </div>
 
     <!-- External Logic Script -->
-    <script src="scratch/moves_db.js" defer></script>
-    <script src="app.js" defer></script>
+    <script src="js/moves-db.js" defer></script>
+    <script src="js/items-db.js" defer></script>
+    <script src="js/constants.js" defer></script>
+    <script src="js/helpers.js" defer></script>
+    <script src="js/db.js" defer></script>
+    <script src="js/save-parser.js" defer></script>
+    <script src="js/allocation.js" defer></script>
+    <script src="js/editor.js" defer></script>
+    <script src="js/ui.js" defer></script>
 </body>
 </html>

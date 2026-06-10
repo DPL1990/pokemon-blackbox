@@ -1,11 +1,18 @@
-const CACHE_NAME = 'blackbox-v4';
+const CACHE_NAME = 'blackbox-v7';
 const ASSETS = [
   'index.html',
   'manifest.json',
   'styles.css',
-  'app.js',
-  'blackbox_app_icon.png',
-  'scratch/moves_db.js'
+  'js/moves-db.js',
+  'js/items-db.js',
+  'js/constants.js',
+  'js/helpers.js',
+  'js/db.js',
+  'js/save-parser.js',
+  'js/allocation.js',
+  'js/editor.js',
+  'js/ui.js',
+  'blackbox_app_icon.png'
 ];
 
 // Instalação do Service Worker e Cache dos ficheiros base
