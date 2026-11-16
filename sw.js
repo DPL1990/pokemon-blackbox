@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blackbox-v9';          // ficheiros da app
+const CACHE_NAME = 'blackbox-v10';         // ficheiros da app
 const RUNTIME_CACHE = 'blackbox-runtime-v1'; // sprites, PokeAPI e fontes
 const MAX_RUNTIME_ENTRIES = 1000;
 const ASSETS = [
@@ -21,7 +21,17 @@ const ASSETS = [
 
 self.addEventListener('install', (e) => {
   self.skipWaiting();
-  e.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS)));
+  e.waitUntil(
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        ASSETS.map((url) =>
+          fetch(new Request(url, { cache: 'reload' }))
+            .then((res) => (res && res.ok ? cache.put(url, res) : null))
+            .catch(() => null)
+        )
+      )
+    )
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -31,6 +41,14 @@ self.addEventListener('activate', (e) => {
         keys.filter((k) => k !== CACHE_NAME && k !== RUNTIME_CACHE).map((k) => caches.delete(k))
       ))
       .then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ type: 'window', includeUncontrolled: true }))
+      .then((clients) => {
+        for (const client of clients) {
+          if ('navigate' in client) {
+            client.navigate(client.url).catch(() => {});
+          }
+        }
+      })
   );
 });
 
@@ -41,11 +59,11 @@ async function trimCache(cacheName, max) {
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
-// Para os ficheiros próprios da app (HTML/JS/CSS/Manifest): tenta rede primeiro para garantir
-// que o telemóvel/PWA recebe sempre a versão mais recente logo ao abrir, com fallback imediato para cache offline.
+// Para os ficheiros próprios da app (HTML/JS/CSS/Manifest): tenta rede primeiro (ignorando HTTP cache obsoleto)
+// para garantir que o telemóvel/PWA recebe sempre a versão mais recente logo ao abrir, com fallback imediato offline.
 function networkFirstAppShell(request) {
   return caches.open(CACHE_NAME).then((cache) =>
-    fetch(request)
+    fetch(request, { cache: 'no-cache' })
       .then((res) => {
         if (res && res.ok) {
           cache.put(request, res.clone());
@@ -54,7 +72,7 @@ function networkFirstAppShell(request) {
       })
       .catch(() =>
         cache.match(request, { ignoreSearch: true }).then((cached) =>
-          cached || cache.match('index.html') || Response.error()
+          cached || cache.match('index.html', { ignoreSearch: true }) || Response.error()
         )
       )
   );
@@ -77,9 +95,7 @@ function staleWhileRevalidate(request, cacheName, matchOptions) {
   );
 }
 
-// Sprites quase nunca mudam: cópia guardada primeiro.
-// Pede-se em modo CORS (o GitHub permite) para a resposta não ser "opaca": respostas opacas
-// contam ~7 MB cada na quota do browser, o que encheria o armazenamento com poucas centenas de sprites.
+// Sprites quase nunca mudam: cópia guardada primeiro em modo CORS
 function cacheFirst(request) {
   return caches.open(RUNTIME_CACHE).then((cache) =>
     cache.match(request).then((cached) => {
@@ -109,4 +125,3 @@ self.addEventListener('fetch', (e) => {
     e.respondWith(staleWhileRevalidate(req, RUNTIME_CACHE));
   }
 });
-

@@ -439,6 +439,8 @@ function switchGame(gameId) {
     document.getElementById("game-select").value = gameId;
     document.body.className = ""; 
     document.body.classList.add(`v-${gameId}`);
+    if (typeof applyMinimalMode === "function") applyMinimalMode();
+    if (typeof applyVisualTheme === "function") applyVisualTheme();
     
     // Set dynamic mobile theme color
     const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -607,10 +609,12 @@ function renderAll() {
         if (p) {
             teamHTML += createSlotHTML(p, i, "team");
         } else {
+            const targetHighlight = (typeof moveTargetTeamSlot === "number" && moveTargetTeamSlot === i) ? "move-source-selected" : "";
+            const touchHint = (typeof isTouchDevice === "function" && isTouchDevice()) ? "Tocar p/ Adicionar" : `Slot ${i + 1}`;
             teamHTML += `
-                <div class="slot empty-team-slot" data-slot-type="team" data-slot-index="${i}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+                <div class="slot empty-team-slot ${targetHighlight}" data-slot-type="team" data-slot-index="${i}" onclick="handleEmptySlotClick('team', ${i})" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
                     <div class="empty-slot-plus">➕</div>
-                    <div class="empty-slot-text">Slot ${i + 1}</div>
+                    <div class="empty-slot-text">${touchHint}</div>
                 </div>
             `;
         }
@@ -741,14 +745,17 @@ function renderAll() {
     });
 
     // Render Box Slots
+    const isTouch = typeof isTouchDevice === "function" && isTouchDevice();
     boxContainer.innerHTML = filteredBox.map((p, idx) => createSlotHTML(p, idx, "box")).join("") + `
-        <div class="slot drop-zone-only" data-slot-type="box" data-slot-index="${filteredBox.length}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+        <div class="slot drop-zone-only" data-slot-type="box" data-slot-index="${filteredBox.length}" onclick="handleEmptySlotClick('box', ${filteredBox.length})" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <div class="empty-slot-plus">➕</div>
-            <div class="empty-slot-text">Arrastar</div>
+            <div class="empty-slot-text">${isTouch ? "Novo / Mover" : "Arrastar"}</div>
         </div>
     `;
     
-    setupDragAndDropEvents();
+    if (!isTouch) {
+        setupDragAndDropEvents();
+    }
     if (activeTab === "allocation") {
         renderAllocationTab();
     }
@@ -789,6 +796,7 @@ function createSlotHTML(p, index, type) {
     const subText = p.nickname ? p.species : `Lv. ${p.level}`;
     const badgeLabel = p.currentGame ? p.currentGame.toUpperCase() : '??';
     const selectedClass = (typeof selectedPokemonIds !== 'undefined' && selectedPokemonIds.has(p.id)) ? 'selected-specimen' : '';
+    const moveSelectedClass = (typeof moveModeSelectedId !== 'undefined' && moveModeSelectedId === p.id) ? 'move-source-selected' : '';
 
     const trainerObj = trainersList.find(t => t.id === p.trainerId);
     const trainerName = trainerObj ? trainerObj.name : "Padrão";
@@ -799,8 +807,13 @@ function createSlotHTML(p, index, type) {
     const dexitBadge = isAllowed ? '' : `<span class="dexit-incompatible-badge">Incompatível</span>`;
     const trophyBadge = p.isLocked ? `<span class="locked-trophy-badge" title="Este espécime está trancado por ser vencedor de um desafio">🏆</span>` : '';
 
+    const isTouch = typeof isTouchDevice === "function" && isTouchDevice();
+    const dragAttrs = isTouch
+        ? ""
+        : `draggable="true" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)"`;
+
     return `
-        <div class="slot ${typeClass} ${selectedClass} ${dexitClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+        <div class="slot ${typeClass} ${selectedClass} ${moveSelectedClass} ${dexitClass}" ${dragAttrs} data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
                 <img class="slot-sprite" draggable="false" loading="lazy" decoding="async" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">

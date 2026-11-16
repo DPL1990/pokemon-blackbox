@@ -142,157 +142,115 @@ function handleDrop(e) {
     executeDropLogic(id, targetSlotType, targetSlotIndex, targetId);
 }
 
-// --- SECTION MOBILE TOUCH DRAG & DROP POLYFILL ---
-let touchDragActive = false;
-let touchDraggedId = null;
-let touchClone = null;
-let touchStartX = 0;
-let touchStartY = 0;
-let touchOffset = { x: 0, y: 0 };
-let touchDraggedFromSlot = null;
-let touchHoldTimer = null;
-let lastTouchHoveredSlot = null;
+// --- SECTION MOBILE TAP-TO-MOVE & QUICK TEAM TOGGLE ---
+let moveModeActive = false;
+let moveModeSelectedId = null;
+let moveTargetTeamSlot = null;
 
 function cleanupTouchDragState() {
-    if (touchHoldTimer) {
-        clearTimeout(touchHoldTimer);
-        touchHoldTimer = null;
-    }
-    if (touchClone) {
-        touchClone.remove();
-        touchClone = null;
-    }
-    if (touchDraggedFromSlot) {
-        touchDraggedFromSlot.style.opacity = "1";
-        touchDraggedFromSlot = null;
-    }
-    if (lastTouchHoveredSlot) {
-        lastTouchHoveredSlot.classList.remove("drag-over");
-        lastTouchHoveredSlot = null;
-    }
-    touchDragActive = false;
-    touchDraggedId = null;
+    moveModeSelectedId = null;
+    moveTargetTeamSlot = null;
 }
 
 function initTouchDragAndDrop() {
-    // Touch Start: aguarda pressão longa (380ms sem deslizar) para distinguir arrasto de scroll/toque
-    document.addEventListener("touchstart", function(e) {
-        if (e.touches.length !== 1) {
-            cleanupTouchDragState();
+    // Intencionalmente vazio em dispositivos touch: não regista listeners touchmove/touchend
+    // com { passive: false } no document para garantir scroll nativo a 60/120fps no telemóvel.
+}
+
+function toggleMoveMode(forceState) {
+    if (typeof selectionMode !== "undefined" && selectionMode) {
+        toggleSelectionMode();
+    }
+    moveModeActive = typeof forceState === "boolean" ? forceState : !moveModeActive;
+    moveModeSelectedId = null;
+    moveTargetTeamSlot = null;
+
+    const btn = document.getElementById("btn-toggle-move-mode");
+    const banner = document.getElementById("move-mode-banner");
+    if (btn) {
+        if (moveModeActive) {
+            btn.innerText = "✕ Sair de Mover";
+            btn.classList.add("btn-danger");
+        } else {
+            btn.innerText = "🔄 Mover";
+            btn.classList.remove("btn-danger");
+        }
+    }
+    if (banner) {
+        if (moveModeActive) {
+            banner.style.display = "flex";
+            banner.innerHTML = `<span>🔄 <strong>Modo Mover:</strong> Toca no 1.º Pokémon que queres mover e depois toca no slot de destino (Equipa ou Box).</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Concluir</button>`;
+        } else {
+            banner.style.display = "none";
+        }
+    }
+    renderAll();
+}
+
+function handleEmptySlotClick(slotType, slotIndex) {
+    if (typeof selectionMode !== "undefined" && selectionMode) return;
+
+    if (moveModeSelectedId) {
+        const id = moveModeSelectedId;
+        moveModeSelectedId = null;
+        moveTargetTeamSlot = null;
+        executeDropLogic(id, slotType, slotIndex, null);
+        return;
+    }
+
+    if (slotType === "team") {
+        if (moveTargetTeamSlot === slotIndex) {
+            toggleMoveMode(false);
             return;
         }
-        if (typeof selectionMode !== "undefined" && selectionMode) return;
-        if (document.querySelector(".modal-overlay.active")) return;
+        moveModeActive = true;
+        moveModeSelectedId = null;
+        moveTargetTeamSlot = slotIndex;
+        const btn = document.getElementById("btn-toggle-move-mode");
+        if (btn) {
+            btn.innerText = "✕ Sair de Mover";
+            btn.classList.add("btn-danger");
+        }
+        const banner = document.getElementById("move-mode-banner");
+        if (banner) {
+            banner.style.display = "flex";
+            banner.innerHTML = `<span>🛡️ <strong>Slot ${slotIndex + 1} da Equipa selecionado:</strong> Agora toca num Pokémon da Box abaixo para o colocar neste slot!</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Cancelar</button>`;
+        }
+        renderAll();
+    } else if (slotType === "box" && !moveModeActive) {
+        openModalForNew();
+    }
+}
 
-        const slot = e.target.closest(".slot[draggable='true']");
-        if (!slot) return;
+function quickToggleTeamFromEditor() {
+    const id = document.getElementById("form-id")?.value;
+    if (!id) return;
+    const p = pokemonDatabase.find(pkmn => pkmn.id === id);
+    if (!p) return;
 
-        cleanupTouchDragState();
-
-        const touch = e.touches[0];
-        touchStartX = touch.clientX;
-        touchStartY = touch.clientY;
-        touchDraggedId = slot.getAttribute("data-id");
-
-        const rect = slot.getBoundingClientRect();
-        touchOffset.x = touchStartX - rect.left;
-        touchOffset.y = touchStartY - rect.top;
-        touchDraggedFromSlot = slot;
-
-        touchHoldTimer = setTimeout(() => {
-            touchHoldTimer = null;
-            if (!touchDraggedId || !touchDraggedFromSlot) return;
-            touchDragActive = true;
-
-            if (navigator.vibrate) {
-                try { navigator.vibrate(25); } catch (_) {}
+    if (p.slotType === "team") {
+        p.slotType = "box";
+        p.slotIndex = 0;
+        saveDatabase();
+        closeModal();
+        renderAll();
+    } else {
+        // Encontrar primeiro slot livre na equipa ativa (0..5)
+        let freeSlot = -1;
+        for (let i = 0; i < 6; i++) {
+            const occupied = pokemonDatabase.some(pk => pk.currentGame === currentGameId && pk.slotType === "team" && pk.slotIndex === i);
+            if (!occupied) {
+                freeSlot = i;
+                break;
             }
-
-            touchClone = touchDraggedFromSlot.cloneNode(true);
-            touchClone.style.position = "fixed";
-            touchClone.style.left = "0px";
-            touchClone.style.top = "0px";
-            touchClone.style.width = touchDraggedFromSlot.offsetWidth + "px";
-            touchClone.style.height = touchDraggedFromSlot.offsetHeight + "px";
-            touchClone.style.transform = `translate3d(${touchStartX - touchOffset.x}px, ${touchStartY - touchOffset.y}px, 0) scale(1.05)`;
-            touchClone.style.willChange = "transform";
-            touchClone.style.pointerEvents = "none";
-            touchClone.style.zIndex = "10000";
-            touchClone.style.opacity = "0.85";
-            touchClone.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
-            touchClone.style.transition = "none";
-            document.body.appendChild(touchClone);
-
-            touchDraggedFromSlot.style.opacity = "0.3";
-        }, 380);
-    }, { passive: true });
-
-    // Touch Move: se o utilizador deslizar antes dos 380ms, é scroll normal da página!
-    document.addEventListener("touchmove", function(e) {
-        if (!touchDraggedId) return;
-
-        const touch = e.touches[0];
-        if (!touch) return;
-        const dx = touch.clientX - touchStartX;
-        const dy = touch.clientY - touchStartY;
-
-        if (!touchDragActive) {
-            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
-                cleanupTouchDragState();
-            }
+        }
+        if (freeSlot === -1) {
+            alert("A Equipa Ativa já tem 6 Pokémon! Retira primeiro um Pokémon da equipa ou usa o botão '🔄 Mover' para trocar de posição.");
             return;
         }
-
-        if (touchClone) {
-            if (e.cancelable) e.preventDefault();
-
-            const x = touch.clientX - touchOffset.x;
-            const y = touch.clientY - touchOffset.y;
-            touchClone.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.05)`;
-
-            const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-            const targetSlot = elementUnder ? elementUnder.closest(".slot") : null;
-
-            if (lastTouchHoveredSlot !== targetSlot) {
-                if (lastTouchHoveredSlot) lastTouchHoveredSlot.classList.remove("drag-over");
-                if (targetSlot) targetSlot.classList.add("drag-over");
-                lastTouchHoveredSlot = targetSlot;
-            }
-        }
-    }, { passive: false });
-
-    // Touch End
-    document.addEventListener("touchend", function(e) {
-        if (!touchDraggedId) return;
-
-        const id = touchDraggedId;
-        const wasDragging = touchDragActive;
-        cleanupTouchDragState();
-
-        if (wasDragging) {
-            if (e.cancelable) e.preventDefault();
-
-            const changedTouch = e.changedTouches[0];
-            if (!changedTouch) return;
-            const elementUnder = document.elementFromPoint(changedTouch.clientX, changedTouch.clientY);
-
-            if (elementUnder) {
-                const targetSlot = elementUnder.closest(".slot");
-                if (targetSlot) {
-                    const targetSlotType = targetSlot.getAttribute("data-slot-type");
-                    const targetSlotIndex = parseInt(targetSlot.getAttribute("data-slot-index"), 10);
-                    const targetId = targetSlot.getAttribute("data-id");
-
-                    executeDropLogic(id, targetSlotType, targetSlotIndex, targetId);
-                }
-            }
-        }
-    }, { passive: false });
-
-    // Touch Cancel
-    document.addEventListener("touchcancel", function() {
-        cleanupTouchDragState();
-    }, { passive: true });
+        closeModal();
+        executeDropLogic(p.id, "team", freeSlot, null);
+    }
 }
 // -----------------------------------------------------
 
@@ -451,6 +409,8 @@ function openModalForNew() {
     document.getElementById("form-origin-game").value = currentGameId;
     document.getElementById("btn-delete-pkmn").style.display = "none"; 
     document.getElementById("btn-owndex-link").style.display = "none";
+    const btnQuickTeamNew = document.getElementById("btn-quick-toggle-team");
+    if (btnQuickTeamNew) btnQuickTeamNew.style.display = "none";
     document.getElementById("modal-title").innerText = "➕ Registar Novo Espécime";
     document.getElementById("passport-display").innerHTML = `<span>O passaporte será gerado ao gravar.</span>`;
     
@@ -467,6 +427,34 @@ function openModalForEdit(id) {
     }
     const p = pokemonDatabase.find(pkmn => pkmn.id === id); 
     if (!p) return;
+
+    if (moveTargetTeamSlot !== null) {
+        const targetSlot = moveTargetTeamSlot;
+        toggleMoveMode(false);
+        executeDropLogic(p.id, "team", targetSlot, null);
+        return;
+    }
+
+    if (moveModeActive) {
+        if (!moveModeSelectedId) {
+            moveModeSelectedId = p.id;
+            const banner = document.getElementById("move-mode-banner");
+            if (banner) {
+                banner.innerHTML = `<span>🔄 <strong>${p.nickname || p.species} selecionado:</strong> Agora toca noutro Pokémon ou num slot vazio da Equipa/Box para mover ou trocar!</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Cancelar</button>`;
+            }
+            renderAll();
+            return;
+        } else if (moveModeSelectedId === p.id) {
+            moveModeSelectedId = null;
+            renderAll();
+            return;
+        } else {
+            const sourceId = moveModeSelectedId;
+            moveModeSelectedId = null;
+            executeDropLogic(sourceId, p.slotType, p.slotIndex || 0, p.id);
+            return;
+        }
+    }
     
     editorViewingAlternativeMoves = false;
     activePokemonEditorMoves = {
@@ -479,9 +467,24 @@ function openModalForEdit(id) {
     setFormLockedState(!!p.isLocked);
     
     const btnDelete = document.getElementById("btn-delete-pkmn");
+    const btnQuickTeam = document.getElementById("btn-quick-toggle-team");
     const footerActions = document.querySelector("#editor-modal .footer-actions");
     const saveBtn = footerActions ? footerActions.querySelector(".btn-primary") : null;
     
+    if (btnQuickTeam) {
+        btnQuickTeam.style.display = "inline-flex";
+        btnQuickTeam.disabled = false;
+        if (p.slotType === "team") {
+            btnQuickTeam.innerText = "📦 Enviar para a Box Regional";
+            btnQuickTeam.style.background = "rgba(99, 102, 241, 0.14)";
+            btnQuickTeam.style.borderColor = "rgba(99, 102, 241, 0.35)";
+        } else {
+            btnQuickTeam.innerText = "🛡️ Colocar na Equipa Ativa";
+            btnQuickTeam.style.background = "rgba(16, 185, 129, 0.14)";
+            btnQuickTeam.style.borderColor = "rgba(16, 185, 129, 0.35)";
+        }
+    }
+
     if (p.isLocked) {
         if (btnDelete) btnDelete.style.display = "none";
         if (saveBtn) saveBtn.style.display = "none";

@@ -1927,19 +1927,27 @@ button {
     user-select: none;
 }
 
+.slot.move-source-selected {
+    border: 2px solid #f59e0b !important;
+    background: rgba(245, 158, 11, 0.18) !important;
+    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35) !important;
+}
+
 @media (hover: none) and (pointer: coarse) {
     .slot:hover {
         transform: none !important;
+        box-shadow: none !important;
     }
-    .slot:hover .sprite {
+    .slot:hover .slot-sprite {
         transform: none !important;
+        filter: none !important;
     }
 }
 
 @media (max-width: 768px), (hover: none) and (pointer: coarse) {
     :root {
-        --bg-card: rgba(20, 24, 33, 0.92);
-        --bg-card-hover: rgba(28, 34, 46, 0.95);
+        --bg-card: rgba(20, 24, 33, 0.96);
+        --bg-card-hover: rgba(28, 34, 46, 0.98);
     }
 
     body {
@@ -1948,77 +1956,105 @@ button {
 
     .glass-panel,
     .slot,
-    .hof-card-member {
+    .hof-card-member,
+    .modal-overlay {
         backdrop-filter: none !important;
         -webkit-backdrop-filter: none !important;
     }
 
+    .slot {
+        box-shadow: none !important;
+        transition: none !important;
+    }
+
+    .box-grid .slot {
+        content-visibility: auto;
+        contain-intrinsic-size: 118px;
+    }
+
+    .slot .slot-sprite {
+        transition: none !important;
+        filter: none !important;
+    }
+
     .modal-overlay {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        background: rgba(5, 7, 11, 0.88);
+        background: rgba(5, 7, 11, 0.92);
+    }
+
+    /* Prevent iOS Safari & Android Chrome auto-zoom on focus */
+    select,
+    input[type="text"],
+    input[type="number"],
+    textarea {
+        font-size: 16px !important;
     }
 }
 
 @media (max-width: 600px) {
     body {
-        padding: 12px 10px;
+        padding: 10px 8px;
     }
 
     header h1 {
-        font-size: 1.25rem !important;
+        font-size: 1.2rem !important;
     }
 
     .tabs-header {
-        gap: 8px !important;
+        gap: 6px !important;
     }
 
     .btn-tab {
         padding: 6px 10px;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
     }
 
+    .dashboard-two-columns .team-grid,
     .team-grid,
     .box-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-        gap: 8px;
+        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+        gap: 8px !important;
     }
 
     .slot {
-        min-height: 118px;
-        padding: 10px 6px;
+        min-height: 112px;
+        padding: 8px 4px;
         border-radius: 12px;
     }
 
-    .slot .sprite {
-        width: 56px;
-        height: 56px;
+    .slot .slot-sprite {
+        width: 52px;
+        height: 52px;
         margin-bottom: 4px;
     }
 
-    .slot .pkmn-name {
-        font-size: 0.75rem;
+    .slot .slot-name {
+        font-size: 0.72rem;
     }
 
-    .slot .pkmn-species {
-        font-size: 0.62rem;
-        margin-bottom: 4px;
+    .slot .slot-meta {
+        font-size: 0.6rem;
+        margin-bottom: 2px;
     }
 
     .modal-overlay {
-        padding: 8px;
+        padding: 6px;
+    }
+
+    .modal-content {
+        max-height: 92vh;
     }
 
     .modal-header {
-        padding: 14px 16px;
+        padding: 12px 14px;
     }
 
     .modal-body {
-        padding: 16px;
+        padding: 14px;
+        -webkit-overflow-scrolling: touch;
     }
 
     .modal-footer {
-        padding: 12px 16px;
+        padding: 10px 14px;
         flex-wrap: wrap;
     }
 }

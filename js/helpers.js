@@ -81,7 +81,7 @@ function ensureAllocationLoaded() {
     if (_allocationLoadPromise) return _allocationLoadPromise;
     _allocationLoadPromise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = "js/allocation.js";
+        script.src = "js/allocation.js?v=10";
         script.onload = () => {
             window.__allocationLoaded = true;
             resolve();
@@ -559,18 +559,44 @@ function onSearchFilterInput() {
     }, 120);
 }
 
+function isTouchDevice() {
+    if (typeof window === "undefined") return false;
+    if (typeof window.matchMedia === "function" && window.matchMedia("(hover: none) and (pointer: coarse)").matches) {
+        return true;
+    }
+    return "ontouchstart" in window && (navigator.maxTouchPoints > 0);
+}
+
+function isRunningStandalonePWA() {
+    if (typeof window === "undefined") return false;
+    return (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches) ||
+           window.navigator.standalone === true;
+}
+
 let deferredInstallPrompt = null;
 
 function _updateInstallButtonsVisibility(visible) {
     const headerBtn = document.getElementById("btn-install-pwa");
     if (headerBtn) headerBtn.style.display = visible ? "inline-flex" : "none";
+    const settingsBtn = document.getElementById("btn-settings-install-pwa");
+    if (settingsBtn) settingsBtn.style.display = visible ? "inline-flex" : "none";
 }
 
 if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("DOMContentLoaded", () => {
+        if (isRunningStandalonePWA()) {
+            _updateInstallButtonsVisibility(false);
+        } else if (isTouchDevice()) {
+            _updateInstallButtonsVisibility(true);
+        }
+    });
+
     window.addEventListener("beforeinstallprompt", (e) => {
         e.preventDefault();
         deferredInstallPrompt = e;
-        _updateInstallButtonsVisibility(true);
+        if (!isRunningStandalonePWA()) {
+            _updateInstallButtonsVisibility(true);
+        }
     });
 
     window.addEventListener("appinstalled", () => {
@@ -592,11 +618,35 @@ async function installBlackBoxPWA() {
         return;
     }
 
+    if (isRunningStandalonePWA()) {
+        alert("A Pokémon BlackBox já está instalada e a correr em modo Aplicação!");
+        return;
+    }
+
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "") && !window.MSStream;
     if (isIOS) {
-        alert("Para instalar no iPhone/iPad:\n1. Toque no botão Partilhar (ícone com seta para cima no Safari).\n2. Escolha 'Adicionar ao ecrã principal' (Add to Home Screen).");
+        alert("📲 Como instalar no iPhone/iPad (Safari):\n\n1. Toque no botão Partilhar (ícone com seta para cima na barra do Safari).\n2. Deslize para baixo e toque em 'Adicionar ao ecrã principal' (Add to Home Screen).\n3. Toque em 'Adicionar' no canto superior direito.");
     } else {
-        alert("Para instalar como App no Android/Chrome:\n1. Toque no menu ⋮ (canto superior direito do navegador).\n2. Selecione 'Instalar aplicação' ou 'Adicionar ao ecrã principal'.");
+        alert("📲 Como instalar como App no Android:\n\n1. Toque no menu ⋮ (3 pontos no canto superior direito do Chrome).\n2. Selecione 'Instalar aplicação' ou 'Adicionar ao ecrã principal'.\n\nNota: Se já tinha um atalho antigo instalado, desinstale-o primeiro do ecrã principal e volte a instalar.");
     }
 }
 
+async function forceUpdateApp() {
+    try {
+        if (typeof flushDatabase === "function") flushDatabase();
+        if ("serviceWorker" in navigator) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) {
+                await reg.unregister();
+            }
+        }
+        if ("caches" in window) {
+            const keys = await caches.keys();
+            for (const k of keys) {
+                await caches.delete(k);
+            }
+        }
+    } catch (e) {}
+    const cleanUrl = window.location.origin + window.location.pathname + "?v=" + Date.now();
+    window.location.replace(cleanUrl);
+}
