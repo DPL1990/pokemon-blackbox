@@ -986,7 +986,16 @@ function importData(e) {
     r.onload = function(evt) {
         try {
             const d = JSON.parse(evt.target.result);
-            if (Array.isArray(d)) { 
+            if (typeof isRunBoxBackup === "function" && isRunBoxBackup(d)) {
+                // Ficheiro de exportação da RunBox
+                const stats = importRunBoxData(d);
+                migrateTrainerIds();
+                cleanupDuplicates();
+                saveDatabase();
+                renderAll();
+                alert(`Importação da RunBox concluída com sucesso! Foram importadas ${stats.runsCount} campanha(s) e ${stats.pokemonCount} Pokémon.`);
+            } else if (Array.isArray(d)) { 
+                // Cópia de segurança JSON nativa do BlackBox
                 pokemonDatabase = d; 
                 migrateTrainerIds(); // Run migration immediately so imported data gets trainerId fields assigned!
                 cleanupDuplicates();
@@ -994,10 +1003,10 @@ function importData(e) {
                 renderAll(); 
                 alert("Importação de cópia de segurança JSON concluída com sucesso!");
             } else {
-                alert("Ficheiro inválido. O backup do BlackBox deve ser um ficheiro JSON.");
+                alert("Ficheiro inválido. O ficheiro deve ser uma cópia de segurança do BlackBox ou uma exportação JSON da RunBox.");
             }
         } catch (err) {
-            alert("Erro ao ler o ficheiro JSON de backup: " + err.message);
+            alert("Erro ao ler o ficheiro JSON: " + err.message);
         }
     }; 
     r.readAsText(file);

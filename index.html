@@ -1180,7 +1180,7 @@
                         <button class="btn btn-action" onclick="document.getElementById('settings-import-file').click()" style="font-size: 0.7rem; font-weight: 800; padding: 8px;">
                             📤 Importar JSON
                         </button>
-                        <input type="file" id="settings-import-file" style="display:none" onchange="importData(event)">
+                        <input type="file" id="settings-import-file" accept=".json" style="display:none" onchange="importData(event)">
                         
                         <button class="btn btn-action" onclick="closeSettingsModal(); openSaveImportModal();" style="grid-column: span 2; background: rgba(16, 185, 129, 0.08); border-color: rgba(16, 185, 129, 0.25); font-size: 0.7rem; font-weight: 800; padding: 8px;">
                             💾 Importar de Save (.sav)

@@ -542,3 +542,219 @@ function setupEditorMovesListeners() {
         }
     });
 }
+
+// =========================================================================
+// SUPORTE A IMPORTAÇÃO DE JSON DA RUNBOX (Fase 2)
+// =========================================================================
+
+function normalizeRunBoxGameId(gameId) {
+    if (!gameId || typeof gameId !== "string") return "custom";
+    const cleaned = gameId.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    if (typeof GAMES_DB !== "undefined" && GAMES_DB) {
+        if (Array.isArray(GAMES_DB)) {
+            // 1. Procura por correspondência exata de id (ex: "sword", "white2", "brilliantdiamond")
+            const exact = GAMES_DB.find(g => (g.id || "").toLowerCase() === cleaned);
+            if (exact) return exact.id;
+            
+            // 2. Procura pelo nome oficial do jogo (ex: "Pokémon Sword" -> "sword")
+            for (const g of GAMES_DB) {
+                const nameClean = (g.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (nameClean && (nameClean === cleaned || cleaned.includes(nameClean) || nameClean.includes(cleaned))) {
+                    return g.id;
+                }
+            }
+        } else if (typeof GAMES_DB === "object") {
+            if (GAMES_DB[cleaned]) return cleaned;
+            const slugHyphen = gameId.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+            if (GAMES_DB[slugHyphen]) return slugHyphen;
+            for (const [key, val] of Object.entries(GAMES_DB)) {
+                const valClean = (val.name || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (valClean && (valClean === cleaned || cleaned.includes(valClean) || valClean.includes(cleaned))) {
+                    return key;
+                }
+            }
+        }
+    }
+    return gameId.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-");
+}
+
+function findPokedexIdBySpecies(speciesName) {
+    if (!speciesName || typeof speciesName !== "string") return 0;
+    const clean = speciesName.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+    if (typeof POKEMON_NAMES_ALL !== "undefined" && Array.isArray(POKEMON_NAMES_ALL)) {
+        for (let i = 1; i < POKEMON_NAMES_ALL.length; i++) {
+            const entry = POKEMON_NAMES_ALL[i];
+            if (entry) {
+                const entryClean = entry.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (entryClean === clean) return i;
+            }
+        }
+        for (let i = 1; i < POKEMON_NAMES_ALL.length; i++) {
+            const entry = POKEMON_NAMES_ALL[i];
+            if (entry) {
+                const entryClean = entry.toLowerCase().replace(/[^a-z0-9]/g, "");
+                if (clean.startsWith(entryClean) || entryClean.startsWith(clean)) return i;
+            }
+        }
+    }
+    return 0;
+}
+
+function isRunBoxBackup(data) {
+    if (!data || typeof data !== "object") return false;
+    if (Array.isArray(data)) return false;
+    if (Array.isArray(data.runs)) return true;
+    if (data.runs && typeof data.runs === "object" && !Array.isArray(data.runs)) return true;
+    return false;
+}
+
+function mapRunBoxPokemon(p, trainerId, gameId, slotType, slotIndex) {
+    if (!p || typeof p !== "object") return null;
+    const species = p.species || p.name || "Unknown";
+    const pokedexId = parseInt(p.pokedexId || p.speciesId || 0, 10) || findPokedexIdBySpecies(species);
+    
+    // Normalização de moves
+    let moves = ["", "", "", ""];
+    if (Array.isArray(p.moveset)) {
+        moves = [p.moveset[0] || "", p.moveset[1] || "", p.moveset[2] || "", p.moveset[3] || ""];
+    } else if (Array.isArray(p.moves)) {
+        moves = [p.moves[0] || "", p.moves[1] || "", p.moves[2] || "", p.moves[3] || ""];
+    }
+
+    // Normalização de tipos
+    let type1 = "";
+    let type2 = "";
+    if (Array.isArray(p.types) && p.types.length > 0) {
+        type1 = (p.types[0] || "").toString().toLowerCase().trim();
+        type2 = (p.types[1] || "").toString().toLowerCase().trim();
+    } else {
+        if (p.type1) type1 = p.type1.toString().toLowerCase().trim();
+        if (p.type2) type2 = p.type2.toString().toLowerCase().trim();
+    }
+
+    const uniqueId = (typeof p.id === "string" && p.id.startsWith("pkmn_"))
+        ? p.id
+        : "pkmn_" + Date.now() + "_" + Math.random().toString(36).substr(2, 7);
+
+    return {
+        id: uniqueId,
+        species: species,
+        pokedexId: pokedexId,
+        nickname: p.nickname || "",
+        level: parseInt(p.level, 10) || 50,
+        ability: p.ability || "",
+        nature: p.nature || "Hardy",
+        item: p.item || "",
+        moves: moves,
+        type1: type1,
+        type2: type2,
+        isShiny: Boolean(p.isShiny || p.shiny),
+        slotType: slotType, // "team" ou "box"
+        slotIndex: slotIndex, // 0..5 para team, 0 para box
+        trainerId: trainerId,
+        currentGame: gameId,
+        originGame: p.originGame ? normalizeRunBoxGameId(p.originGame) : gameId,
+        gender: (p.gender || "M").toString().toUpperCase(),
+        ivs: p.ivs || { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 },
+        evs: p.evs || { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 }
+    };
+}
+
+function importRunBoxData(data) {
+    if (!isRunBoxBackup(data)) return { runsCount: 0, pokemonCount: 0 };
+    
+    const runsList = Array.isArray(data.runs) ? data.runs : Object.values(data.runs);
+    if (!Array.isArray(trainersList)) {
+        trainersList = [];
+    }
+    if (!Array.isArray(pokemonDatabase)) {
+        pokemonDatabase = [];
+    }
+
+    let importedRuns = 0;
+    let importedPkmn = 0;
+
+    runsList.forEach((run, rIdx) => {
+        if (!run || typeof run !== "object") return;
+        importedRuns++;
+
+        const gameId = normalizeRunBoxGameId(run.gameId || run.game || "custom");
+        const trainerName = (run.name || run.trainerName || `Run ${rIdx + 1}`).trim();
+        const tid = (run.trainerId || run.tid || "00000").toString().trim();
+        const sid = (run.trainerSid || run.sid || "00000").toString().trim();
+
+        // Encontra ou cria perfil de treinador correspondente
+        let trainer = trainersList.find(t => t.gameId === gameId && t.name.toLowerCase() === trainerName.toLowerCase());
+        if (!trainer) {
+            trainer = {
+                id: "trainer_" + gameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+                gameId: gameId,
+                name: trainerName,
+                tid: tid,
+                sid: sid
+            };
+            trainersList.push(trainer);
+        }
+
+        const teamMembers = [];
+        // 1. Team (slotType: "team", slotIndex: 0..5)
+        if (Array.isArray(run.team)) {
+            run.team.forEach((p, idx) => {
+                if (idx < 6) {
+                    const mapped = mapRunBoxPokemon(p, trainer.id, gameId, "team", idx);
+                    if (mapped) {
+                        teamMembers.push(mapped);
+                        pokemonDatabase.push(mapped);
+                        importedPkmn++;
+                    }
+                }
+            });
+        }
+
+        // Função auxiliar para verificar duplicação interna na run
+        const isDuplicateOfTeam = (p) => {
+            const species = (p.species || p.name || "").toLowerCase().trim();
+            const nick = (p.nickname || "").toLowerCase().trim();
+            return teamMembers.some(tm => 
+                tm.species.toLowerCase().trim() === species &&
+                tm.nickname.toLowerCase().trim() === nick &&
+                tm.level === (parseInt(p.level, 10) || tm.level)
+            );
+        };
+
+        // 2. Box / Bench / Graveyard (slotType: "box")
+        const boxSources = [run.box, run.bench, run.graveyard, run.dead, run.daycare];
+        boxSources.forEach(source => {
+            if (Array.isArray(source)) {
+                source.forEach(p => {
+                    const mapped = mapRunBoxPokemon(p, trainer.id, gameId, "box", 0);
+                    if (mapped) {
+                        pokemonDatabase.push(mapped);
+                        importedPkmn++;
+                    }
+                });
+            }
+        });
+
+        // 3. FinalTeam (se houver, e não for cópia exata do team atual)
+        if (Array.isArray(run.finalTeam)) {
+            run.finalTeam.forEach(p => {
+                if (!isDuplicateOfTeam(p)) {
+                    const mapped = mapRunBoxPokemon(p, trainer.id, gameId, "box", 0);
+                    if (mapped) {
+                        pokemonDatabase.push(mapped);
+                        importedPkmn++;
+                    }
+                }
+            });
+        }
+    });
+
+    try {
+        localStorage.setItem("bb_trainers", JSON.stringify(trainersList));
+    } catch (e) {
+        console.warn("Não foi possível persistir bb_trainers:", e);
+    }
+
+    return { runsCount: importedRuns, pokemonCount: importedPkmn };
+}
