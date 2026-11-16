@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blackbox-v11';         // ficheiros da app
+const CACHE_NAME = 'blackbox-v12';         // ficheiros da app
 const RUNTIME_CACHE = 'blackbox-runtime-v1'; // sprites, PokeAPI e fontes
 const MAX_RUNTIME_ENTRIES = 1000;
 const ASSETS = [

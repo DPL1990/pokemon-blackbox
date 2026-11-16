@@ -660,6 +660,13 @@ function mapRunBoxPokemon(p, trainerId, gameId, slotType, slotIndex) {
     };
 }
 
+function sanitizeTrainerIdentifier(str) {
+    if (!str || typeof str !== "string") return "";
+    return str.toLowerCase().trim()
+        .replace(/[^a-z0-9]+/g, "_")
+        .replace(/^_+|_+$/g, "");
+}
+
 function importRunBoxData(data) {
     if (!isRunBoxBackup(data)) return { runsCount: 0, newTrainersCount: 0, pokemonCount: 0 };
     
@@ -684,17 +691,27 @@ function importRunBoxData(data) {
         const tid = (run.trainerId || run.tid || "00000").toString().trim();
         const sid = (run.trainerSid || run.sid || "00000").toString().trim();
 
-        // 1. Gestão Dinâmica de Treinadores (OTs):
-        // Verifica no array atual de treinadores (trainersList) se já existe um treinador com esse nome para esse jogo
-        let trainer = trainersList.find(t => 
-            (t.gameId || "").toLowerCase() === gameId.toLowerCase() && 
-            (t.name || "").toLowerCase().trim() === trainerName.toLowerCase()
-        );
+        // 1. Geração de Trainer ID Único por Run:
+        // Combina o jogo e o identificador/nome da run (ex: trainer_${gameId}_${run.id} ou trainer_${gameId}_${sanitizeTrainerIdentifier(run.name)})
+        const rawRunId = run.id || run.runId || "";
+        const runIdTag = sanitizeTrainerIdentifier(String(rawRunId));
+        const runNameTag = sanitizeTrainerIdentifier(trainerName);
+        const uniqueRunTag = runIdTag || runNameTag || `run_${rIdx + 1}`;
+        const targetTrainerId = `trainer_${gameId}_${uniqueRunTag}`;
 
-        // Se não existir, cria um novo registo de treinador com ID único
+        // Verifica no array atual de treinadores (trainersList) se já existe um treinador com esse ID ou com mesmo nome para o jogo
+        let trainer = trainersList.find(t => t.id === targetTrainerId);
+        if (!trainer) {
+            trainer = trainersList.find(t => 
+                (t.gameId || "").toLowerCase() === gameId.toLowerCase() && 
+                (t.name || "").toLowerCase().trim() === trainerName.toLowerCase()
+            );
+        }
+
+        // Se não existir, cria um novo registo de treinador com o ID único gerado
         if (!trainer) {
             trainer = {
-                id: `trainer_${gameId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
+                id: targetTrainerId,
                 gameId: gameId,
                 name: trainerName,
                 tid: tid,
@@ -702,6 +719,17 @@ function importRunBoxData(data) {
             };
             trainersList.push(trainer);
             newTrainersCount++;
+        } else {
+            // Se já existia, assegura a atribuição do ID determinístico por run
+            if (trainer.id !== targetTrainerId && !trainersList.some(t => t.id === targetTrainerId)) {
+                const oldId = trainer.id;
+                trainer.id = targetTrainerId;
+                pokemonDatabase.forEach(p => {
+                    if (p.trainerId === oldId) p.trainerId = targetTrainerId;
+                });
+            }
+            if (tid !== "00000" && (!trainer.tid || trainer.tid === "00000")) trainer.tid = tid;
+            if (sid !== "00000" && (!trainer.sid || trainer.sid === "00000")) trainer.sid = sid;
         }
 
         const teamMembers = [];
