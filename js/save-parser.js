@@ -1596,10 +1596,17 @@ function parseDecryptedPKM(buffer, fileName) {
     }];
 }
 
+function isSlotZeroU32(u32, slotStart, pkLen) {
+    const startWord = slotStart >>> 2;
+    const endWord = (slotStart + pkLen) >>> 2;
+    for (let w = startWord; w < endWord; w++) {
+        if (u32[w] !== 0) return false;
+    }
+    return true;
+}
+
 function parseGen8Gen9Save(buffer) {
-    const u8 = new Uint8Array(buffer);
     const size = buffer.byteLength;
-    
     let pkLen = 328;
     if (size > 2000000) {
         pkLen = 344;
@@ -1608,51 +1615,67 @@ function parseGen8Gen9Save(buffer) {
     const parsedList = [];
     const totalSlots = 960;
     const blockLen = totalSlots * pkLen;
-    let bestOffset = -1;
+    if (size < blockLen) return parsedList;
     
-    for (let offset = 0; offset <= size - blockLen; offset += 8) {
-        let validOrZeroCount = 0;
-        let nonZeroCount = 0;
+    const alignedByteLen = size & ~3;
+    const u16 = new Uint16Array(buffer, 0, alignedByteLen >>> 1);
+    const u32 = new Uint32Array(buffer, 0, alignedByteLen >>> 2);
+    
+    let bestOffset = -1;
+    const maxRecOffset = size - pkLen;
+    
+    // Salta rapidamente zonas a zero (passo de 8 bytes apenas sobre palavras u16/u32)
+    // e só valida a janela de 960 slots quando encontra um registo PK8/PK9 válido.
+    for (let recOffset = 0; recOffset <= maxRecOffset; recOffset += 8) {
+        // Verifica rapidamente se a espécie em +0x08 está no intervalo válido (1..1025)
+        const rawSpecies = u16[(recOffset + 8) >>> 1];
+        if (rawSpecies === 0 || rawSpecies > 1025) continue;
         
-        for (let i = 0; i < totalSlots; i++) {
-            const slotStart = offset + (i * pkLen);
-            let isZero = true;
-            for (let j = 0; j < pkLen; j++) {
-                if (u8[slotStart + j] !== 0) {
-                    isZero = false;
-                    break;
-                }
-            }
-            
-            if (isZero) {
-                validOrZeroCount++;
+        if (!isValidPKMRecord(buffer, recOffset, pkLen)) continue;
+        
+        // Conta quantos slots consecutivos para a frente (a passo pkLen) são válidos ou zero
+        let forwardCount = 0;
+        let forwardNonZero = 0;
+        for (let s = 1; s < totalSlots; s++) {
+            const slotOff = recOffset + s * pkLen;
+            if (slotOff + pkLen > size) break;
+            if (isSlotZeroU32(u32, slotOff, pkLen)) {
+                forwardCount++;
+            } else if (isValidPKMRecord(buffer, slotOff, pkLen)) {
+                forwardCount++;
+                forwardNonZero++;
             } else {
-                if (isValidPKMRecord(buffer, slotStart, pkLen)) {
-                    validOrZeroCount++;
-                    nonZeroCount++;
-                } else {
-                    break;
-                }
+                break;
             }
         }
         
-        if (validOrZeroCount === totalSlots && nonZeroCount > 0) {
-            bestOffset = offset;
+        const neededBefore = (totalSlots - 1) - forwardCount;
+        let backwardCount = 0;
+        for (let s = 1; s <= neededBefore; s++) {
+            const slotOff = recOffset - s * pkLen;
+            if (slotOff < 0) break;
+            if (isSlotZeroU32(u32, slotOff, pkLen) || isValidPKMRecord(buffer, slotOff, pkLen)) {
+                backwardCount++;
+            } else {
+                break;
+            }
+        }
+        
+        if (1 + forwardCount + backwardCount >= totalSlots) {
+            bestOffset = recOffset - backwardCount * pkLen;
             break;
+        }
+        
+        // Se esta janela falhou à frente, avança para depois do último slot verificado
+        if (forwardCount > 0) {
+            recOffset += forwardCount * pkLen - 8;
         }
     }
     
     if (bestOffset !== -1) {
         for (let i = 0; i < totalSlots; i++) {
             const slotStart = bestOffset + (i * pkLen);
-            let isZero = true;
-            for (let j = 0; j < pkLen; j++) {
-                if (u8[slotStart + j] !== 0) {
-                    isZero = false;
-                    break;
-                }
-            }
-            if (isZero) continue;
+            if (isSlotZeroU32(u32, slotStart, pkLen)) continue;
             
             const pkBuffer = buffer.slice(slotStart, slotStart + pkLen);
             const parsed = parseDecryptedPKM(pkBuffer, `Slot ${i + 1}`);
@@ -1660,6 +1683,9 @@ function parseGen8Gen9Save(buffer) {
                 const boxNum = Math.floor(i / 30) + 1;
                 const slotNum = (i % 30) + 1;
                 parsed[0].sourceSlot = `Caixa ${boxNum} Slot ${slotNum}`;
+                if (parsed[0].saveMeta) {
+                    parsed[0].saveMeta.structOffset = slotStart;
+                }
                 parsedList.push(parsed[0]);
             }
         }
@@ -1672,6 +1698,9 @@ function isValidPKMRecord(buffer, start, len) {
     const u16 = new Uint16Array(buffer, start, len / 2);
     const u32 = new Uint32Array(buffer, start, len / 4);
     
+    // Sanity word em +0x04 tem de ser 0 num PK8/PK9 desencriptado
+    if (u16[2] !== 0) return false;
+    
     const pokedexId = u16[4];
     const exp = u32[4];
     
@@ -1680,6 +1709,7 @@ function isValidPKMRecord(buffer, start, len) {
     
     const nickWords = u16.subarray(44, 44 + 12);
     const nickname = decodeUTF16String(nickWords);
+    if (!nickname || nickname.length === 0) return false;
     
     for (let j = 0; j < nickname.length; j++) {
         const charCode = nickname.charCodeAt(j);
