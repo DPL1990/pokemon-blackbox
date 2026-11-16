@@ -28,6 +28,9 @@ const blockOrders = [
     [2, 0, 1, 3], [2, 0, 3, 1], [2, 1, 0, 3], [2, 1, 3, 0], [2, 3, 0, 1], [2, 3, 1, 0],
     [3, 0, 1, 2], [3, 0, 2, 1], [3, 1, 0, 2], [3, 1, 2, 0], [3, 2, 0, 1], [3, 2, 1, 0]
 ];
+if (typeof window !== "undefined") {
+    window.blockOrders = blockOrders;
+}
 
 function cleanSpeciesName(name) {
     if (!name) return "";
@@ -315,11 +318,11 @@ async function enrichImportedPokemonList(list) {
         if (!p.nature && p.saveMeta && p.saveMeta.gen) {
             const gen = p.saveMeta.gen;
             if (gen === 1 || gen === 2) {
-                const exp = p.exp || 0;
+                const exp = (p.exp || 0) >>> 0;
                 p.nature = GEN3_NATURES[exp % 25];
             } else if (gen === 3 || gen === 4 || gen === 5) {
-                const pid = p.saveMeta.pid || 0;
-                p.nature = GEN3_NATURES[pid % 25];
+                const pid = (p.saveMeta.pid || 0) >>> 0;
+                p.nature = GEN3_NATURES[pid % 25] || "Hardy";
             }
         }
         if ((!p.gender || p.gender === "⚲") && p.saveMeta && p.saveMeta.gen) {
@@ -328,7 +331,7 @@ async function enrichImportedPokemonList(list) {
                 const atkDv = p.atkDv !== undefined ? p.atkDv : 15;
                 p.gender = getGenderFromDv(p.pokedexId, atkDv);
             } else if (gen === 3 || gen === 4 || gen === 5) {
-                const pid = p.saveMeta.pid || 0;
+                const pid = (p.saveMeta.pid || 0) >>> 0;
                 p.gender = getGenderFromPid(p.pokedexId, pid);
             }
         }
@@ -365,7 +368,7 @@ async function enrichImportedPokemonList(list) {
                         if (p.saveMeta && p.saveMeta.gen) {
                             const gen = p.saveMeta.gen;
                             if (gen === 3) {
-                                const pid = p.saveMeta.pid || 0;
+                                const pid = (p.saveMeta.pid || 0) >>> 0;
                                 const slot = (pid % 2 === 0) ? 1 : 2;
                                 p.ability = getAbilityFromSlots(data.abilities, slot);
                             }
@@ -429,7 +432,7 @@ function getGenderFromDv(pokedexId, atkDv) {
 }
 
 function getGenderFromPid(pokedexId, pid) {
-    const genderByte = pid & 0xFF;
+    const genderByte = (pid >>> 0) & 0xFF;
     const genderless = [81,82,100,101,120,121,132,137,144,145,146,150,151,201,233,243,244,245,249,250,251, 292,337,338,343,344,374,375,376,377,378,379,382,383,384,385,386,
                         436, 437, 479, 480, 481, 482, 483, 484, 486, 487, 489, 490, 491, 492, 493, 494, 599, 600, 601, 615, 622, 623, 638, 639, 640, 643, 644, 646, 647, 648, 649];
     if (genderless.includes(pokedexId)) return "⚲";
@@ -748,58 +751,39 @@ function parseGen2Save(buffer) {
     return parsedList;
 }
 
-function parseGen3Save(buffer) {
-    const u8 = new Uint8Array(buffer);
-    const parsedList = [];
-    
-    let maxSaveIndex0 = -1;
-    let maxSaveIndex1 = -1;
-    const numSectors = Math.floor(u8.length / 4096);
-    
-    for (let i = 0; i < 14 && i < numSectors; i++) {
-        const offset = i * 4096;
-        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-        if (sig === 0x08012025) {
-            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
-            if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
-        }
-    }
-    
-    if (numSectors >= 28) {
-        for (let i = 14; i < 28; i++) {
-            const offset = i * 4096;
-            const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-            if (sig === 0x08012025) {
-                const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
-                if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
-            }
-        }
-    }
-    
-    let activeSlotStartSector = 0;
-    if (numSectors >= 28 && maxSaveIndex1 > maxSaveIndex0) {
-        activeSlotStartSector = 14;
-    }
-    
+function parseGen3SectorGroup(u8, startSector) {
     const activeSectors = {};
     for (let i = 0; i < 14; i++) {
-        const sectorIndex = activeSlotStartSector + i;
+        const sectorIndex = startSector + i;
         const offset = sectorIndex * 4096;
-        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-        if (sig === 0x08012025) {
-            const sectionId = u8[offset + 0x0FF4];
+        if (offset + 4096 > u8.length) break;
+        const sig = (u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24)) >>> 0;
+        const sectionId = (u8[offset + 0x0FF4] | (u8[offset + 0x0FF5] << 8)) & 0xFFFF;
+        if (sig === 0x08012025 && sectionId < 14) {
             activeSectors[sectionId] = u8.subarray(offset, offset + 4096);
         }
     }
-    
+    // Fallback: se algum sector faltar por assinatura ligeiramente alterada em saves modificados/PKHeX
+    for (let i = 0; i < 14; i++) {
+        const sectorIndex = startSector + i;
+        const offset = sectorIndex * 4096;
+        if (offset + 4096 > u8.length) break;
+        const sectionId = (u8[offset + 0x0FF4] | (u8[offset + 0x0FF5] << 8)) & 0xFFFF;
+        if (sectionId < 14 && !activeSectors[sectionId]) {
+            activeSectors[sectionId] = u8.subarray(offset, offset + 4096);
+        }
+    }
+
+    const parsedList = [];
+
     // Parse Active Team (Section 1)
     if (activeSectors[1]) {
         const section1 = activeSectors[1];
         let teamCount = 0;
         let listOffset = 0;
         
-        const countRSE = section1[0x0234] | (section1[0x0235] << 8) | (section1[0x0236] << 16) | (section1[0x0237] << 24);
-        const countFRLG = section1[0x0034] | (section1[0x0035] << 8) | (section1[0x0036] << 16) | (section1[0x0037] << 24);
+        const countRSE = (section1[0x0234] | (section1[0x0235] << 8) | (section1[0x0236] << 16) | (section1[0x0237] << 24)) >>> 0;
+        const countFRLG = (section1[0x0034] | (section1[0x0035] << 8) | (section1[0x0036] << 16) | (section1[0x0037] << 24)) >>> 0;
         
         if (countRSE >= 1 && countRSE <= 6) {
             teamCount = countRSE;
@@ -808,7 +792,7 @@ function parseGen3Save(buffer) {
             teamCount = countFRLG;
             listOffset = 0x0038;
         } else {
-            teamCount = countRSE;
+            teamCount = 0;
             listOffset = 0x0238;
         }
         
@@ -816,33 +800,35 @@ function parseGen3Save(buffer) {
             const structOffset = listOffset + (i * 100);
             if (structOffset + 100 > section1.length) break;
             
-            const pid = section1[structOffset] |
+            const pid = ((section1[structOffset] |
                         (section1[structOffset + 1] << 8) |
                         (section1[structOffset + 2] << 16) |
-                        (section1[structOffset + 3] << 24);
+                        (section1[structOffset + 3] << 24)) >>> 0);
                         
-            const otid = section1[structOffset + 4] |
+            const otid = ((section1[structOffset + 4] |
                          (section1[structOffset + 5] << 8) |
                          (section1[structOffset + 6] << 16) |
-                         (section1[structOffset + 7] << 24);
+                         (section1[structOffset + 7] << 24)) >>> 0);
+            
+            if (pid === 0 && otid === 0) continue;
                          
             const nickBytes = section1.subarray(structOffset + 8, structOffset + 18);
             const nickname = decodeGen3String(nickBytes);
             
-            const key = pid ^ otid;
+            const key = (pid ^ otid) >>> 0;
             const decryptedWords = new Uint32Array(12);
             for (let j = 0; j < 12; j++) {
                 const wordOffset = structOffset + 0x20 + j * 4;
-                const encryptedWord = section1[wordOffset] |
+                const encryptedWord = (section1[wordOffset] |
                                       (section1[wordOffset + 1] << 8) |
                                       (section1[wordOffset + 2] << 16) |
-                                      (section1[wordOffset + 3] << 24);
-                decryptedWords[j] = encryptedWord ^ key;
+                                      (section1[wordOffset + 3] << 24)) >>> 0;
+                decryptedWords[j] = (encryptedWord ^ key) >>> 0;
             }
             
             const decryptedBytes = new Uint8Array(decryptedWords.buffer);
-            const shuffleIndex = pid % 24;
-            const order = blockOrders[shuffleIndex];
+            const shuffleIndex = (pid >>> 0) % 24;
+            const order = blockOrders[shuffleIndex] || blockOrders[0];
             
             let blockG = null;
             let blockA = null;
@@ -865,6 +851,9 @@ function parseGen3Save(buffer) {
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
             
             const otId = otid & 0xFFFF;
+            const secretId = (otid >>> 16) & 0xFFFF;
+            const isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
+            
             const otNameBytes = section1.subarray(structOffset + 20, structOffset + 20 + 7);
             const otName = decodeGen3String(otNameBytes);
             
@@ -884,7 +873,7 @@ function parseGen3Save(buffer) {
             
             let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
             if (blockM) {
-                const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
+                const ivWord = (blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24)) >>> 0;
                 ivs = {
                     hp: ivWord & 0x1F,
                     atk: (ivWord >> 5) & 0x1F,
@@ -906,11 +895,12 @@ function parseGen3Save(buffer) {
                 item: itemName,
                 moves: moves,
                 ivs: ivs,
-                nature: GEN3_NATURES[pid % 25],
+                nature: GEN3_NATURES[(pid >>> 0) % 25] || "Hardy",
                 gender: getGenderFromPid(pokedexId, pid),
                 ability: "",
                 type1: "normal",
                 type2: "",
+                isShiny: isShiny,
                 saveMeta: {
                     gen: 3,
                     isParty: true,
@@ -924,54 +914,54 @@ function parseGen3Save(buffer) {
         }
     }
     
-    // Parse Stored Boxes (Section 5 a 13)
-    const pcBuffer = new Uint8Array(33744);
+    // Parse Stored Boxes (Section 5 a 13 - Storage totaliza 9 sectores x 3968 bytes)
+    const pcBuffer = new Uint8Array(35712);
     let pcOffset = 0;
-    let hasPC = true;
+    let hasPC = false;
     for (let id = 5; id <= 13; id++) {
         const sec = activeSectors[id];
-        if (!sec) {
-            hasPC = false;
-            break;
+        if (sec) {
+            hasPC = true;
+            const len = Math.min(3968, sec.length);
+            pcBuffer.set(sec.subarray(0, len), pcOffset);
         }
-        const len = (id === 13) ? 2000 : 3968;
-        pcBuffer.set(sec.subarray(0, len), pcOffset);
-        pcOffset += len;
+        pcOffset += 3968;
     }
     
     if (hasPC) {
         for (let i = 0; i < 420; i++) {
             const structOffset = 4 + (i * 80);
+            if (structOffset + 80 > pcBuffer.length) break;
             
-            const pid = pcBuffer[structOffset] |
+            const pid = ((pcBuffer[structOffset] |
                         (pcBuffer[structOffset + 1] << 8) |
                         (pcBuffer[structOffset + 2] << 16) |
-                        (pcBuffer[structOffset + 3] << 24);
+                        (pcBuffer[structOffset + 3] << 24)) >>> 0);
                         
-            const otid = pcBuffer[structOffset + 4] |
+            const otid = ((pcBuffer[structOffset + 4] |
                          (pcBuffer[structOffset + 5] << 8) |
                          (pcBuffer[structOffset + 6] << 16) |
-                         (pcBuffer[structOffset + 7] << 24);
+                         (pcBuffer[structOffset + 7] << 24)) >>> 0);
             
             if (pid === 0 && otid === 0) continue;
             
             const nickBytes = pcBuffer.subarray(structOffset + 8, structOffset + 18);
             const nickname = decodeGen3String(nickBytes);
             
-            const key = pid ^ otid;
+            const key = (pid ^ otid) >>> 0;
             const decryptedWords = new Uint32Array(12);
             for (let j = 0; j < 12; j++) {
                 const wordOffset = structOffset + 32 + j * 4;
-                const encryptedWord = pcBuffer[wordOffset] |
+                const encryptedWord = (pcBuffer[wordOffset] |
                                       (pcBuffer[wordOffset + 1] << 8) |
                                       (pcBuffer[wordOffset + 2] << 16) |
-                                      (pcBuffer[wordOffset + 3] << 24);
-                decryptedWords[j] = encryptedWord ^ key;
+                                      (pcBuffer[wordOffset + 3] << 24)) >>> 0;
+                decryptedWords[j] = (encryptedWord ^ key) >>> 0;
             }
             
             const decryptedBytes = new Uint8Array(decryptedWords.buffer);
-            const shuffleIndex = pid % 24;
-            const order = blockOrders[shuffleIndex];
+            const shuffleIndex = (pid >>> 0) % 24;
+            const order = blockOrders[shuffleIndex] || blockOrders[0];
             
             let blockG = null;
             let blockA = null;
@@ -990,11 +980,14 @@ function parseGen3Save(buffer) {
             const pokedexId = gen3InternalToNational(rawSpeciesId);
             if (pokedexId === 0 || pokedexId > 386) continue;
             
-            const exp = blockG[4] | (blockG[5] << 8) | (blockG[6] << 16) | (blockG[7] << 24);
+            const exp = (blockG[4] | (blockG[5] << 8) | (blockG[6] << 16) | (blockG[7] << 24)) >>> 0;
             const level = levelFromExp(pokedexId, exp);
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
             
             const otId = otid & 0xFFFF;
+            const secretId = (otid >>> 16) & 0xFFFF;
+            const isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
+            
             const otNameBytes = pcBuffer.subarray(structOffset + 20, structOffset + 20 + 7);
             const otName = decodeGen3String(otNameBytes);
             
@@ -1014,7 +1007,7 @@ function parseGen3Save(buffer) {
             
             let ivs = { hp: 31, atk: 31, def: 31, spa: 31, spd: 31, spe: 31 };
             if (blockM) {
-                const ivWord = blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24);
+                const ivWord = (blockM[4] | (blockM[5] << 8) | (blockM[6] << 16) | (blockM[7] << 24)) >>> 0;
                 ivs = {
                     hp: ivWord & 0x1F,
                     atk: (ivWord >> 5) & 0x1F,
@@ -1039,11 +1032,12 @@ function parseGen3Save(buffer) {
                 item: itemName,
                 moves: moves,
                 ivs: ivs,
-                nature: GEN3_NATURES[pid % 25],
+                nature: GEN3_NATURES[(pid >>> 0) % 25] || "Hardy",
                 gender: getGenderFromPid(pokedexId, pid),
                 ability: "",
                 type1: "normal",
                 type2: "",
+                isShiny: isShiny,
                 saveMeta: {
                     gen: 3,
                     isParty: false,
@@ -1059,6 +1053,58 @@ function parseGen3Save(buffer) {
     }
     
     return parsedList;
+}
+
+function parseGen3Save(buffer) {
+    const u8 = new Uint8Array(buffer);
+    
+    let maxSaveIndex0 = -1;
+    let maxSaveIndex1 = -1;
+    const numSectors = Math.floor(u8.length / 4096);
+    
+    for (let i = 0; i < 14 && i < numSectors; i++) {
+        const offset = i * 4096;
+        const sig = (u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24)) >>> 0;
+        if (sig === 0x08012025) {
+            const saveIndex = (u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24)) >>> 0;
+            if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
+        }
+    }
+    
+    if (numSectors >= 28) {
+        for (let i = 14; i < 28; i++) {
+            const offset = i * 4096;
+            const sig = (u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24)) >>> 0;
+            if (sig === 0x08012025) {
+                const saveIndex = (u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24)) >>> 0;
+                if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
+            }
+        }
+    }
+    
+    let activeSlotStartSector = 0;
+    if (numSectors >= 28 && maxSaveIndex1 > maxSaveIndex0) {
+        activeSlotStartSector = 14;
+    }
+    
+    let parsedList = parseGen3SectorGroup(u8, activeSlotStartSector);
+    // Se a partição selecionada estiver vazia e existir a partição alternativa, faz fallback para a alternativa
+    if ((!parsedList || parsedList.length === 0) && numSectors >= 28) {
+        const altSlot = activeSlotStartSector === 0 ? 14 : 0;
+        const altList = parseGen3SectorGroup(u8, altSlot);
+        if (altList && altList.length > 0) {
+            parsedList = altList;
+            activeSlotStartSector = altSlot;
+        }
+    }
+    
+    if (parsedList) {
+        parsedList.forEach(p => {
+            if (p.saveMeta) p.saveMeta.activeSlotStartSector = activeSlotStartSector;
+        });
+    }
+    
+    return parsedList || [];
 }
 
 // Fonte: PKHeX.Core/Saves/SAV4.cs (partição 0 em 0x00000 e partição 1 em 0x40000;
@@ -1153,7 +1199,7 @@ function parseGen4Gen5Save(buffer) {
         
         if (sum === checksum) {
             const shuffleIndex = ((pid & 0x3E000) >>> 13) % 24;
-            const order = blockOrders[shuffleIndex];
+            const order = blockOrders[shuffleIndex] || blockOrders[0];
             
             const blockA = new Uint16Array(16);
             const blockB = new Uint16Array(16);
@@ -1395,7 +1441,7 @@ function parseDecryptedPKM(buffer, fileName) {
         };
         
         genderVal = getGenderFromPid(pokedexId, pid);
-        natureName = GEN3_NATURES[pid % 25] || "Hardy";
+        natureName = GEN3_NATURES[(pid >>> 0) % 25] || "Hardy";
         isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
         
         rawSaveMeta = { 
@@ -1437,7 +1483,7 @@ function parseDecryptedPKM(buffer, fileName) {
             natureName = GEN3_NATURES[u8[0x41]];
         }
         if (!natureName) {
-            natureName = GEN3_NATURES[pid % 25] || "Hardy";
+            natureName = GEN3_NATURES[(pid >>> 0) % 25] || "Hardy";
         }
         
         for (let m = 0; m < 4; m++) {
@@ -1812,8 +1858,8 @@ function extractTrainerFromSave(u8, gen, activeSlotStartSector, parsedPokemonLis
     let name = "Treinador";
     let tid = "00000";
     
-    // For Gen 4 and Gen 5, let's find the most common trainer in the parsed list!
-    if ((gen === 4 || gen === 5) && parsedPokemonList && parsedPokemonList.length > 0) {
+    // For Gen 3, Gen 4 and Gen 5, let's find the most common trainer in the parsed list!
+    if ((gen === 3 || gen === 4 || gen === 5) && parsedPokemonList && parsedPokemonList.length > 0) {
         const counts = {};
         parsedPokemonList.forEach(p => {
             if (p.otName && p.otId !== undefined) {
@@ -1913,29 +1959,8 @@ function handleSaveFileSelect(e) {
                 parsed = parseGen3Save(buffer);
                 if (parsed && parsed.length > 0) {
                     detectedGen = 3;
-                    let maxSaveIndex0 = -1;
-                    let maxSaveIndex1 = -1;
-                    const numSectors = Math.floor(u8.length / 4096);
-                    for (let i = 0; i < 14 && i < numSectors; i++) {
-                        const offset = i * 4096;
-                        const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-                        if (sig === 0x08012025) {
-                            const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
-                            if (saveIndex > maxSaveIndex0) maxSaveIndex0 = saveIndex;
-                        }
-                    }
-                    if (numSectors >= 28) {
-                        for (let i = 14; i < 28; i++) {
-                            const offset = i * 4096;
-                            const sig = u8[offset + 0x0FF8] | (u8[offset + 0x0FF9] << 8) | (u8[offset + 0x0FFA] << 16) | (u8[offset + 0x0FFB] << 24);
-                            if (sig === 0x08012025) {
-                                const saveIndex = u8[offset + 0x0FFC] | (u8[offset + 0x0FFD] << 8) | (u8[offset + 0x0FFE] << 16) | (u8[offset + 0x0FFF] << 24);
-                                if (saveIndex > maxSaveIndex1) maxSaveIndex1 = saveIndex;
-                            }
-                        }
-                    }
-                    if (numSectors >= 28 && maxSaveIndex1 > maxSaveIndex0) {
-                        activeSlotStartSector = 14;
+                    if (parsed[0].saveMeta && parsed[0].saveMeta.activeSlotStartSector !== undefined) {
+                        activeSlotStartSector = parsed[0].saveMeta.activeSlotStartSector;
                     }
                 }
             } else if (size >= 500000 && size <= 550000) {
@@ -1974,7 +1999,22 @@ function handleSaveFileSelect(e) {
                 defaultGameId = isCrystal ? "crystal" : "gold";
             } else if (detectedGen === 3) {
                 const curGame = GAMES_DB.find(g => g.id === currentGameId);
-                if (!curGame || curGame.gen !== 3) defaultGameId = "ruby";
+                if (curGame && curGame.gen === 3) {
+                    defaultGameId = curGame.id;
+                } else {
+                    const fn = (file.name || "").toLowerCase();
+                    if (fn.includes("emerald") || fn.includes("esmeralda")) {
+                        defaultGameId = "emerald";
+                    } else if (fn.includes("fire") || fn.includes("fr") || fn.includes("fogo")) {
+                        defaultGameId = "firered";
+                    } else if (fn.includes("leaf") || fn.includes("lg") || fn.includes("verde")) {
+                        defaultGameId = "leafgreen";
+                    } else if (fn.includes("sapphire") || fn.includes("safira")) {
+                        defaultGameId = "sapphire";
+                    } else {
+                        defaultGameId = "ruby";
+                    }
+                }
             }
             
             const saveTrainer = extractTrainerFromSave(u8, detectedGen, activeSlotStartSector, parsed);

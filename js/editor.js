@@ -1184,11 +1184,11 @@ function compileSaveDiffReport(savablePokemon, saveBuffer) {
             if (sectorIndex !== -1) {
                 const sectorOffset = sectorIndex * 4096;
                 const structOffset = sectorOffset + meta.structOffset;
-                const pid = meta.pid;
-                const otid = meta.otid;
-                const key = pid ^ otid;
-                const shuffleIndex = meta.shuffleIndex;
-                const order = blockOrders[shuffleIndex];
+                const pid = (meta.pid || 0) >>> 0;
+                const otid = (meta.otid || 0) >>> 0;
+                const key = (pid ^ otid) >>> 0;
+                const shuffleIndex = meta.shuffleIndex !== undefined ? ((meta.shuffleIndex >>> 0) % 24) : (pid % 24);
+                const order = (typeof blockOrders !== 'undefined' ? blockOrders[shuffleIndex] : null) || (window.blockOrders ? window.blockOrders[shuffleIndex] : null) || [[0,1,2,3]][0];
                 
                 const decryptedWords = new Uint32Array(12);
                 for (let j = 0; j < 12; j++) {

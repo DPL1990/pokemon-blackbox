@@ -3071,11 +3071,11 @@ function exportModifiedSave() {
                 const sectorOffset = sectorIndex * 4096;
                 const structOffset = sectorOffset + meta.structOffset;
                 
-                const pid = meta.pid;
-                const otid = meta.otid;
-                const key = pid ^ otid;
-                const shuffleIndex = meta.shuffleIndex;
-                const order = blockOrders[shuffleIndex];
+                const pid = (meta.pid || 0) >>> 0;
+                const otid = (meta.otid || 0) >>> 0;
+                const key = (pid ^ otid) >>> 0;
+                const shuffleIndex = meta.shuffleIndex !== undefined ? ((meta.shuffleIndex >>> 0) % 24) : (pid % 24);
+                const order = (typeof blockOrders !== 'undefined' ? blockOrders[shuffleIndex] : null) || (window.blockOrders ? window.blockOrders[shuffleIndex] : null) || [[0,1,2,3]][0];
                 
                 const decryptedWords = new Uint32Array(12);
                 for (let j = 0; j < 12; j++) {
@@ -3338,12 +3338,12 @@ function exportIndividualPkx() {
         let pid = pkmn.saveMeta ? pkmn.saveMeta.pid : 0;
         let otid = pkmn.saveMeta ? pkmn.saveMeta.otid : 0;
         let shuffleIndex = 0;
-        if (pkmn.saveMeta) {
-            shuffleIndex = pkmn.saveMeta.shuffleIndex;
+        if (pkmn.saveMeta && pkmn.saveMeta.shuffleIndex !== undefined) {
+            shuffleIndex = ((pkmn.saveMeta.shuffleIndex >>> 0) % 24);
         } else {
-            pid = Math.floor(Math.random() * 0xFFFFFFFF);
-            otid = Math.floor(Math.random() * 0xFFFFFFFF);
-            shuffleIndex = pid % 24;
+            pid = Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+            otid = Math.floor(Math.random() * 0xFFFFFFFF) >>> 0;
+            shuffleIndex = (pid >>> 0) % 24;
             
             u32[0] = pid;
             u32[1] = otid;
@@ -3359,15 +3359,15 @@ function exportIndividualPkx() {
             u8[84] = level;
         }
         
-        const key = pid ^ otid;
+        const key = (pid ^ otid) >>> 0;
         const decryptedWords = new Uint32Array(12);
         for (let j = 0; j < 12; j++) {
             const wordOffset = 0x20 + j * 4;
-            const encryptedWord = u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24);
-            decryptedWords[j] = encryptedWord ^ key;
+            const encryptedWord = (u8[wordOffset] | (u8[wordOffset + 1] << 8) | (u8[wordOffset + 2] << 16) | (u8[wordOffset + 3] << 24)) >>> 0;
+            decryptedWords[j] = (encryptedWord ^ key) >>> 0;
         }
         const decryptedBytes = new Uint8Array(decryptedWords.buffer);
-        const order = blockOrders[shuffleIndex];
+        const order = (typeof blockOrders !== 'undefined' ? blockOrders[shuffleIndex] : null) || (window.blockOrders ? window.blockOrders[shuffleIndex] : null) || [[0,1,2,3]][0];
         
         let blockGIdx = -1;
         let blockAIdx = -1;
@@ -3461,7 +3461,7 @@ function exportIndividualPkx() {
             decryptedWords[j] = encryptedWord ^ key;
         }
         
-        const order = blockOrders[shuffleIndex];
+        const order = (typeof blockOrders !== 'undefined' ? blockOrders[shuffleIndex] : null) || (window.blockOrders ? window.blockOrders[shuffleIndex] : null) || [[0,1,2,3]][0];
         const blockA = new Uint16Array(16);
         const blockB = new Uint16Array(16);
         const blockC = new Uint16Array(16);
