@@ -3695,7 +3695,7 @@ function exportIndividualPkx() {
         blockA[0] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         blockA[1] = itemId & 0xFFFF;
         
         for (let m = 0; m < 4; m++) {
@@ -3746,7 +3746,7 @@ function exportIndividualPkx() {
         u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         u16[0x0A / 2] = itemId & 0xFFFF;
         
         for (let m = 0; m < 4; m++) {
@@ -3778,14 +3778,15 @@ function exportIndividualPkx() {
         u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         u16[0x0A / 2] = itemId & 0xFFFF;
         
+        // Fonte: PKHeX.Core/PKM/G8PKM.cs e PK9.cs (Move1 = 0x72, Move1_PP = 0x7A)
         for (let m = 0; m < 4; m++) {
             const moveName = getEnglishMoveName(moves[m]);
             const moveId = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && Object.keys(POKEAPI_MOVE_ID_TO_NAME).find(k => POKEAPI_MOVE_ID_TO_NAME[k] === moveName.toLowerCase())) || BINARY_MOVES_MAP[moveName] || 0;
-            u16[(0x7C + m * 2) / 2] = moveId & 0xFFFF;
-            u8[0x84 + m] = moveId > 0 ? 20 : 0;
+            u16[(0x72 + m * 2) / 2] = moveId & 0xFFFF;
+            u8[0x7A + m] = moveId > 0 ? 20 : 0;
         }
         
         let ivWord = u32[0x8C / 4];
