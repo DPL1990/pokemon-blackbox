@@ -2,49 +2,25 @@
 let dbInstance = null;
 
 function initDB() {
-    return new Promise((resolve) => {
-        if (typeof indexedDB === "undefined") {
-            resolve(null);
-            return;
-        }
-        let settled = false;
-        const finish = (val) => {
-            if (!settled) {
-                settled = true;
-                resolve(val);
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open("bb_assets_db", 1);
+        
+        request.onupgradeneeded = function(e) {
+            const db = e.target.result;
+            if (!db.objectStoreNames.contains("hall_of_fame")) {
+                db.createObjectStore("hall_of_fame");
             }
         };
-        const timer = setTimeout(() => finish(null), 2000);
-        try {
-            const request = indexedDB.open("bb_assets_db", 1);
-
-            request.onupgradeneeded = function(e) {
-                const db = e.target.result;
-                if (!db.objectStoreNames.contains("hall_of_fame")) {
-                    db.createObjectStore("hall_of_fame");
-                }
-            };
-
-            request.onsuccess = function(e) {
-                clearTimeout(timer);
-                dbInstance = e.target.result;
-                finish(dbInstance);
-            };
-
-            request.onerror = function(e) {
-                clearTimeout(timer);
-                console.error("Erro ao inicializar IndexedDB:", e.target.error);
-                finish(null);
-            };
-
-            request.onblocked = function() {
-                clearTimeout(timer);
-                finish(null);
-            };
-        } catch (err) {
-            clearTimeout(timer);
-            finish(null);
-        }
+        
+        request.onsuccess = function(e) {
+            dbInstance = e.target.result;
+            resolve(dbInstance);
+        };
+        
+        request.onerror = function(e) {
+            console.error("Erro ao inicializar IndexedDB:", e.target.error);
+            reject(e.target.error);
+        };
     });
 }
 
@@ -383,7 +359,7 @@ function generateHofFromActiveTeam() {
                     p.ribbons.push(ribbonToGrant);
                 }
             });
-            saveDatabase();
+            localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
         }
 
         saveHofRecord(currentGameId, record).then(() => {
@@ -430,20 +406,15 @@ function navigateHof(dir) {
 }
 // ---------------------------------
 
-function populateStaticDatalists() {
+function setupDatalists() {
     document.getElementById("natures-list").innerHTML = SUGGESTIONS.natures.map(n => `<option value="${n}"></option>`).join("");
     document.getElementById("ability-list").innerHTML = SUGGESTIONS.abilities.map(a => `<option value="${a}"></option>`).join("");
     
     if (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined') {
-        const uniqueItems = Array.from(new Set(Object.values(POKEAPI_ITEM_ID_TO_NAME).map(name => formatItemNameForDisplay(name))));
-        uniqueItems.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-        document.getElementById("items-list").innerHTML = uniqueItems.map(name => `<option value="${name}"></option>`).join("");
+        const itemNames = Object.values(POKEAPI_ITEM_ID_TO_NAME).map(name => formatItemNameForDisplay(name));
+        itemNames.sort((a, b) => a.localeCompare(b));
+        document.getElementById("items-list").innerHTML = itemNames.map(name => `<option value="${name}"></option>`).join("");
     }
-}
-
-function setupDatalists() {
-    // As listas de sugestões (milhares de <option>) só são construídas quando o browser está livre
-    runWhenIdle(populateStaticDatalists);
     
     const gameOptions = GAMES_DB.map(g => `<option value="${g.id}">${g.name} (Gen ${g.gen})</option>`).join("");
     document.getElementById("form-origin-game").innerHTML = gameOptions;
@@ -463,8 +434,6 @@ function switchGame(gameId) {
     document.getElementById("game-select").value = gameId;
     document.body.className = ""; 
     document.body.classList.add(`v-${gameId}`);
-    if (typeof applyMinimalMode === "function") applyMinimalMode();
-    if (typeof applyVisualTheme === "function") applyVisualTheme();
     
     // Set dynamic mobile theme color
     const metaTheme = document.querySelector('meta[name="theme-color"]');
@@ -614,9 +583,7 @@ function updateDexitMonitor() {
 function renderAll() {
     updateStats(); 
     updateDexitMonitor();
-    if (typeof activeTab !== "undefined" && activeTab === "resume") {
-        renderTrainerResume();
-    }
+    renderTrainerResume();
     
     const teamContainer = document.getElementById("team-container");
     const boxContainer = document.getElementById("box-container");
@@ -627,23 +594,20 @@ function renderAll() {
         : pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "box");
 
     // Render Active Team Slots (Exactly 6 slots)
-    let teamHTML = "";
+    teamContainer.innerHTML = "";
     for (let i = 0; i < 6; i++) {
         const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.slotType === "team" && pkmn.slotIndex === i);
         if (p) {
-            teamHTML += createSlotHTML(p, i, "team");
+            teamContainer.innerHTML += createSlotHTML(p, i, "team");
         } else {
-            const targetHighlight = (typeof moveTargetTeamSlot === "number" && moveTargetTeamSlot === i) ? "move-source-selected" : "";
-            const touchHint = (typeof isTouchDevice === "function" && isTouchDevice()) ? "Tocar p/ Adicionar" : `Slot ${i + 1}`;
-            teamHTML += `
-                <div class="slot empty-team-slot ${targetHighlight}" data-slot-type="team" data-slot-index="${i}" onclick="handleEmptySlotClick('team', ${i})" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+            teamContainer.innerHTML += `
+                <div class="slot empty-team-slot" data-slot-type="team" data-slot-index="${i}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
                     <div class="empty-slot-plus">➕</div>
-                    <div class="empty-slot-text">${touchHint}</div>
+                    <div class="empty-slot-text">Slot ${i + 1}</div>
                 </div>
             `;
         }
     }
-    teamContainer.innerHTML = teamHTML;
 
     // Render HOF dynamically from IndexedDB (supporting multiple generated & uploads)
     const hofDisplayArea = document.getElementById("hof-display-area");
@@ -769,17 +733,18 @@ function renderAll() {
     });
 
     // Render Box Slots
-    const isTouch = typeof isTouchDevice === "function" && isTouchDevice();
-    boxContainer.innerHTML = filteredBox.map((p, idx) => createSlotHTML(p, idx, "box")).join("") + `
-        <div class="slot drop-zone-only" data-slot-type="box" data-slot-index="${filteredBox.length}" onclick="handleEmptySlotClick('box', ${filteredBox.length})" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
+    boxContainer.innerHTML = "";
+    filteredBox.forEach((p, idx) => { 
+        boxContainer.innerHTML += createSlotHTML(p, idx, "box"); 
+    });
+    boxContainer.innerHTML += `
+        <div class="slot drop-zone-only" data-slot-type="box" data-slot-index="${filteredBox.length}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <div class="empty-slot-plus">➕</div>
-            <div class="empty-slot-text">${isTouch ? "Novo / Mover" : "Arrastar"}</div>
+            <div class="empty-slot-text">Arrastar</div>
         </div>
     `;
     
-    if (!isTouch) {
-        setupDragAndDropEvents();
-    }
+    setupDragAndDropEvents();
     if (activeTab === "allocation") {
         renderAllocationTab();
     }
@@ -820,7 +785,6 @@ function createSlotHTML(p, index, type) {
     const subText = p.nickname ? p.species : `Lv. ${p.level}`;
     const badgeLabel = p.currentGame ? p.currentGame.toUpperCase() : '??';
     const selectedClass = (typeof selectedPokemonIds !== 'undefined' && selectedPokemonIds.has(p.id)) ? 'selected-specimen' : '';
-    const moveSelectedClass = (typeof moveModeSelectedId !== 'undefined' && moveModeSelectedId === p.id) ? 'move-source-selected' : '';
 
     const trainerObj = trainersList.find(t => t.id === p.trainerId);
     const trainerName = trainerObj ? trainerObj.name : "Padrão";
@@ -831,16 +795,11 @@ function createSlotHTML(p, index, type) {
     const dexitBadge = isAllowed ? '' : `<span class="dexit-incompatible-badge">Incompatível</span>`;
     const trophyBadge = p.isLocked ? `<span class="locked-trophy-badge" title="Este espécime está trancado por ser vencedor de um desafio">🏆</span>` : '';
 
-    const isTouch = typeof isTouchDevice === "function" && isTouchDevice();
-    const dragAttrs = isTouch
-        ? ""
-        : `draggable="true" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)"`;
-
     return `
-        <div class="slot ${typeClass} ${selectedClass} ${moveSelectedClass} ${dexitClass}" ${dragAttrs} data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')">
+        <div class="slot ${typeClass} ${selectedClass} ${dexitClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
-                <img class="slot-sprite" draggable="false" loading="lazy" decoding="async" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
+                <img class="slot-sprite" draggable="false" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
             </div>
             <div class="slot-name">${displayName}</div>
             <div class="slot-meta">

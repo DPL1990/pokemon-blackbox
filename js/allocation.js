@@ -1844,7 +1844,7 @@ function loadOpponentPreset(presetId) {
         }
     });
     
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     renderAll();
     
     // Reset selection select
@@ -1952,7 +1952,7 @@ function applyRecommendedAllocation() {
         }
     });
     
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     renderAll();
     switchTab("boxes");
     alert("Frota tática alocada com sucesso! A tua equipa ativa foi atualizada.");
@@ -2465,7 +2465,7 @@ function applyRecommendedMove(pokemonId, moveEnglishName, moveDisplayName) {
     if (targetSlot !== -1) {
         moves[targetSlot] = moveEnglishName;
         pkmn.moves = moves;
-        saveDatabase();
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
         renderAll();
         alert(`Sucesso! Adicionado o ataque "${moveEnglishName}" no slot vazio de ${pkmn.nickname || pkmn.species}.`);
         return;
@@ -2487,7 +2487,7 @@ function applyRecommendedMove(pokemonId, moveEnglishName, moveDisplayName) {
         const oldMove = moves[choiceNum - 1];
         moves[choiceNum - 1] = moveEnglishName;
         pkmn.moves = moves;
-        saveDatabase();
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
         renderAll();
         alert(`Sucesso! Substituído o ataque "${oldMove || 'Vazio'}" por "${moveEnglishName}" em ${pkmn.nickname || pkmn.species}.`);
     } else {
@@ -2780,7 +2780,7 @@ function loadPreset(presetId) {
         }
     });
     
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     renderAll();
     switchTab("boxes");
     alert(`Preset "${preset.name}" ativado com sucesso!`);
@@ -2826,7 +2826,7 @@ function cleanSlateActiveTrainer() {
     
     // 1. Limpar Pokémon da base de dados para o treinador ativo e jogo atual
     pokemonDatabase = pokemonDatabase.filter(p => !(p.currentGame === currentGameId && p.trainerId === activeTrainerId));
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     
     // 2. Limpar Presets de Equipa para o treinador ativo e jogo atual
     teamPresetsList = teamPresetsList.filter(tp => !(tp.gameId === currentGameId && tp.trainerId === activeTrainerId));
@@ -2853,9 +2853,221 @@ function cleanSlateActiveTrainer() {
     alert(`Clean Slate concluído! Todos os dados de Pokémon, presets e mural do treinador "${trainerName}" foram eliminados.`);
 }
 
+let minimalModeEnabled = localStorage.getItem("bb_minimal_mode") === "true";
+uploadedSaveBuffer = null;
+uploadedSaveName = "";
+uploadedSaveGen = 0;
+uploadedSaveIsCrystal = false;
+uploadedSaveActiveSectorStart = 0;
+
+currentVisualTheme = localStorage.getItem("bb_visual_theme") || "default";
+
+function toggleMinimalMode() {
+    minimalModeEnabled = !minimalModeEnabled;
+    localStorage.setItem("bb_minimal_mode", minimalModeEnabled);
+    applyMinimalMode();
+}
+
+function applyMinimalMode() {
+    const checkbox = document.getElementById("settings-clean-layout");
+    if (checkbox) checkbox.checked = minimalModeEnabled;
+    
+    if (minimalModeEnabled) {
+        document.body.classList.add("minimal-mode");
+    } else {
+        document.body.classList.remove("minimal-mode");
+    }
+}
+
+function setVisualTheme(theme) {
+    currentVisualTheme = theme;
+    localStorage.setItem("bb_visual_theme", theme);
+    
+    // Remove all existing theme classes from body
+    const themesList = ["retro", "advance", "ds", "upgrade", "alola", "legends", "final", "home"];
+    themesList.forEach(t => document.body.classList.remove(`theme-${t}`));
+    
+    // Add the new theme class if it's not the default
+    if (theme !== "default") {
+        document.body.classList.add(`theme-${theme}`);
+    }
+    
+    // Sync the select dropdowns if they exist
+    const themeSelect = document.getElementById("settings-visual-theme");
+    if (themeSelect) themeSelect.value = theme;
+}
+
+function applyVisualTheme() {
+    setVisualTheme(currentVisualTheme);
+}
+
+function openSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    if (modal) {
+        const styleSelect = document.getElementById("settings-sprite-style");
+        if (styleSelect) styleSelect.value = currentSpriteStyle;
+
+        const ribbonToggle = document.getElementById("settings-auto-ribbon");
+        if (ribbonToggle) ribbonToggle.checked = autoRibbonsEnabled;
+
+        const cleanToggle = document.getElementById("settings-clean-layout");
+        if (cleanToggle) cleanToggle.checked = minimalModeEnabled;
+
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
+
+        const exportBtn = document.getElementById("btn-export-modified-save");
+        if (exportBtn) {
+            exportBtn.style.display = (uploadedSaveBuffer && uploadedSaveGen >= 1 && uploadedSaveGen <= 3) ? "block" : "none";
+        }
+
+        modal.classList.add("active");
+    }
+}
+
+function closeSettingsModal() {
+    const modal = document.getElementById("settings-modal");
+    if (modal) modal.classList.remove("active");
+}
+
+function toggleAdvancedFilters() {
+    const panel = document.getElementById("advanced-filters-panel");
+    if (panel) {
+        panel.style.display = panel.style.display === "none" ? "block" : "none";
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    applyMinimalMode();
+    applyVisualTheme();
+});
+
+window.onload = function() {
+    initDB().then(() => {
+        cleanupDuplicates();
+        setupDatalists(); 
+        loadSpeciesDatalist(); 
+        renderRibbonChecklist();
+        initTouchDragAndDrop();
+        initGlobalBoxUI();
+        
+        const spriteSelect = document.getElementById("settings-sprite-style");
+        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
+        const autoToggle = document.getElementById("settings-auto-ribbon");
+        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
+        
+        switchGame(currentGameId);
+        setupEditorMovesListeners();
+    }).catch(err => {
+        console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
+        cleanupDuplicates();
+        setupDatalists(); 
+        loadSpeciesDatalist(); 
+        renderRibbonChecklist();
+        initTouchDragAndDrop();
+        initGlobalBoxUI();
+        
+        const spriteSelect = document.getElementById("settings-sprite-style");
+        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
+        const autoToggle = document.getElementById("settings-auto-ribbon");
+        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+        const themeSelect = document.getElementById("settings-visual-theme");
+        if (themeSelect) themeSelect.value = currentVisualTheme;
+        
+        switchGame(currentGameId);
+        setupEditorMovesListeners();
+    });
+};
+
 // ==========================================================================
-// 💾 Editor de Saves Binários (Gen 1-3)
+// 💾 Dicionários e Editor de Saves Binários (Gen 1-3)
 // ==========================================================================
+
+const BINARY_MOVES_MAP = {
+    "pound": 1, "karate chop": 2, "double slap": 3, "comet punch": 4, "mega punch": 5, "pay day": 6, "fire punch": 7, "ice punch": 8, "thunder punch": 9, "scratch": 10,
+    "vice grip": 11, "guillotine": 12, "razor wind": 13, "swords dance": 14, "cut": 15, "gust": 16, "wing attack": 17, "whirlwind": 18, "fly": 19, "bind": 20,
+    "slam": 21, "vine whip": 22, "stomp": 23, "double kick": 24, "mega kick": 25, "jump kick": 26, "rolling kick": 27, "sand attack": 28, "headbutt": 29, "horn attack": 30,
+    "fury attack": 31, "horn drill": 32, "tackle": 33, "body slam": 34, "wrap": 35, "take down": 36, "thrash": 37, "double-edge": 38, "double edge": 38, "tail whip": 39, "poison sting": 40,
+    "twineedle": 41, "pin missile": 42, "leer": 43, "bite": 44, "growl": 45, "roar": 46, "sing": 47, "supersonic": 48, "sonicboom": 49, "sonic boom": 49, "disable": 50,
+    "acid": 51, "ember": 52, "flamethrower": 53, "mist": 54, "water gun": 55, "hydro pump": 56, "surf": 57, "ice beam": 58, "blizzard": 59, "psybeam": 60,
+    "bubblebeam": 61, "bubble beam": 61, "aurora beam": 62, "hyper beam": 63, "peck": 64, "drill peck": 65, "submission": 66, "low kick": 67, "counter": 68, "seismic toss": 69,
+    "strength": 70, "absorb": 71, "mega drain": 72, "leech seed": 73, "growth": 74, "razor leaf": 75, "solar beam": 76, "solarbeam": 76, "poisonpowder": 77, "poison powder": 77,
+    "stun spore": 78, "sleep powder": 79, "petal dance": 80, "string shot": 81, "dragon rage": 82, "fire spin": 83, "thundershock": 84, "thunder shock": 84, "thunderbolt": 85,
+    "thunder wave": 86, "thunder": 87, "rock throw": 88, "earthquake": 89, "fissure": 90, "dig": 91, "toxic": 92, "confusion": 93, "psychic": 94, "hypnosis": 95,
+    "meditate": 96, "agility": 97, "quick attack": 98, "rage": 99, "teleport": 100, "night shade": 101, "mimic": 102, "screech": 103, "double team": 104, "recover": 105,
+    "harden": 106, "minimize": 107, "smokescreen": 108, "confuse ray": 109, "withdraw": 110, "defense curl": 111, "barrier": 112, "light screen": 113, "haze": 114, "reflect": 115,
+    "focus energy": 116, "bide": 117, "metronome": 118, "mirror move": 119, "self-destruct": 120, "self destruct": 120, "egg bomb": 121, "lick": 122, "smog": 123, "sludge": 124,
+    "bone club": 125, "fire blast": 126, "waterfall": 127, "clamp": 128, "swift": 129, "skull bash": 130, "spike cannon": 131, "constrict": 132, "amnesia": 133, "kinesis": 134,
+    "soft-boiled": 135, "softboiled": 135, "high jump kick": 136, "glare": 137, "dream eater": 138, "poison gas": 139, "barrage": 140, "leech life": 141, "lovely kiss": 142, "sky attack": 143,
+    "transform": 144, "bubble": 145, "dizzy punch": 146, "spore": 147, "flash": 148, "psywave": 149, "splash": 150, "acid armor": 151, "crabhammer": 152, "explosion": 153,
+    "fury swipes": 154, "bonemerang": 155, "rest": 156, "rock slide": 157, "hyper fang": 158, "sharpen": 159, "conversion": 160, "tri attack": 161, "super fang": 162, "slash": 163,
+    "substitute": 164, "struggle": 165,
+    
+    // Gen 2 additions
+    "sketch": 166, "triple kick": 167, "thief": 168, "spider web": 169, "mind reader": 170, "nightmare": 171, "flame wheel": 172, "snore": 173, "curse": 174, "flail": 175,
+    "conversion 2": 176, "aeroblast": 177, "cotton spore": 178, "reversal": 179, "spite": 180, "powder snow": 181, "protect": 182, "mach punch": 183, "scary face": 184, "feint attack": 185,
+    "sweet kiss": 186, "belly drum": 187, "sludge bomb": 188, "mud-slap": 189, "mud slap": 189, "octazooka": 190, "spikes": 191, "zap cannon": 192, "foresight": 193, "destiny bond": 194,
+    "perish song": 195, "icy wind": 196, "detect": 197, "bone rush": 198, "lock-on": 199, "lock on": 199, "outrage": 200, "sandstorm": 201, "giga drain": 202, "endure": 203,
+    "charm": 204, "rollout": 205, "false swipe": 206, "swagger": 207, "milk drink": 208, "spark": 209, "fury cutter": 210, "steel wing": 211, "mean look": 212, "attract": 213,
+    "sleep talk": 214, "heal bell": 215, "return": 216, "present": 217, "frustration": 218, "safeguard": 219, "pain split": 220, "sacred fire": 221, "magnitude": 222, "dynamicpunch": 223,
+    "dynamic punch": 223, "megahorn": 224, "dragonbreath": 225, "dragon breath": 225, "baton pass": 226, "encore": 227, "pursuit": 228, "rapid spin": 229, "sweet scent": 230, "iron tail": 231,
+    "metal claw": 232, "vital throw": 233, "morning sun": 234, "synthesis": 235, "moonlight": 236, "hidden power": 237, "cross chop": 238, "twister": 239, "rain dance": 240,
+    "sunny day": 241, "crunch": 242, "mirror coat": 243, "psych up": 244, "extreme speed": 245, "ancientpower": 246, "ancient power": 246, "shadow ball": 247, "future sight": 248, "rock smash": 249,
+    "whirlpool": 250, "beat up": 251,
+    
+    // Gen 3 additions
+    "fake out": 252, "uproar": 253, "stockpile": 254, "spit up": 255, "swallow": 256, "heat wave": 257, "hail": 258, "torment": 259, "flatter": 260,
+    "will-o-wisp": 261, "will o wisp": 261, "memento": 262, "facade": 263, "focus punch": 264, "smellingsalts": 265, "smelling salts": 265, "follow me": 266, "nature power": 267, "charge": 268,
+    "taunt": 269, "helping hand": 270, "trick": 271, "role play": 272, "wish": 273, "assist": 274, "ingrain": 275, "superpower": 276, "magic coat": 277, "recycle": 278,
+    "brick break": 279, "yawn": 280, "knock off": 281, "endeavor": 282, "eruption": 283, "skill swap": 284, "imprison": 285, "refresh": 286, "grudge": 287, "snatch": 288,
+    "secret power": 289, "dive": 290, "arm thrust": 291, "camouflage": 292, "tail glow": 293, "luster purge": 294, "mist ball": 295, "featherdance": 296, "feather dance": 296, "teeter dance": 297,
+    "blaze kick": 298, "mud sport": 299, "ice ball": 300, "needle arm": 301, "slack off": 302, "hyper voice": 303, "poison fang": 304, "crush claw": 305, "blast burn": 306,
+    "hydro cannon": 307, "meteor mash": 308, "astonish": 309, "weather ball": 310, "aromatherapy": 311, "fake tears": 312, "air cutter": 313, "overheat": 314, "odor sleuth": 315,
+    "rock tomb": 316, "silver wind": 317, "metal sound": 318, "grasswhistle": 319, "grass whistle": 319, "tickle": 320, "cosmic power": 321, "water spout": 322, "signal beam": 323,
+    "shadow punch": 324, "extrasensory": 325, "sky uppercut": 326, "sand tomb": 327, "sheer cold": 328, "muddy water": 329, "bullet seed": 330, "aerial ace": 331, "icicle spear": 332,
+    "iron defense": 333, "block": 334, "howl": 335, "dragon claw": 336, "frenzy plant": 337, "bulk up": 338, "bounce": 339, "mud shot": 340, "poison tail": 341, "covet": 342,
+    "volt tackle": 343, "magical leaf": 344, "water sport": 345, "calm mind": 346, "leaf blade": 347, "dragon dance": 348, "rock blast": 349, "shock wave": 350, "water pulse": 351,
+    "doom desire": 352, "psycho boost": 353, "bounce": 354
+};
+
+const BINARY_ITEMS_MAP_GEN2 = {
+    "master ball": 1, "ultra ball": 2, "brightpowder": 3, "great ball": 4, "poke ball": 5,
+    "quick claw": 30, "metal powder": 34, "amulet coin": 35, "cleanse tag": 37, "mystic water": 38,
+    "twistedspoon": 39, "blackbelt": 40, "black belt": 40, "blackglasses": 41, "black glasses": 41,
+    "pink bow": 42, "silk scarf": 42, "charcoal": 43, "berry juice": 44, "dragon scale": 45,
+    "soft sand": 48, "sharp beak": 49, "poison barb": 50, "kings rock": 51, "king's rock": 51,
+    "bitter berry": 52, "mint berry": 53, "red apricorn": 54, "tiny mushroom": 55, "big mushroom": 56,
+    "silverpowder": 57, "silver powder": 57, "blu apricorn": 58, "lucky punch": 68,
+    "leftovers": 76, "mystery berry": 90, "miracle seed": 91,
+    "thick club": 92, "focus band": 93, "polkadot bow": 115, "lucky egg": 118, "sacred ash": 124,
+    "heavy ball": 125, "flower mail": 126, "level ball": 127, "lure ball": 128, "fast ball": 129,
+    "light ball": 131, "friend ball": 132, "moon ball": 133, "love ball": 134, "normal box": 135,
+    "gorgeous box": 136, "sun stone": 137, "everstone": 138, "exp share": 156
+};
+
+const BINARY_ITEMS_MAP_GEN3 = {
+    "master ball": 1, "ultra ball": 2, "great ball": 3, "poke ball": 4, "safari ball": 5, "net ball": 6, "dive ball": 7, "nest ball": 8, "repeat ball": 9, "timer ball": 10, "luxury ball": 11, "premier ball": 12,
+    "brightpowder": 17, "white herb": 18, "macho brace": 19, "exp share": 20, "quick claw": 21, "soothe bell": 22, "mental herb": 23, "choice band": 24, "kings rock": 25, "king's rock": 25, "silverpowder": 26, "silver powder": 26, "amulet coin": 27, "cleanse tag": 28, "soul dew": 29, "deepseatooth": 30, "deep sea tooth": 30, "deepseascale": 31, "deep sea scale": 31, "smoke ball": 32, "everstone": 33, "focus band": 34, "lucky egg": 35, "scope lens": 36, "metal coat": 37, "leftovers": 38, "dragon scale": 39, "light ball": 40, "soft sand": 41, "hard stone": 42, "miracle seed": 43, "blackglasses": 44, "black glasses": 44, "blackbelt": 45, "black belt": 45, "magnet": 46, "mystic water": 47, "sharp beak": 48, "poison barb": 49, "nevermeltice": 50, "never-melt-ice": 50, "spell tag": 51, "twistedspoon": 52, "twisted spoon": 52, "charcoal": 53, "dragon fang": 54, "silk scarf": 55, "up-grade": 56, "shell bell": 57,
+    "sea incense": 58, "lax incense": 59, "lucky punch": 60, "metal powder": 61, "thick club": 62, "stick": 63,
+    "red scarf": 254, "blue scarf": 255, "pink scarf": 256, "green scarf": 257, "yellow scarf": 258
+};
+
+const REVERSE_ITEMS_MAP_GEN2 = {};
+Object.keys(BINARY_ITEMS_MAP_GEN2).forEach(k => {
+    REVERSE_ITEMS_MAP_GEN2[BINARY_ITEMS_MAP_GEN2[k]] = k;
+});
+
+const REVERSE_ITEMS_MAP_GEN3 = {};
+Object.keys(BINARY_ITEMS_MAP_GEN3).forEach(k => {
+    REVERSE_ITEMS_MAP_GEN3[BINARY_ITEMS_MAP_GEN3[k]] = k;
+});
+
+const REVERSE_MOVES_MAP = {};
+Object.keys(BINARY_MOVES_MAP).forEach(k => {
+    REVERSE_MOVES_MAP[BINARY_MOVES_MAP[k]] = k;
+});
 
 function exportModifiedSave() {
     if (!uploadedSaveBuffer) {
@@ -3483,7 +3695,7 @@ function exportIndividualPkx() {
         blockA[0] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         blockA[1] = itemId & 0xFFFF;
         
         for (let m = 0; m < 4; m++) {
@@ -3534,7 +3746,7 @@ function exportIndividualPkx() {
         u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         u16[0x0A / 2] = itemId & 0xFFFF;
         
         for (let m = 0; m < 4; m++) {
@@ -3566,15 +3778,14 @@ function exportIndividualPkx() {
         u16[0x08 / 2] = pkmn.pokedexId & 0xFFFF;
         
         const itemName = getEnglishItemName(item);
-        const itemId = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && Number(Object.keys(POKEAPI_ITEM_ID_TO_NAME).find(k => POKEAPI_ITEM_ID_TO_NAME[k] === itemName.toLowerCase()))) || BINARY_ITEMS_MAP_GEN3[itemName] || 0;
+        const itemId = BINARY_ITEMS_MAP_GEN3[itemName] || 0;
         u16[0x0A / 2] = itemId & 0xFFFF;
         
-        // Fonte: PKHeX.Core/PKM/G8PKM.cs e PK9.cs (Move1 = 0x72, Move1_PP = 0x7A)
         for (let m = 0; m < 4; m++) {
             const moveName = getEnglishMoveName(moves[m]);
             const moveId = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && Object.keys(POKEAPI_MOVE_ID_TO_NAME).find(k => POKEAPI_MOVE_ID_TO_NAME[k] === moveName.toLowerCase())) || BINARY_MOVES_MAP[moveName] || 0;
-            u16[(0x72 + m * 2) / 2] = moveId & 0xFFFF;
-            u8[0x7A + m] = moveId > 0 ? 20 : 0;
+            u16[(0x7C + m * 2) / 2] = moveId & 0xFFFF;
+            u8[0x84 + m] = moveId > 0 ? 20 : 0;
         }
         
         let ivWord = u32[0x8C / 4];
@@ -3607,4 +3818,211 @@ function exportIndividualPkx() {
     document.body.removeChild(link);
 }
 
-window.__allocationLoaded = true;
+function getMoveGeneration(moveId) {
+    if (moveId >= 10001) return 3; // Shadow moves are Gen 3
+    if (moveId <= 165) return 1;
+    if (moveId <= 251) return 2;
+    if (moveId <= 354) return 3;
+    if (moveId <= 467) return 4;
+    if (moveId <= 559) return 5;
+    if (moveId <= 621) return 6;
+    if (moveId <= 742) return 7;
+    if (moveId <= 826) return 8;
+    return 9;
+}
+
+function getMoveIdFromName(moveName) {
+    if (!moveName) return 0;
+    const englishName = getEnglishMoveName(moveName).toLowerCase().trim().replace(/\s+/g, "-");
+    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
+        const found = Object.entries(POKEAPI_MOVE_ID_TO_NAME).find(([id, name]) => name.toLowerCase() === englishName);
+        if (found) return parseInt(found[0], 10);
+    }
+    if (typeof REVERSE_MOVES_MAP !== 'undefined') {
+        const found = Object.entries(REVERSE_MOVES_MAP).find(([id, name]) => name.toLowerCase() === englishName);
+        if (found) return parseInt(found[0], 10);
+    }
+    return 0;
+}
+
+function getMoveGenerationFromMoveName(moveName) {
+    if (!moveName) return 1;
+    const moveId = getMoveIdFromName(moveName);
+    if (moveId > 0) {
+        return getMoveGeneration(moveId);
+    }
+    return 1;
+}
+
+function validateMovesGeneration(moves, targetGameOrGen) {
+    let targetGen = 9;
+    if (typeof targetGameOrGen === "number") {
+        targetGen = targetGameOrGen;
+    } else {
+        const game = GAMES_DB.find(g => g.id === targetGameOrGen);
+        if (game) targetGen = game.gen;
+    }
+    
+    for (const move of moves) {
+        if (!move) continue;
+        const moveGen = getMoveGenerationFromMoveName(move);
+        if (moveGen > targetGen) {
+            return {
+                valid: false,
+                move: move,
+                moveGen: moveGen,
+                targetGen: targetGen
+            };
+        }
+    }
+    return { valid: true };
+}
+
+function populateMoveSelects(p) {
+    if (!p) return;
+    
+    let gen = 9;
+    const currentGame = GAMES_DB.find(g => g.id === (p.currentGame || currentGameId));
+    if (currentGame) {
+        gen = currentGame.gen;
+    }
+    
+    const currentMoves = (p.moves || []).map(m => m ? getEnglishMoveName(m).toLowerCase() : "");
+    const recommendedList = getFourRecommendedMoves(p, gen);
+    const recommendedEng = recommendedList.map(m => m.english.toLowerCase());
+    
+    const learnableMoves = [];
+    const otherMoves = [];
+    
+    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
+        Object.entries(POKEAPI_MOVE_ID_TO_NAME).forEach(([idStr, rawName]) => {
+            const moveId = parseInt(idStr, 10);
+            const moveGen = getMoveGeneration(moveId);
+            const englishName = rawName.toLowerCase();
+            
+            if (englishName === "struggle") return;
+            
+            const isCurrentlySelected = currentMoves.includes(englishName);
+            const isRec = recommendedEng.includes(englishName);
+            
+            const formattedName = formatMoveNameForDisplay(englishName);
+            const moveObj = { id: moveId, english: englishName, display: formattedName, gen: moveGen };
+            
+            if (isCurrentlySelected || isRec) {
+                return;
+            }
+            
+            if (moveGen <= gen) {
+                if (canPokemonLearnMove(p, englishName, gen)) {
+                    learnableMoves.push(moveObj);
+                } else {
+                    otherMoves.push(moveObj);
+                }
+            } else {
+                otherMoves.push(moveObj);
+            }
+        });
+    }
+    
+    const sortFn = (a, b) => a.display.localeCompare(b.display);
+    learnableMoves.sort(sortFn);
+    otherMoves.sort(sortFn);
+    
+    let datalistHtml = "";
+    recommendedList.forEach(m => {
+        datalistHtml += `<option value="${m.display}">⭐ ${m.display} (Recomendado)</option>`;
+    });
+    learnableMoves.forEach(m => {
+        datalistHtml += `<option value="${m.display}">${m.display}</option>`;
+    });
+    otherMoves.forEach(m => {
+        const genLabel = m.gen > gen ? `Gen ${m.gen}` : "Incompatível";
+        datalistHtml += `<option value="${m.display}">${m.display} [${genLabel}]</option>`;
+    });
+    
+    const datalistEl = document.getElementById("moves-datalist");
+    if (datalistEl) {
+        datalistEl.innerHTML = datalistHtml;
+    }
+    
+    for (let slotNum = 1; slotNum <= 4; slotNum++) {
+        const inputId = `form-move${slotNum}`;
+        const inputEl = document.getElementById(inputId);
+        if (inputEl) {
+            inputEl.value = p.moves?.[slotNum - 1] || "";
+        }
+    }
+}
+
+function setupEditorMovesListeners() {
+    const speciesInput = document.getElementById("form-species");
+    const originGameSelect = document.getElementById("form-origin-game");
+    
+    const onFormChange = () => {
+        const currentId = document.getElementById("form-id").value;
+        const currentSpecies = speciesInput ? speciesInput.value.trim() : "";
+        const currentOrigin = originGameSelect ? originGameSelect.value : currentGameId;
+        
+        let p = pokemonDatabase.find(pkmn => pkmn.id === currentId);
+        if (p) {
+            const tempP = {
+                ...p,
+                species: currentSpecies,
+                currentGame: currentOrigin,
+                moves: [
+                    document.getElementById("form-move1").value.trim(),
+                    document.getElementById("form-move2").value.trim(),
+                    document.getElementById("form-move3").value.trim(),
+                    document.getElementById("form-move4").value.trim()
+                ]
+            };
+            populateMoveSelects(tempP);
+        } else {
+            populateMoveSelects({
+                species: currentSpecies,
+                currentGame: currentOrigin,
+                moves: [
+                    document.getElementById("form-move1").value.trim(),
+                    document.getElementById("form-move2").value.trim(),
+                    document.getElementById("form-move3").value.trim(),
+                    document.getElementById("form-move4").value.trim()
+                ]
+            });
+        }
+    };
+    
+    if (speciesInput) {
+        speciesInput.addEventListener("input", onFormChange);
+        speciesInput.addEventListener("change", onFormChange);
+    }
+    if (originGameSelect) {
+        originGameSelect.addEventListener("change", onFormChange);
+    }
+    
+    const moveInputs = ["form-move1", "form-move2", "form-move3", "form-move4"];
+    moveInputs.forEach(id => {
+        const input = document.getElementById(id);
+        if (input) {
+            input.addEventListener("input", (event) => {
+                const val = event.target.value.trim();
+                if (!val) return;
+                
+                let duplicate = false;
+                moveInputs.forEach(otherId => {
+                    if (otherId !== id) {
+                        const otherInput = document.getElementById(otherId);
+                        if (otherInput && otherInput.value.trim().toLowerCase() === val.toLowerCase()) {
+                            duplicate = true;
+                        }
+                    }
+                });
+                
+                if (duplicate) {
+                    alert("Não podes ter ataques iguais! Este ataque já está selecionado noutro slot.");
+                    event.target.value = "";
+                }
+            });
+        }
+    });
+}
+

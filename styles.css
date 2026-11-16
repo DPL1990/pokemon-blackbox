@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Outfit:wght@300;400;500;600;700;800;900&family=Cinzel:wght@500;700;900&display=swap');
+
 :root {
     /* Design Tokens */
     --bg-main: #090b0e;
@@ -1063,6 +1065,201 @@ select {
     text-align: right;
 }
 .base-stat-bar-bg {
+    content: "✓";
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--game-color, #6366f1);
+    color: #fff;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 900;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+    z-index: 10;
+}
+
+/* Responsividade da Barra Flutuante de Ações no Telemóvel */
+@media (max-width: 600px) {
+    .floating-action-bar {
+        width: 95% !important;
+        padding: 12px 14px !important;
+        bottom: -150px;
+    }
+    
+    .floating-action-bar.active {
+        bottom: 16px !important;
+    }
+    
+    .fab-content {
+        flex-direction: column !important;
+        align-items: center !important;
+        gap: 10px !important;
+    }
+    
+    .fab-counter {
+        font-size: 0.75rem !important;
+    }
+    
+    .fab-actions {
+        width: 100% !important;
+        justify-content: center !important;
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+    }
+    
+    .fab-actions select, 
+    .fab-actions button {
+        font-size: 0.7rem !important;
+        padding: 6px 10px !important;
+        margin: 0 !important;
+    }
+}
+
+/* Matchup UI Responsive Adjustments */
+.matchup-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    gap: 16px;
+    align-items: center;
+    justify-items: center;
+    margin-bottom: 10px;
+}
+
+.matchup-vs {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--text-muted);
+    opacity: 0.6;
+    text-shadow: 0 0 10px rgba(255,255,255,0.1);
+    transition: transform 0.3s ease;
+}
+
+.matchup-selectors {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+@media (max-width: 580px) {
+    .matchup-grid {
+        grid-template-columns: 1fr !important;
+        gap: 8px !important;
+    }
+    .matchup-vs {
+        transform: rotate(90deg) !important;
+        margin: 6px 0 !important;
+    }
+    .matchup-selectors {
+        grid-template-columns: 1fr !important;
+        gap: 10px !important;
+    }
+}
+
+/* Trainer Manager Item */
+.trainer-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 8px;
+    font-size: 0.8rem;
+}
+.trainer-item:hover {
+    background: rgba(255,255,255,0.06);
+}
+
+/* Tab Navigation Styles */
+.btn-tab {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-weight: 800;
+    font-size: 0.9rem;
+    cursor: pointer;
+    padding: 6px 16px;
+    border-bottom: 3px solid transparent;
+    transition: all 0.3s ease;
+    border-radius: 0 !important;
+}
+.btn-tab:hover {
+    color: #fff;
+}
+.btn-tab.active {
+    color: #fff;
+    border-bottom-color: var(--game-color) !important;
+}
+
+/* Challenge Status Badges */
+.status-badge {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    display: inline-block;
+}
+.status-in_progress {
+    background: rgba(234, 179, 8, 0.1);
+    color: #eab308;
+    border: 1px solid rgba(234, 179, 8, 0.2);
+}
+.status-completed {
+    background: var(--accent-success-glow);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+.status-failed {
+    background: var(--accent-danger-glow);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+/* Global Box Origin Badge in slots */
+.global-origin-badge {
+    position: absolute;
+    bottom: 2px;
+    right: 2px;
+    font-size: 0.55rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    pointer-events: none;
+    max-width: 65px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Base Stat bars for Owndex */
+.base-stat-row {
+    display: grid;
+    grid-template-columns: 70px 30px 1fr;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.7rem;
+}
+.base-stat-label {
+    font-weight: bold;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+.base-stat-val {
+    font-weight: bold;
+    color: #fff;
+    text-align: right;
+}
+.base-stat-bar-bg {
     height: 6px;
     background: rgba(255,255,255,0.05);
     border-radius: 3px;
@@ -1909,152 +2106,4 @@ body.theme-home input {
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
 }
 
-/* ==========================================================================
-   MOBILE & TOUCH PERFORMANCE OPTIMIZATIONS
-   ========================================================================== */
-.slot,
-.btn,
-.btn-tab,
-select,
-input,
-button {
-    touch-action: manipulation;
-    -webkit-tap-highlight-color: transparent;
-}
 
-.slot {
-    -webkit-user-select: none;
-    user-select: none;
-}
-
-.slot.move-source-selected {
-    border: 2px solid #f59e0b !important;
-    background: rgba(245, 158, 11, 0.18) !important;
-    box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.35) !important;
-}
-
-@media (hover: none) and (pointer: coarse) {
-    .slot:hover {
-        transform: none !important;
-        box-shadow: none !important;
-    }
-    .slot:hover .slot-sprite {
-        transform: none !important;
-        filter: none !important;
-    }
-}
-
-@media (max-width: 768px), (hover: none) and (pointer: coarse) {
-    :root {
-        --bg-card: rgba(20, 24, 33, 0.96);
-        --bg-card-hover: rgba(28, 34, 46, 0.98);
-    }
-
-    body {
-        background-attachment: scroll !important;
-    }
-
-    .glass-panel,
-    .slot,
-    .hof-card-member,
-    .modal-overlay {
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-
-    .slot {
-        box-shadow: none !important;
-        transition: none !important;
-    }
-
-    .box-grid .slot {
-        content-visibility: auto;
-        contain-intrinsic-size: 118px;
-    }
-
-    .slot .slot-sprite {
-        transition: none !important;
-        filter: none !important;
-    }
-
-    .modal-overlay {
-        background: rgba(5, 7, 11, 0.92);
-    }
-
-    /* Prevent iOS Safari & Android Chrome auto-zoom on focus */
-    select,
-    input[type="text"],
-    input[type="number"],
-    textarea {
-        font-size: 16px !important;
-    }
-}
-
-@media (max-width: 600px) {
-    body {
-        padding: 10px 8px;
-    }
-
-    header h1 {
-        font-size: 1.2rem !important;
-    }
-
-    .tabs-header {
-        gap: 6px !important;
-    }
-
-    .btn-tab {
-        padding: 6px 10px;
-        font-size: 0.78rem;
-    }
-
-    .dashboard-two-columns .team-grid,
-    .team-grid,
-    .box-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
-        gap: 8px !important;
-    }
-
-    .slot {
-        min-height: 112px;
-        padding: 8px 4px;
-        border-radius: 12px;
-    }
-
-    .slot .slot-sprite {
-        width: 52px;
-        height: 52px;
-        margin-bottom: 4px;
-    }
-
-    .slot .slot-name {
-        font-size: 0.72rem;
-    }
-
-    .slot .slot-meta {
-        font-size: 0.6rem;
-        margin-bottom: 2px;
-    }
-
-    .modal-overlay {
-        padding: 6px;
-    }
-
-    .modal-content {
-        max-height: 92vh;
-    }
-
-    .modal-header {
-        padding: 12px 14px;
-    }
-
-    .modal-body {
-        padding: 14px;
-        -webkit-overflow-scrolling: touch;
-    }
-
-    .modal-footer {
-        padding: 10px 14px;
-        flex-wrap: wrap;
-    }
-}

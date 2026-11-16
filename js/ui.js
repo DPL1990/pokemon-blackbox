@@ -102,7 +102,7 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
         draggedPkmn.slotType = targetSlotType; 
         draggedPkmn.slotIndex = targetSlotIndex;
     }
-    saveDatabase(); 
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
     renderAll();
 }
 
@@ -142,115 +142,120 @@ function handleDrop(e) {
     executeDropLogic(id, targetSlotType, targetSlotIndex, targetId);
 }
 
-// --- SECTION MOBILE TAP-TO-MOVE & QUICK TEAM TOGGLE ---
-let moveModeActive = false;
-let moveModeSelectedId = null;
-let moveTargetTeamSlot = null;
-
-function cleanupTouchDragState() {
-    moveModeSelectedId = null;
-    moveTargetTeamSlot = null;
-}
+// --- SECTION MOBILE TOUCH DRAG & DROP POLYFILL ---
+let touchDragActive = false;
+let touchDraggedId = null;
+let touchClone = null;
+let touchStartX = 0;
+let touchStartY = 0;
+let touchOffset = { x: 0, y: 0 };
+let touchDraggedFromSlot = null;
 
 function initTouchDragAndDrop() {
-    // Intencionalmente vazio em dispositivos touch: não regista listeners touchmove/touchend
-    // com { passive: false } no document para garantir scroll nativo a 60/120fps no telemóvel.
-}
+    // Touch Start
+    document.addEventListener("touchstart", function(e) {
+        const slot = e.target.closest(".slot[draggable='true']");
+        if (!slot) return;
+        
+        const touch = e.touches[0];
+        touchStartX = touch.clientX;
+        touchStartY = touch.clientY;
+        touchDragActive = false;
+        touchDraggedId = slot.getAttribute("data-id");
+        
+        const rect = slot.getBoundingClientRect();
+        touchOffset.x = touchStartX - rect.left;
+        touchOffset.y = touchStartY - rect.top;
+        
+        touchDraggedFromSlot = slot;
+    }, { passive: true });
 
-function toggleMoveMode(forceState) {
-    if (typeof selectionMode !== "undefined" && selectionMode) {
-        toggleSelectionMode();
-    }
-    moveModeActive = typeof forceState === "boolean" ? forceState : !moveModeActive;
-    moveModeSelectedId = null;
-    moveTargetTeamSlot = null;
-
-    const btn = document.getElementById("btn-toggle-move-mode");
-    const banner = document.getElementById("move-mode-banner");
-    if (btn) {
-        if (moveModeActive) {
-            btn.innerText = "✕ Sair de Mover";
-            btn.classList.add("btn-danger");
-        } else {
-            btn.innerText = "🔄 Mover";
-            btn.classList.remove("btn-danger");
-        }
-    }
-    if (banner) {
-        if (moveModeActive) {
-            banner.style.display = "flex";
-            banner.innerHTML = `<span>🔄 <strong>Modo Mover:</strong> Toca no 1.º Pokémon que queres mover e depois toca no slot de destino (Equipa ou Box).</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Concluir</button>`;
-        } else {
-            banner.style.display = "none";
-        }
-    }
-    renderAll();
-}
-
-function handleEmptySlotClick(slotType, slotIndex) {
-    if (typeof selectionMode !== "undefined" && selectionMode) return;
-
-    if (moveModeSelectedId) {
-        const id = moveModeSelectedId;
-        moveModeSelectedId = null;
-        moveTargetTeamSlot = null;
-        executeDropLogic(id, slotType, slotIndex, null);
-        return;
-    }
-
-    if (slotType === "team") {
-        if (moveTargetTeamSlot === slotIndex) {
-            toggleMoveMode(false);
-            return;
-        }
-        moveModeActive = true;
-        moveModeSelectedId = null;
-        moveTargetTeamSlot = slotIndex;
-        const btn = document.getElementById("btn-toggle-move-mode");
-        if (btn) {
-            btn.innerText = "✕ Sair de Mover";
-            btn.classList.add("btn-danger");
-        }
-        const banner = document.getElementById("move-mode-banner");
-        if (banner) {
-            banner.style.display = "flex";
-            banner.innerHTML = `<span>🛡️ <strong>Slot ${slotIndex + 1} da Equipa selecionado:</strong> Agora toca num Pokémon da Box abaixo para o colocar neste slot!</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Cancelar</button>`;
-        }
-        renderAll();
-    } else if (slotType === "box" && !moveModeActive) {
-        openModalForNew();
-    }
-}
-
-function quickToggleTeamFromEditor() {
-    const id = document.getElementById("form-id")?.value;
-    if (!id) return;
-    const p = pokemonDatabase.find(pkmn => pkmn.id === id);
-    if (!p) return;
-
-    if (p.slotType === "team") {
-        p.slotType = "box";
-        p.slotIndex = 0;
-        saveDatabase();
-        closeModal();
-        renderAll();
-    } else {
-        // Encontrar primeiro slot livre na equipa ativa (0..5)
-        let freeSlot = -1;
-        for (let i = 0; i < 6; i++) {
-            const occupied = pokemonDatabase.some(pk => pk.currentGame === currentGameId && pk.slotType === "team" && pk.slotIndex === i);
-            if (!occupied) {
-                freeSlot = i;
-                break;
+    // Touch Move
+    document.addEventListener("touchmove", function(e) {
+        if (!touchDraggedId) return;
+        
+        const touch = e.touches[0];
+        const dx = touch.clientX - touchStartX;
+        const dy = touch.clientY - touchStartY;
+        
+        if (!touchDragActive && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+            touchDragActive = true;
+            
+            if (touchDraggedFromSlot) {
+                touchClone = touchDraggedFromSlot.cloneNode(true);
+                touchClone.style.position = "fixed";
+                touchClone.style.width = touchDraggedFromSlot.offsetWidth + "px";
+                touchClone.style.height = touchDraggedFromSlot.offsetHeight + "px";
+                touchClone.style.left = (touch.clientX - touchOffset.x) + "px";
+                touchClone.style.top = (touch.clientY - touchOffset.y) + "px";
+                touchClone.style.pointerEvents = "none";
+                touchClone.style.zIndex = "10000";
+                touchClone.style.opacity = "0.75";
+                touchClone.style.transform = "scale(1.05)";
+                touchClone.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+                touchClone.style.transition = "none";
+                document.body.appendChild(touchClone);
+                
+                touchDraggedFromSlot.style.opacity = "0.3";
             }
         }
-        if (freeSlot === -1) {
-            alert("A Equipa Ativa já tem 6 Pokémon! Retira primeiro um Pokémon da equipa ou usa o botão '🔄 Mover' para trocar de posição.");
-            return;
+        
+        if (touchDragActive && touchClone) {
+            if (e.cancelable) e.preventDefault(); 
+            
+            touchClone.style.left = (touch.clientX - touchOffset.x) + "px";
+            touchClone.style.top = (touch.clientY - touchOffset.y) + "px";
+            
+            const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+            document.querySelectorAll(".slot").forEach(s => s.classList.remove("drag-over"));
+            
+            if (elementUnder) {
+                const targetSlot = elementUnder.closest(".slot");
+                if (targetSlot) {
+                    targetSlot.classList.add("drag-over");
+                }
+            }
         }
-        closeModal();
-        executeDropLogic(p.id, "team", freeSlot, null);
-    }
+    }, { passive: false });
+
+    // Touch End
+    document.addEventListener("touchend", function(e) {
+        if (!touchDraggedId) return;
+        
+        const id = touchDraggedId;
+        touchDraggedId = null;
+        
+        if (touchClone) {
+            touchClone.remove();
+            touchClone = null;
+        }
+        
+        if (touchDraggedFromSlot) {
+            touchDraggedFromSlot.style.opacity = "1";
+        }
+        
+        document.querySelectorAll(".slot").forEach(s => s.classList.remove("drag-over"));
+        
+        if (touchDragActive) {
+            e.preventDefault(); 
+            
+            const changedTouch = e.changedTouches[0];
+            const elementUnder = document.elementFromPoint(changedTouch.clientX, changedTouch.clientY);
+            
+            if (elementUnder) {
+                const targetSlot = elementUnder.closest(".slot");
+                if (targetSlot) {
+                    const targetSlotType = targetSlot.getAttribute("data-slot-type");
+                    const targetSlotIndex = parseInt(targetSlot.getAttribute("data-slot-index"), 10);
+                    const targetId = targetSlot.getAttribute("data-id");
+                    
+                    executeDropLogic(id, targetSlotType, targetSlotIndex, targetId);
+                }
+            }
+        }
+        
+        touchDraggedFromSlot = null;
+    }, { passive: false });
 }
 // -----------------------------------------------------
 
@@ -409,8 +414,6 @@ function openModalForNew() {
     document.getElementById("form-origin-game").value = currentGameId;
     document.getElementById("btn-delete-pkmn").style.display = "none"; 
     document.getElementById("btn-owndex-link").style.display = "none";
-    const btnQuickTeamNew = document.getElementById("btn-quick-toggle-team");
-    if (btnQuickTeamNew) btnQuickTeamNew.style.display = "none";
     document.getElementById("modal-title").innerText = "➕ Registar Novo Espécime";
     document.getElementById("passport-display").innerHTML = `<span>O passaporte será gerado ao gravar.</span>`;
     
@@ -427,34 +430,6 @@ function openModalForEdit(id) {
     }
     const p = pokemonDatabase.find(pkmn => pkmn.id === id); 
     if (!p) return;
-
-    if (moveTargetTeamSlot !== null) {
-        const targetSlot = moveTargetTeamSlot;
-        toggleMoveMode(false);
-        executeDropLogic(p.id, "team", targetSlot, null);
-        return;
-    }
-
-    if (moveModeActive) {
-        if (!moveModeSelectedId) {
-            moveModeSelectedId = p.id;
-            const banner = document.getElementById("move-mode-banner");
-            if (banner) {
-                banner.innerHTML = `<span>🔄 <strong>${p.nickname || p.species} selecionado:</strong> Agora toca noutro Pokémon ou num slot vazio da Equipa/Box para mover ou trocar!</span><button class="btn btn-danger" onclick="toggleMoveMode(false)" style="width:auto; padding:4px 10px; font-size:0.7rem;">Cancelar</button>`;
-            }
-            renderAll();
-            return;
-        } else if (moveModeSelectedId === p.id) {
-            moveModeSelectedId = null;
-            renderAll();
-            return;
-        } else {
-            const sourceId = moveModeSelectedId;
-            moveModeSelectedId = null;
-            executeDropLogic(sourceId, p.slotType, p.slotIndex || 0, p.id);
-            return;
-        }
-    }
     
     editorViewingAlternativeMoves = false;
     activePokemonEditorMoves = {
@@ -467,24 +442,9 @@ function openModalForEdit(id) {
     setFormLockedState(!!p.isLocked);
     
     const btnDelete = document.getElementById("btn-delete-pkmn");
-    const btnQuickTeam = document.getElementById("btn-quick-toggle-team");
     const footerActions = document.querySelector("#editor-modal .footer-actions");
     const saveBtn = footerActions ? footerActions.querySelector(".btn-primary") : null;
     
-    if (btnQuickTeam) {
-        btnQuickTeam.style.display = "inline-flex";
-        btnQuickTeam.disabled = false;
-        if (p.slotType === "team") {
-            btnQuickTeam.innerText = "📦 Enviar para a Box Regional";
-            btnQuickTeam.style.background = "rgba(99, 102, 241, 0.14)";
-            btnQuickTeam.style.borderColor = "rgba(99, 102, 241, 0.35)";
-        } else {
-            btnQuickTeam.innerText = "🛡️ Colocar na Equipa Ativa";
-            btnQuickTeam.style.background = "rgba(16, 185, 129, 0.14)";
-            btnQuickTeam.style.borderColor = "rgba(16, 185, 129, 0.35)";
-        }
-    }
-
     if (p.isLocked) {
         if (btnDelete) btnDelete.style.display = "none";
         if (saveBtn) saveBtn.style.display = "none";
@@ -649,7 +609,7 @@ function executeTransfer() {
         targetPokemon.slotIndex = 0;
         
         renderPassportTimeline(targetPokemon);
-        saveDatabase();
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
         renderAll();
     } else {
         alert("O Pokémon já se encontra nessa versão!");
@@ -857,7 +817,7 @@ async function savePokemon() {
     targetPokemon.evolutionNotes = evolutionNotes;
     targetPokemon.originGame = originGame;
 
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     closeModal();
     renderAll();
 }
@@ -874,7 +834,7 @@ function deletePokemon() {
     
     if (confirm("Tens a certeza absoluta que queres eliminar este espécime?")) {
         pokemonDatabase = pokemonDatabase.filter(p => p.id !== id);
-        saveDatabase(); 
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
         closeModal(); 
         renderAll();
     }
@@ -1004,7 +964,7 @@ async function parseShowdownText() {
         count++;
     }
     if (count > 0) { 
-        saveDatabase(); 
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
         closeModal(); 
         renderAll(); 
     }
@@ -1030,7 +990,7 @@ function importData(e) {
                 pokemonDatabase = d; 
                 migrateTrainerIds(); // Run migration immediately so imported data gets trainerId fields assigned!
                 cleanupDuplicates();
-                saveDatabase(); 
+                localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
                 renderAll(); 
                 alert("Importação de cópia de segurança JSON concluída com sucesso!");
             } else {
@@ -1138,7 +1098,7 @@ function cleanupDuplicates() {
         console.log(`blackbox: Removed ${idsToRemove.size} duplicate specimens from the box.`);
     }
     
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
 }
 
 function toggleSelectionMode() {
@@ -1222,7 +1182,7 @@ function executeMassTransfer() {
     });
     
     if (migratedCount > 0) {
-        saveDatabase();
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
         alert(`${migratedCount} Pokémon migrados com sucesso para ${targetGameName}!`);
         toggleSelectionMode();
         renderAll();
@@ -1238,7 +1198,7 @@ function executeMassDelete() {
     }
     
     pokemonDatabase = pokemonDatabase.filter(p => !selectedPokemonIds.has(p.id));
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     
     alert(`${count} Pokémon eliminados da base de dados.`);
     toggleSelectionMode();
@@ -1354,7 +1314,7 @@ function deleteTrainerProfile(trainerId) {
             p.trainerId = defaultTrainerId;
         }
     });
-    saveDatabase();
+    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
     
     // 2. Reatribuir HOFs no IndexedDB
     if (dbInstance) {
