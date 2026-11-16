@@ -1061,16 +1061,80 @@ function parseGen3Save(buffer) {
     return parsedList;
 }
 
+// Fonte: PKHeX.Core/Saves/SAV4.cs (partição 0 em 0x00000 e partição 1 em 0x40000;
+// rodapé de 0x14 bytes no fim dos blocos General e Storage com magic 0x20060623 e contadores u32 em +0x00/+0x04)
+function detectGen4PartitionCounters(u8) {
+    const result = {
+        general: [0, 0],
+        storage: [0, 0]
+    };
+    if (u8.length < 0x80000) return result;
+    const u32 = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+    // Fins de bloco General conhecidos: DP (0x0C100), Pt (0x0CF2C), HGSS (0x0F700)
+    const generalEnds = [0x0C100, 0x0CF2C, 0x0F700];
+    for (let i = 0; i < generalEnds.length; i++) {
+        const footer0 = generalEnds[i] - 0x14;
+        const footer1 = footer0 + 0x40000;
+        const magic0 = u32.getUint32(footer0 + 0x0C, true);
+        const magic1 = u32.getUint32(footer1 + 0x0C, true);
+        if (magic0 === 0x20060623 || magic1 === 0x20060623) {
+            result.general[0] = magic0 === 0x20060623 ? u32.getUint32(footer0 + 0x04, true) : 0;
+            result.general[1] = magic1 === 0x20060623 ? u32.getUint32(footer1 + 0x04, true) : 0;
+            break;
+        }
+    }
+    // Fins de bloco Storage conhecidos: DP (0x1E2E0), Pt (0x1F110), HGSS (0x21A10)
+    const storageEnds = [0x1E2E0, 0x1F110, 0x21A10];
+    for (let i = 0; i < storageEnds.length; i++) {
+        const footer0 = storageEnds[i] - 0x14;
+        const footer1 = footer0 + 0x40000;
+        const magic0 = u32.getUint32(footer0 + 0x0C, true);
+        const magic1 = u32.getUint32(footer1 + 0x0C, true);
+        if (magic0 === 0x20060623 || magic1 === 0x20060623) {
+            result.storage[0] = magic0 === 0x20060623 ? u32.getUint32(footer0 + 0x04, true) : 0;
+            result.storage[1] = magic1 === 0x20060623 ? u32.getUint32(footer1 + 0x04, true) : 0;
+            break;
+        }
+    }
+    return result;
+}
+
+function isNewerGen4Gen5Candidate(cand, prev) {
+    // 1. Maior experiência acumulada ganha sempre (um Pokémon nunca perde EXP)
+    if ((cand.exp || 0) !== (prev.exp || 0)) {
+        return (cand.exp || 0) > (prev.exp || 0);
+    }
+    // 2. Maior nível
+    if ((cand.level || 0) !== (prev.level || 0)) {
+        return (cand.level || 0) > (prev.level || 0);
+    }
+    // 3. Contador de bloco mais recente no rodapé da partição (0x00000 vs 0x40000)
+    const candCounter = (cand.saveMeta && cand.saveMeta.blockCounter) || 0;
+    const prevCounter = (prev.saveMeta && prev.saveMeta.blockCounter) || 0;
+    if (candCounter !== prevCounter) {
+        return candCounter > prevCounter;
+    }
+    // 4. Desempate por número de ataques preenchidos
+    const candMoves = (cand.moves || []).filter(Boolean).length;
+    const prevMoves = (prev.moves || []).filter(Boolean).length;
+    if (candMoves !== prevMoves) {
+        return candMoves > prevMoves;
+    }
+    return false;
+}
+
 function parseGen4Gen5Save(buffer) {
     const u8 = new Uint8Array(buffer);
-    const parsedList = [];
-    const seenPids = new Set();
+    const byPid = new Map();
+    const gen4Counters = detectGen4PartitionCounters(u8);
     
     const limit = u8.length - 136;
     for (let offset = 0; offset <= limit; offset += 2) {
-        const pid = u8[offset] | (u8[offset + 1] << 8) | (u8[offset + 2] << 16) | (u8[offset + 3] << 24);
+        const pid = (u8[offset] | (u8[offset + 1] << 8) | (u8[offset + 2] << 16) | (u8[offset + 3] << 24)) >>> 0;
         if (pid === 0) continue;
-        if (seenPids.has(pid)) continue;
+        
+        // Fonte: PKHeX.Core/PKM/PK4.cs (Bytes 0x04..0x05 = Sanity/Unused, sempre 0x0000 em PKM desencriptado/cifrado válido)
+        if ((u8[offset + 4] | u8[offset + 5]) !== 0) continue;
         
         const checksum = u8[offset + 6] | (u8[offset + 7] << 8);
         if (checksum === 0 || checksum === 0xFFFF) continue;
@@ -1213,7 +1277,14 @@ function parseGen4Gen5Save(buffer) {
             // Ability (0x15 = byte alto de blockA[6])
             const abilityId = blockA[6] >> 8;
             
-            parsedList.push({
+            // Contador de bloco na partição (0x00000 vs 0x40000) para desempatar cópias ativas vs backup
+            const halfIdx = offset >= 0x40000 ? 1 : 0;
+            const localOff = offset & 0x3FFFF;
+            const blockCounter = !isGen5
+                ? (localOff < 0x0C100 ? (gen4Counters.general[halfIdx] || gen4Counters.storage[halfIdx]) : (gen4Counters.storage[halfIdx] || gen4Counters.general[halfIdx]))
+                : 0;
+            
+            const candidate = {
                 sourceSlot: isParty ? `Equipa (Gen ${isGen5 ? 5 : 4})` : `Box (Gen ${isGen5 ? 5 : 4})`,
                 pokedexId,
                 species: speciesName,
@@ -1234,13 +1305,22 @@ function parseGen4Gen5Save(buffer) {
                     isParty: isParty,
                     structOffset: offset,
                     pid: pid,
-                    abilityId: abilityId
+                    abilityId: abilityId,
+                    blockCounter: blockCounter
                 }
-            });
+            };
             
-            seenPids.add(pid);
+            const prev = byPid.get(pid);
+            if (!prev || isNewerGen4Gen5Candidate(candidate, prev)) {
+                byPid.set(pid, candidate);
+            }
+            
+            // Salta o resto da estrutura atual para não varrer palavras internas como falsos PIDs
+            offset += (isParty ? (isGen5 ? 220 : 236) : 136) - 2;
         }
     }
+    
+    const parsedList = Array.from(byPid.values());
     
     // Atribui índice sequencial 0..5 aos Pokémon da equipa ativa para não colidirem no slot 0
     let partyIdx = 0;
