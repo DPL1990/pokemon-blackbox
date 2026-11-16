@@ -2345,6 +2345,9 @@ async function fetchMissingSpeciesData(speciesName) {
         if (abEl && !abEl.value && cached.ability) {
             abEl.value = cached.ability;
         }
+        if (typeof updateEditorTypeBadges === "function") {
+            updateEditorTypeBadges();
+        }
         return;
     }
     
@@ -2372,6 +2375,9 @@ async function fetchMissingSpeciesData(speciesName) {
             }
             if (abEl && !abEl.value && abilityName) {
                 abEl.value = abilityName;
+            }
+            if (typeof updateEditorTypeBadges === "function") {
+                updateEditorTypeBadges();
             }
         }
     } catch(e) {}

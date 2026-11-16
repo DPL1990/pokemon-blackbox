@@ -35,14 +35,26 @@
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('sw.js')
-                    .then(reg => console.log('Caixa Negra operando offline!', reg))
+                    .then(reg => {
+                        reg.update();
+                        reg.onupdatefound = () => {
+                            const inst = reg.installing;
+                            if (inst) {
+                                inst.onstatechange = () => {
+                                    if (inst.state === 'installed' && navigator.serviceWorker.controller) {
+                                        window.location.reload();
+                                    }
+                                };
+                            }
+                        };
+                    })
                     .catch(err => console.log('Erro no Service Worker:', err));
             });
         }
     </script>
     
     <!-- External Stylesheet -->
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="styles.css?v=14">
 </head>
 <body>
     <div class="container">
@@ -463,14 +475,14 @@
                                     <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0;">Espécie</label>
                                     <button type="button" class="btn btn-action" id="btn-owndex-link" onclick="openOwndexFromEditor()" style="width: auto; font-size: 0.55rem; padding: 1px 6px; display: none; height: 18px; line-height: 14px; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25);">📋 Owndex</button>
                                 </div>
-                                <input type="text" id="form-species" list="species-list" onchange="fetchPokemonTypes(this.value); if(typeof updateEditorSprite==='function') updateEditorSprite();" placeholder="ex: Pikachu">
+                                <input type="text" id="form-species" list="species-list" oninput="if(typeof updateEditorSprite==='function') updateEditorSprite();" onchange="fetchPokemonTypes(this.value); if(typeof updateEditorSprite==='function') updateEditorSprite();" placeholder="ex: Pikachu">
                             </div>
                         </div>
 
                         <!-- Sprite em Destaque Oficial -->
                         <div class="editor-sprite-card" id="editor-sprite-card">
                             <div class="editor-sprite-wrapper">
-                                <img id="editor-pokemon-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png" alt="Pokemon Sprite" onerror="handleSpriteError(this, 1, (typeof editorCurrentIsShiny!=='undefined' && editorCurrentIsShiny) ? 'shiny' : 'normal')">
+                                <img id="editor-pokemon-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png" alt="Pokemon Sprite" onerror="if(typeof handleSpriteError==='function') handleSpriteError(this, (typeof getEditorPokedexId==='function'?getEditorPokedexId():1), (typeof editorCurrentIsShiny!=='undefined' && editorCurrentIsShiny)?'shiny':'normal');">
                             </div>
                             <div class="editor-type-badges" id="editor-type-badges"></div>
                         </div>
@@ -1293,13 +1305,13 @@
     </div>
 
     <!-- External Logic Script -->
-    <script src="js/moves-db.js" defer></script>
-    <script src="js/items-db.js" defer></script>
-    <script src="js/constants.js" defer></script>
-    <script src="js/helpers.js" defer></script>
-    <script src="js/db.js" defer></script>
-    <script src="js/save-parser.js" defer></script>
-    <script src="js/editor.js" defer></script>
-    <script src="js/ui.js" defer></script>
+    <script src="js/moves-db.js?v=14" defer></script>
+    <script src="js/items-db.js?v=14" defer></script>
+    <script src="js/constants.js?v=14" defer></script>
+    <script src="js/helpers.js?v=14" defer></script>
+    <script src="js/db.js?v=14" defer></script>
+    <script src="js/save-parser.js?v=14" defer></script>
+    <script src="js/editor.js?v=14" defer></script>
+    <script src="js/ui.js?v=14" defer></script>
 </body>
 </html>

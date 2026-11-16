@@ -64,9 +64,18 @@ async function fetchPokemonLearnset(species) {
             // Re-render recommendations since we now have the accurate learnset
             const game = GAMES_DB.find(g => g.id === currentGameId);
             const gen = game ? game.gen : 9;
-            const recommendations = getRecommendedAllocation();
-            const activeTeam = recommendations.map(rec => rec.pokemon);
-            renderWeaknessAnalysis(activeTeam, gen);
+            const recResult = getRecommendedAllocation();
+            if (recResult && typeof recResult.then === "function") {
+                recResult.then(recs => {
+                    if (Array.isArray(recs)) {
+                        const activeTeam = recs.map(rec => rec.pokemon);
+                        renderWeaknessAnalysis(activeTeam, gen);
+                    }
+                }).catch(() => {});
+            } else if (Array.isArray(recResult)) {
+                const activeTeam = recResult.map(rec => rec.pokemon);
+                renderWeaknessAnalysis(activeTeam, gen);
+            }
             
             // Re-populate moves dropdowns if editor is active and matches species
             const editorModal = document.getElementById("editor-modal");

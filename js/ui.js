@@ -370,15 +370,25 @@ const TYPE_NAMES_PT = {
 };
 
 function getEditorPokedexId() {
-    const species = (document.getElementById("form-species")?.value || "").trim().toLowerCase();
+    const currentId = document.getElementById("form-id")?.value;
+    if (currentId && typeof pokemonDatabase !== "undefined" && Array.isArray(pokemonDatabase)) {
+        const p = pokemonDatabase.find(pkmn => pkmn.id === currentId);
+        if (p && p.pokedexId) return p.pokedexId;
+    }
+    const species = (document.getElementById("form-species")?.value || "").trim();
     if (!species) return 0;
+    if (typeof findPokedexIdBySpecies === "function") {
+        const found = findPokedexIdBySpecies(species);
+        if (found) return found;
+    }
     if (typeof POKEMON_NAMES_ALL !== "undefined" && Array.isArray(POKEMON_NAMES_ALL)) {
-        let localDexId = POKEMON_NAMES_ALL.findIndex(name => name && name.toLowerCase().trim() === species);
+        const lower = species.toLowerCase();
+        let localDexId = POKEMON_NAMES_ALL.findIndex(name => name && name.toLowerCase().trim() === lower);
         if (localDexId === -1) {
             localDexId = POKEMON_NAMES_ALL.findIndex(name => {
                 if (!name) return false;
                 const cleanA = name.toLowerCase().replace(/[^a-z0-9]/g, "");
-                const cleanB = species.replace(/[^a-z0-9]/g, "");
+                const cleanB = lower.replace(/[^a-z0-9]/g, "");
                 return cleanA === cleanB;
             });
         }
@@ -406,22 +416,25 @@ function updateEditorSprite() {
     const pokedexId = getEditorPokedexId();
     const isShiny = editorCurrentIsShiny;
 
-    if (pokedexId === 0) {
+    if (!pokedexId || pokedexId === 0) {
         spriteImg.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
         updateEditorTypeBadges();
         return;
     }
 
+    const style = (typeof currentSpriteStyle !== "undefined" && currentSpriteStyle) ? currentSpriteStyle : (localStorage.getItem("bb_sprite_style") || "classic");
+
     let spriteUrl = "";
-    if (typeof currentSpriteStyle !== "undefined" && currentSpriteStyle === "3d-home") {
-        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
-    } else if (typeof currentSpriteStyle !== "undefined" && currentSpriteStyle === "3d-animated") {
+    if (style === "3d-animated") {
         spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${isShiny ? 'shiny/' : ''}${pokedexId}.gif`;
+    } else if (style === "3d-home") {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
     } else {
         spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
     }
+
     spriteImg.src = spriteUrl;
-    spriteImg.onerror = () => {
+    spriteImg.onerror = function() {
         if (typeof handleSpriteError === "function") {
             handleSpriteError(spriteImg, pokedexId, isShiny ? 'shiny' : 'normal');
         } else {
@@ -723,25 +736,29 @@ function openModalForEdit(id) {
     renderPassportTimeline(p); 
     updateFormTrainerSelect(p.trainerId);
 
-    editorCurrentIsShiny = Boolean(p.isShiny);
-    editorTargetSlotType = p.slotType || "box";
-    const btnShiny = document.getElementById("btn-toggle-shiny");
-    if (btnShiny) {
-        if (editorCurrentIsShiny) {
-            btnShiny.classList.add("active");
-            btnShiny.innerHTML = "⭐ Shiny: <strong>Sim</strong>";
-        } else {
-            btnShiny.classList.remove("active");
-            btnShiny.innerHTML = "⭐ Shiny: <strong>Não</strong>";
+    try {
+        editorCurrentIsShiny = Boolean(p.isShiny);
+        editorTargetSlotType = p.slotType || "box";
+        const btnShiny = document.getElementById("btn-toggle-shiny");
+        if (btnShiny) {
+            if (editorCurrentIsShiny) {
+                btnShiny.classList.add("active");
+                btnShiny.innerHTML = "⭐ Shiny: <strong>Sim</strong>";
+            } else {
+                btnShiny.classList.remove("active");
+                btnShiny.innerHTML = "⭐ Shiny: <strong>Não</strong>";
+            }
         }
-    }
-    const btnEvolve = document.getElementById("btn-evolve-pkmn");
-    if (btnEvolve) btnEvolve.style.display = p.isLocked ? "none" : "inline-flex";
-    const btnToggleSlot = document.getElementById("btn-toggle-slot-type");
-    if (btnToggleSlot) btnToggleSlot.style.display = p.isLocked ? "none" : "inline-flex";
+        const btnEvolve = document.getElementById("btn-evolve-pkmn");
+        if (btnEvolve) btnEvolve.style.display = p.isLocked ? "none" : "inline-flex";
+        const btnToggleSlot = document.getElementById("btn-toggle-slot-type");
+        if (btnToggleSlot) btnToggleSlot.style.display = p.isLocked ? "none" : "inline-flex";
 
-    updateEditorSlotBadges(p);
-    updateEditorSprite();
+        updateEditorSlotBadges(p);
+        updateEditorSprite();
+    } catch (e) {
+        console.error("Erro ao atualizar elementos visuais do editor:", e);
+    }
 
     document.getElementById("editor-modal").classList.add("active");
 }
@@ -831,12 +848,14 @@ function executeTransfer() {
 
 function renderPassportTimeline(p) {
     const display = document.getElementById("passport-display");
-    if (!p.history || p.history.length === 0) { 
-        display.innerHTML = `<span class="timeline-node active">${p.currentGame.toUpperCase()} (Origem)</span>`; 
+    if (!display) return;
+    const curGame = (p && p.currentGame) ? p.currentGame.toUpperCase() : (typeof currentGameId !== "undefined" ? currentGameId.toUpperCase() : "??");
+    if (!p || !p.history || p.history.length === 0) { 
+        display.innerHTML = `<span class="timeline-node active">${curGame} (Origem)</span>`; 
         return; 
     }
-    let nodes = p.history.map(gId => `<span class="timeline-node">${gId.toUpperCase()}</span>`);
-    nodes.push(`<span class="timeline-node active">${p.currentGame.toUpperCase()} (Atual)</span>`);
+    let nodes = p.history.map(gId => `<span class="timeline-node">${(gId || "??").toUpperCase()}</span>`);
+    nodes.push(`<span class="timeline-node active">${curGame} (Atual)</span>`);
     display.innerHTML = nodes.join(`<span class="timeline-arrow">➔</span>`);
 }
 

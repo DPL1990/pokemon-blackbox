@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blackbox-v13';         // ficheiros da app
+const CACHE_NAME = 'blackbox-v14';         // ficheiros da app
 const RUNTIME_CACHE = 'blackbox-runtime-v1'; // sprites, PokeAPI e fontes
 const MAX_RUNTIME_ENTRIES = 1000;
 const ASSETS = [
@@ -39,6 +39,17 @@ async function trimCache(cacheName, max) {
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
 }
 
+// Network-First para ficheiros da própria app (evita versão defasada quando há updates)
+function networkFirst(request, cacheName) {
+  return fetch(request).then((res) => {
+    if (res && res.ok) {
+      const copy = res.clone();
+      caches.open(cacheName).then((cache) => cache.put(request, copy));
+    }
+    return res;
+  }).catch(() => caches.match(request));
+}
+
 // Responde logo com a cópia guardada e atualiza-a em segundo plano
 function staleWhileRevalidate(request, cacheName, matchOptions) {
   return caches.open(cacheName).then((cache) =>
@@ -57,8 +68,6 @@ function staleWhileRevalidate(request, cacheName, matchOptions) {
 }
 
 // Sprites quase nunca mudam: cópia guardada primeiro.
-// Pede-se em modo CORS (o GitHub permite) para a resposta não ser "opaca": respostas opacas
-// contam ~7 MB cada na quota do browser, o que encheria o armazenamento com poucas centenas de sprites.
 function cacheFirst(request) {
   return caches.open(RUNTIME_CACHE).then((cache) =>
     cache.match(request).then((cached) => {
@@ -82,7 +91,7 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin === self.location.origin) {
     e.respondWith(
-      staleWhileRevalidate(req, CACHE_NAME, { ignoreSearch: true }).then((res) =>
+      networkFirst(req, CACHE_NAME).then((res) =>
         res && res.status ? res : caches.match('index.html')
       )
     );
