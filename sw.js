@@ -11,7 +11,6 @@ const ASSETS = [
   'js/helpers.js',
   'js/db.js',
   'js/save-parser.js',
-  'js/allocation.js',
   'js/editor.js',
   'js/ui.js',
   'blackbox_app_icon.png'
