@@ -189,7 +189,7 @@ function getRibbonForOpponent(opponentId) {
 }
 
 function generateHofFromActiveTeam() {
-    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team");
+    const activeTeam = pokemonDatabase.filter(p => p.currentGame === currentGameId && (!activeTrainerId || p.trainerId === activeTrainerId) && p.slotType === "team");
     if (activeTeam.length === 0) {
         alert("A tua equipa ativa para este cartucho está vazia! Adiciona Pokémon à equipa primeiro.");
         return;
@@ -601,7 +601,7 @@ function renderAll() {
     // Render Active Team Slots (Exactly 6 slots)
     let teamHTML = "";
     for (let i = 0; i < 6; i++) {
-        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.slotType === "team" && pkmn.slotIndex === i);
+        const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && (!activeTrainerId || pkmn.trainerId === activeTrainerId) && pkmn.slotType === "team" && pkmn.slotIndex === i);
         if (p) {
             teamHTML += createSlotHTML(p, i, "team");
         } else {
@@ -821,7 +821,7 @@ function updateStats() {
     
     const teamEl = document.getElementById("stat-team");
     if (teamEl) {
-        teamEl.innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && p.slotType === "team").length}/6`;
+        teamEl.innerText = `${pokemonDatabase.filter(p => p.currentGame === currentGameId && (!activeTrainerId || p.trainerId === activeTrainerId) && p.slotType === "team").length}/6`;
     }
 }
 

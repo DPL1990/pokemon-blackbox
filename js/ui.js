@@ -91,7 +91,8 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
             }
 
             draggedPkmn.currentGame = currentGameId; 
-            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && p.slotType === "team" && p.slotIndex === targetSlotIndex);
+            draggedPkmn.trainerId = activeTrainerId;
+            const blocking = pokemonDatabase.find(p => p.currentGame === currentGameId && (!activeTrainerId || p.trainerId === activeTrainerId) && p.slotType === "team" && p.slotIndex === targetSlotIndex);
             if (blocking) { 
                 blocking.slotType = "box"; 
                 blocking.slotIndex = 0; 
@@ -987,13 +988,17 @@ function importData(e) {
         try {
             const d = JSON.parse(evt.target.result);
             if (typeof isRunBoxBackup === "function" && isRunBoxBackup(d)) {
-                // Ficheiro de exportação da RunBox
+                // Ficheiro de exportação da RunBox com múltiplos OTs
                 const stats = importRunBoxData(d);
                 migrateTrainerIds();
                 cleanupDuplicates();
                 saveDatabase();
+                if (typeof updateTrainerSelect === "function") {
+                    updateTrainerSelect();
+                }
                 renderAll();
-                alert(`Importação da RunBox concluída com sucesso! Foram importadas ${stats.runsCount} campanha(s) e ${stats.pokemonCount} Pokémon.`);
+                const otMsg = stats.newTrainersCount === 1 ? "1 novo OT criado" : `${stats.newTrainersCount} novos OTs criados`;
+                alert(`Importação da RunBox concluída com sucesso! Foram importadas ${stats.runsCount} campanha(s) (${otMsg}) e ${stats.pokemonCount} Pokémon.`);
             } else if (Array.isArray(d)) { 
                 // Cópia de segurança JSON nativa do BlackBox
                 pokemonDatabase = d; 
@@ -1096,7 +1101,8 @@ function cleanupDuplicates() {
                 tp.species === bp.species &&
                 (tp.nickname || "") === (bp.nickname || "") &&
                 tp.level === bp.level &&
-                tp.currentGame === bp.currentGame) {
+                tp.currentGame === bp.currentGame &&
+                (tp.trainerId && bp.trainerId ? tp.trainerId === bp.trainerId : true)) {
                 idsToRemove.add(bp.id);
             }
         }

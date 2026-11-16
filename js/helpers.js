@@ -661,7 +661,7 @@ function mapRunBoxPokemon(p, trainerId, gameId, slotType, slotIndex) {
 }
 
 function importRunBoxData(data) {
-    if (!isRunBoxBackup(data)) return { runsCount: 0, pokemonCount: 0 };
+    if (!isRunBoxBackup(data)) return { runsCount: 0, newTrainersCount: 0, pokemonCount: 0 };
     
     const runsList = Array.isArray(data.runs) ? data.runs : Object.values(data.runs);
     if (!Array.isArray(trainersList)) {
@@ -672,6 +672,7 @@ function importRunBoxData(data) {
     }
 
     let importedRuns = 0;
+    let newTrainersCount = 0;
     let importedPkmn = 0;
 
     runsList.forEach((run, rIdx) => {
@@ -683,17 +684,24 @@ function importRunBoxData(data) {
         const tid = (run.trainerId || run.tid || "00000").toString().trim();
         const sid = (run.trainerSid || run.sid || "00000").toString().trim();
 
-        // Encontra ou cria perfil de treinador correspondente
-        let trainer = trainersList.find(t => t.gameId === gameId && t.name.toLowerCase() === trainerName.toLowerCase());
+        // 1. Gestão Dinâmica de Treinadores (OTs):
+        // Verifica no array atual de treinadores (trainersList) se já existe um treinador com esse nome para esse jogo
+        let trainer = trainersList.find(t => 
+            (t.gameId || "").toLowerCase() === gameId.toLowerCase() && 
+            (t.name || "").toLowerCase().trim() === trainerName.toLowerCase()
+        );
+
+        // Se não existir, cria um novo registo de treinador com ID único
         if (!trainer) {
             trainer = {
-                id: "trainer_" + gameId + "_" + Date.now() + "_" + Math.random().toString(36).substr(2, 4),
+                id: `trainer_${gameId}_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
                 gameId: gameId,
                 name: trainerName,
                 tid: tid,
                 sid: sid
             };
             trainersList.push(trainer);
+            newTrainersCount++;
         }
 
         const teamMembers = [];
@@ -756,5 +764,5 @@ function importRunBoxData(data) {
         console.warn("Não foi possível persistir bb_trainers:", e);
     }
 
-    return { runsCount: importedRuns, pokemonCount: importedPkmn };
+    return { runsCount: importedRuns, newTrainersCount: newTrainersCount, pokemonCount: importedPkmn };
 }
