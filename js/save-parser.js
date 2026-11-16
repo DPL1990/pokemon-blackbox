@@ -104,48 +104,123 @@ function decodeGen1String(bytes) {
     return str.trim();
 }
 
+// Fonte: PKHeX.Core/PKM/Util/Conversion/SpeciesConverter.cs (Table3InternalToNational)
+// Na Gen 3 (RSE/FRLG), os IDs internos 1..251 coincidem com a National Dex, 252..276 são vazios,
+// e 277..411 mapeiam para as espécies de Hoenn (252..386) numa ordem interna própria.
+const GEN3_INTERNAL_TO_NATIONAL_OFFSET = [
+    -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25,
+    -25, -25, -25, -25, -11, -11, -23, -23, -23, -23, -17, -17, -17, -15, -15, -5, -5, -16, -16, -1,
+    -1, -35, -35, -35, 11, 11, -24, -24, -27, -27, -23, -23, 2, -26, -22, -22, 8, 8, -37, -37,
+    -22, -22, -31, -31, -34, -34, -28, -28, -28, 7, 7, -32, -32, -8, -8, -32, -32, -16, -16, -16,
+    -27, -27, -16, -16, -24, -24, -24, -10, -10, -22, -41, -34, -34, -19, -19, -20, -20, -24, -34, -12,
+    -14, -49, -19, -19, -39, -39, -25, -25, -24, -24, -18, -18, -18, -26, -26, -26, -22, -46, -29, -29,
+    -29, -26, -26, -26, -25, -25, -25, -25, -25, -25, -25, -25, -25, -25, -53
+];
+
+function gen3InternalToNational(rawId) {
+    if (rawId >= 277 && rawId <= 411) {
+        return rawId + GEN3_INTERNAL_TO_NATIONAL_OFFSET[rawId - 277];
+    }
+    return rawId;
+}
+
+// Fonte: PKHeX.Core/PKM/Util/Conversion/SpeciesConverter.cs (Table9InternalToNational)
+// Na Gen 9 (SV), os IDs internos 917..1025 usam deslocamentos próprios para converter para a National Dex.
+const GEN9_INTERNAL_TO_NATIONAL_OFFSET = [
+    63, 63, 4, 4, 4, 1, 1, 1, 21, 21, 35, 35, 35, -8, -8, -8, 25, 25, 29, 29, 29, -22, -22, -6, -6, 31, 31, -6, -6,
+    -24, -24, -24, 7, 7, -23, -23, -17, -17, -17, -14, -14, -25, -25, 19, -30, 12, 12, -33, -33, -13, 2, 2, -25, -25,
+    11, 11, 27, 27, -33, -1, -1, 13, 13, -30, 8, -38, -38, -28, -28, -25, -25, -29, -18, -11, 22, 22, 22, 7, 7, -13,
+    -9, -9, -7, -6, -15, -11, -3, -15, -13, -14, -4, -27, -11, -28, -6, -4, 6, 6, 3, 2, 0, 8, 8, -5, -5, -5, 0, 0, 0
+];
+
+function gen9InternalToNational(rawId) {
+    if (rawId >= 917 && rawId < 917 + GEN9_INTERNAL_TO_NATIONAL_OFFSET.length) {
+        return rawId + GEN9_INTERNAL_TO_NATIONAL_OFFSET[rawId - 917];
+    }
+    return rawId;
+}
+
+// Fonte: PKHeX.Core/PKM/Strings/StringConverter3.cs (G3_EN)
+// Tabela oficial de caracteres ocidentais da Gen 3 (inclui acentos 0x01..0x2A, 0x5A, 0x68, 0x6F, 0xF1..0xF6 e símbolos ♂/♀ em 0xB5/0xB6).
+const GEN3_CHAR_TABLE = [
+    " ", "À", "Á", "Â", "Ç", "È", "É", "Ê", "Ë", "Ì", " ", "Î", "Ï", "Ò", "Ó", "Ô",
+    "Œ", "Ù", "Ú", "Û", "Ñ", "ß", "à", "á", " ", "ç", "è", "é", "ê", "ë", "ì", " ",
+    "î", "ï", "ò", "ó", "ô", "œ", "ù", "ú", "û", "ñ", "º", "ª", "⯪", "&", "+", " ",
+    " ", " ", " ", " ", " ", "=", ";", " ", " ", " ", " ", " ", " ", " ", " ", " ",
+    " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ",
+    "▯", "¿", "¡", "PK", "MN", "PO", "Ké", "BL", "OC", "K", "Í", "%", "(", ")", " ", " ",
+    " ", " ", " ", " ", " ", " ", " ", " ", "â", " ", " ", " ", " ", " ", " ", "í",
+    " ", " ", " ", " ", " ", " ", " ", " ", " ", "⬆", "⬇", "⬅", "➡", "*", "*", "*",
+    "*", "*", "*", "*", "ᵉ", "<", ">", " ", " ", " ", " ", " ", " ", " ", " ", " ",
+    " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ", " ",
+    "ᵉ", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "!", "?", ".", "-", "·",
+    "…", "“", "”", "‘", "'", "♂", "♀", "$", ",", "×", "/", "A", "B", "C", "D", "E",
+    "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U",
+    "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k",
+    "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "▶",
+    ":", "Ä", "Ö", "Ü", "ä", "ö", "ü", "⬆", "⬇", "⬅", " ", " ", " ", " ", " ", ""
+];
+
 function decodeGen3String(bytes) {
     let str = "";
     for (let i = 0; i < bytes.length; i++) {
         const b = bytes[i];
         if (b === 0xFF) break;
-        if (b === 0x00) {
-            str += " ";
-        } else if (b >= 0xBB && b <= 0xD4) {
-            str += String.fromCharCode("A".charCodeAt(0) + (b - 0xBB));
-        } else if (b >= 0xD5 && b <= 0xEE) {
-            str += String.fromCharCode("a".charCodeAt(0) + (b - 0xD5));
-        } else if (b >= 0xA1 && b <= 0xAA) {
-            str += String.fromCharCode("0".charCodeAt(0) + (b - 0xA1));
-        } else if (b === 0x5A) {
-            str += "♂";
-        } else if (b === 0x5B) {
-            str += "♀";
-        } else if (b === 0xF0) {
-            str += ":";
-        } else if (b === 0xE1) {
-            str += "PK";
-        } else if (b === 0xE2) {
-            str += "MN";
-        } else if (b === 0xB5) {
-            str += "e";
-        } else if (b === 0x1B || b === 0x1C) {
-            str += "é";
-        } else if (b === 0x7F) {
-            str += " ";
+        const ch = GEN3_CHAR_TABLE[b];
+        if (ch !== undefined) {
+            str += ch;
         }
     }
     return str.trim();
 }
 
+// Fonte: PKHeX.Core/PKM/Strings/StringConverter4Util.cs (TableINT)
+// Na Gen 4 (DPPt/HGSS), os nomes e OT não usam UTF-16 direto: usam códigos de 16 bits próprios
+// (0x0121..0x012A = '0'..'9', 0x012B..0x0144 = 'A'..'Z', 0x0145..0x015E = 'a'..'z', 0x015F..0x019E = 'À'..'ÿ', etc.).
+const GEN4_SPECIAL_CHARS = {
+    0x00EE: "♂", 0x00EF: "♀",
+    0x019F: "Œ", 0x01A0: "œ", 0x01A1: "Ş", 0x01A2: "ş", 0x01A3: "ª", 0x01A4: "º",
+    0x01AB: "!", 0x01AC: "?", 0x01AD: ",", 0x01AE: ".", 0x01AF: "…",
+    0x01B0: "·", 0x01B1: "/", 0x01B2: "‘", 0x01B3: "’", 0x01B4: "“", 0x01B5: "”",
+    0x01B6: "„", 0x01B7: "«", 0x01B8: "»", 0x01B9: "(", 0x01BA: ")",
+    0x01BB: "♂", 0x01BC: "♀", 0x01BD: "+", 0x01BE: "-", 0x01BF: "*",
+    0x01C0: "#", 0x01C1: "=", 0x01C2: "&", 0x01C3: "~", 0x01C4: ":", 0x01C5: ";",
+    0x01D0: "@", 0x01D2: "%", 0x01DE: " ",
+    0x246D: "♂", 0x246E: "♀", 0x2642: "♂", 0x2640: "♀"
+};
+
+function decodeGen4String(uint16Array) {
+    let str = "";
+    for (let i = 0; i < uint16Array.length; i++) {
+        const val = uint16Array[i];
+        if (val === 0xFFFF || val === 0x0000) break;
+        if (val >= 0x0121 && val <= 0x012A) {
+            str += String.fromCharCode(0x0030 + (val - 0x0121));
+        } else if (val >= 0x012B && val <= 0x0144) {
+            str += String.fromCharCode(0x0041 + (val - 0x012B));
+        } else if (val >= 0x0145 && val <= 0x015E) {
+            str += String.fromCharCode(0x0061 + (val - 0x0145));
+        } else if (val >= 0x015F && val <= 0x019E) {
+            str += String.fromCharCode(0x00C0 + (val - 0x015F));
+        } else if (GEN4_SPECIAL_CHARS[val] !== undefined) {
+            str += GEN4_SPECIAL_CHARS[val];
+        } else if (val >= 0x0020 && val <= 0x00FF) {
+            // Fallback para buffers de teste escritos em UTF-16/ASCII direto
+            str += String.fromCharCode(val);
+        }
+    }
+    return str.trim();
+}
+
+// Fonte: PKHeX.Core/PKM/Strings/StringConverter5.cs (Gen 5+ UTF-16LE, com símbolos ♂/♀ em 0x246D/0x246E ou 0x2642/0x2640)
 function decodeUTF16String(uint16Array) {
     let str = "";
     for (let i = 0; i < uint16Array.length; i++) {
         const val = uint16Array[i];
         if (val === 0xFFFF || val === 0x0000) break;
-        if (val === 0x2642) {
+        if (val === 0x2642 || val === 0x246D) {
             str += "♂";
-        } else if (val === 0x2640) {
+        } else if (val === 0x2640 || val === 0x246E) {
             str += "♀";
         } else {
             str += String.fromCharCode(val);
@@ -555,6 +630,7 @@ function parseGen2Save(buffer) {
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
             
             const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
+            const itemName = formatItemNameForDisplay((typeof REVERSE_ITEMS_MAP_GEN2 !== "undefined" && REVERSE_ITEMS_MAP_GEN2[u8[structOffset + 1]]) || "");
             
             const dvsOffset = 21;
             const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
@@ -568,6 +644,7 @@ function parseGen2Save(buffer) {
                 level: level || 5,
                 otName: otName,
                 otId: otId,
+                item: itemName,
                 moves: moves,
                 ivs: ivs,
                 nature: GEN3_NATURES[exp % 25],
@@ -611,6 +688,7 @@ function parseGen2Save(buffer) {
                     const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
                     
                     const { moves, ivs } = parseGen1Gen2DVsAndMoves(u8, structOffset, 2, 21);
+                    const itemName = formatItemNameForDisplay((typeof REVERSE_ITEMS_MAP_GEN2 !== "undefined" && REVERSE_ITEMS_MAP_GEN2[u8[structOffset + 1]]) || "");
                     
                     const dvsOffset = 21;
                     const atkDv = (u8[structOffset + dvsOffset] >> 4) & 15;
@@ -624,6 +702,7 @@ function parseGen2Save(buffer) {
                         level: level || 5,
                         otName: otName,
                         otId: otId,
+                        item: itemName,
                         moves: moves,
                         ivs: ivs,
                         nature: GEN3_NATURES[exp % 25],
@@ -768,7 +847,9 @@ function parseGen3Save(buffer) {
             
             if (!blockG) continue;
             
-            const pokedexId = blockG[0] | (blockG[1] << 8);
+            // Fonte: PKHeX.Core/PKM/PK3.cs (SpeciesInternal em Block G +0x00 convertido via SpeciesConverter.GetNational3)
+            const rawSpeciesId = blockG[0] | (blockG[1] << 8);
+            const pokedexId = gen3InternalToNational(rawSpeciesId);
             if (pokedexId === 0 || pokedexId > 386) continue;
             
             const level = section1[structOffset + 84];
@@ -895,7 +976,9 @@ function parseGen3Save(buffer) {
             
             if (!blockG) continue;
             
-            const pokedexId = blockG[0] | (blockG[1] << 8);
+            // Fonte: PKHeX.Core/PKM/PK3.cs (SpeciesInternal em Block G +0x00 convertido via SpeciesConverter.GetNational3)
+            const rawSpeciesId = blockG[0] | (blockG[1] << 8);
+            const pokedexId = gen3InternalToNational(rawSpeciesId);
             if (pokedexId === 0 || pokedexId > 386) continue;
             
             const exp = blockG[4] | (blockG[5] << 8) | (blockG[6] << 16) | (blockG[7] << 24);
@@ -1022,49 +1105,63 @@ function parseGen4Gen5Save(buffer) {
             const pokedexId = blockA[0];
             if (pokedexId === 0 || pokedexId > 649) continue;
             
-            const originGame = blockC[11] >> 8; // byte 0x5F (jogo de origem)
+            // Fonte: PKHeX.Core/PKM/PK4.cs e PK5.cs (Origin Game em 0x5F; Nickname em 0x48; OT Name em 0x68)
+            const originGame = blockC[11] >> 8; // byte 0x5F (jogo de origem: 20..23 = BW/B2W2)
             const isGen5 = (originGame >= 20 && originGame <= 23);
             
-            const exp = blockA[4] | (blockA[5] << 16);
+            const exp = (blockA[4] | (blockA[5] << 16)) >>> 0;
             const otId = blockA[2];
             const secretId = blockA[3];
-            const nickname = decodeUTF16String(blockC.subarray(0, 11));
+            const nickWords = blockC.subarray(0, 11);
+            const nickname = isGen5 ? decodeUTF16String(nickWords) : decodeGen4String(nickWords);
             
             // Nome do OT: 0x68 (início do bloco D) tanto na Gen 4 como na Gen 5
             const otNameWords = blockD.subarray(0, 8);
-            const otName = decodeUTF16String(otNameWords);
+            const otName = isGen5 ? decodeUTF16String(otNameWords) : decodeGen4String(otNameWords);
             
-            let level = levelFromExp(pokedexId, exp);
+            const expLevel = levelFromExp(pokedexId, exp);
+            let level = expLevel;
             let isParty = false;
             
+            // Fonte: PKHeX.Core/PKM/PK4.cs (SIZE_4PARTY=236) e PK5.cs (SIZE_5PARTY=220)
             // Equipa: a zona extra (0x88+) vem cifrada com o PID como semente.
-            // Só conta como equipa se, depois de decifrada, nível/HP/stats fizerem sentido.
+            // Só conta como equipa se os bytes brutos não forem todos zero (slot vazio a seguir na Box),
+            // se o nível em 0x8C coincidir com o nível calculado pela EXP e se HP/stats estiverem no intervalo válido.
             if (offset + 136 + 20 <= u8.length) {
-                let pseed = pid >>> 0;
-                const pw = new Uint16Array(10);
-                for (let j = 0; j < 10; j++) {
-                    pseed = (Math.imul(pseed, 1103515245) + 24691) >>> 0;
-                    const w = u8[offset + 136 + j * 2] | (u8[offset + 137 + j * 2] << 8);
-                    pw[j] = w ^ ((pseed >>> 16) & 0xFFFF);
+                let hasNonZeroExtra = false;
+                for (let k = 0; k < 20; k++) {
+                    if (u8[offset + 136 + k] !== 0) {
+                        hasNonZeroExtra = true;
+                        break;
+                    }
                 }
-                const pl = pw[2] & 0xFF;       // 0x8C nível
-                const curHp = pw[3];           // 0x8E HP atual
-                const maxHp = pw[4];           // 0x90 HP máximo
-                let statsOk = true;
-                for (let st = 5; st < 10; st++) {
-                    if (pw[st] < 1 || pw[st] > 999) statsOk = false;
-                }
-                if (pl >= 1 && pl <= 100 && maxHp >= 1 && maxHp <= 999 && curHp <= maxHp && statsOk) {
-                    level = pl;
-                    isParty = true;
+                if (hasNonZeroExtra) {
+                    let pseed = pid >>> 0;
+                    const pw = new Uint16Array(10);
+                    for (let j = 0; j < 10; j++) {
+                        pseed = (Math.imul(pseed, 1103515245) + 24691) >>> 0;
+                        const w = u8[offset + 136 + j * 2] | (u8[offset + 137 + j * 2] << 8);
+                        pw[j] = w ^ ((pseed >>> 16) & 0xFFFF);
+                    }
+                    const pl = pw[2] & 0xFF;       // 0x8C nível na equipa
+                    const curHp = pw[3];           // 0x8E HP atual
+                    const maxHp = pw[4];           // 0x90 HP máximo
+                    let statsOk = true;
+                    for (let st = 5; st < 10; st++) {
+                        if (pw[st] < 1 || pw[st] > 999) statsOk = false;
+                    }
+                    if (pl >= 1 && pl <= 100 && Math.abs(pl - expLevel) <= 1 && maxHp >= 1 && maxHp <= 999 && curHp <= maxHp && statsOk) {
+                        level = pl;
+                        isParty = true;
+                    }
                 }
             }
             
             const speciesName = cleanSpeciesName(POKEMON_NAMES_ALL[pokedexId] || `Species #${pokedexId}`);
             
             // Extract item, moves, and IVs
+            // Fonte: PKHeX.Core/PKM/PK4.cs e PK5.cs (HeldItem em 0x0A = blockA[1])
             const itemId = blockA[1];
-            // Gen 4/5 usam IDs de itens diferentes da Gen 3 (tabela da PokeAPI)
             const rawItem = (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && POKEAPI_ITEM_ID_TO_NAME[itemId]) || "";
             const itemName = formatItemNameForDisplay(rawItem);
             
@@ -1086,6 +1183,7 @@ function parseGen4Gen5Save(buffer) {
             };
             
             // Nature
+            // Fonte: PKHeX.Core/PKM/PK5.cs (Nature em 0x41 = byte alto de blockB[12]); na Gen 4 deriva de PID % 25
             let natureName = "";
             if (isGen5) {
                 const natureVal = (blockB[12] >> 8) & 0xFF; // byte 0x41
@@ -1094,7 +1192,7 @@ function parseGen4Gen5Save(buffer) {
                 }
             }
             if (!natureName) {
-                natureName = GEN3_NATURES[pid % 25] || "Hardy";
+                natureName = GEN3_NATURES[(pid >>> 0) % 25] || "Hardy";
             }
             
             // Gender
@@ -1103,15 +1201,16 @@ function parseGen4Gen5Save(buffer) {
             // Shiny
             const isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
             
-            // Ability
+            // Ability (0x15 = byte alto de blockA[6])
             const abilityId = blockA[6] >> 8;
             
             parsedList.push({
-                sourceSlot: isParty ? `Equipa (Gen 4/5)` : `Box (Gen 4/5)`,
+                sourceSlot: isParty ? `Equipa (Gen ${isGen5 ? 5 : 4})` : `Box (Gen ${isGen5 ? 5 : 4})`,
                 pokedexId,
                 species: speciesName,
                 nickname: nickname || speciesName,
                 level: level,
+                exp: exp,
                 otName: otName,
                 otId: otId,
                 item: itemName,
@@ -1134,6 +1233,16 @@ function parseGen4Gen5Save(buffer) {
         }
     }
     
+    // Atribui índice sequencial 0..5 aos Pokémon da equipa ativa para não colidirem no slot 0
+    let partyIdx = 0;
+    for (let i = 0; i < parsedList.length; i++) {
+        if (parsedList[i].saveMeta && parsedList[i].saveMeta.isParty) {
+            parsedList[i].saveMeta.index = partyIdx < 6 ? partyIdx : 0;
+            parsedList[i].sourceSlot = `Equipa (Gen ${parsedList[i].saveMeta.gen}) #${partyIdx + 1}`;
+            partyIdx++;
+        }
+    }
+    
     return parsedList;
 }
 
@@ -1142,6 +1251,7 @@ function parseDecryptedPKM(buffer, fileName) {
     const u8 = new Uint8Array(buffer);
     const u16 = new Uint16Array(buffer);
     const u32 = new Uint32Array(buffer);
+    const lowerName = (fileName || "").toLowerCase();
     
     let pokedexId = 0;
     let exp = 0;
@@ -1157,30 +1267,35 @@ function parseDecryptedPKM(buffer, fileName) {
     let rawSaveMeta = null;
     let genderVal = "⚲";
     let natureName = "";
+    let abilityId = 0;
+    let isShiny = false;
     
-    if (size === 100) {
-        // PK3
-        const pid = u32[0];
-        pokedexId = u16[32 / 2];
+    if (size === 80 || size === 100) {
+        // Fonte: PKHeX.Core/PKM/PK3.cs (SIZE_3STORED = 80, SIZE_3PARTY = 100)
+        const pid = u32[0] >>> 0;
+        const rawSpeciesId = u16[0x20 / 2];
+        pokedexId = gen3InternalToNational(rawSpeciesId);
+        exp = u32[0x24 / 4] >>> 0;
         const nickBytes = u8.subarray(8, 18);
         nickname = decodeGen3String(nickBytes);
-        level = u8[84] || 5;
-        sourceSlot = "Ficheiro PK3 Decifrado";
+        level = (size === 100 && u8[84] >= 1 && u8[84] <= 100) ? u8[84] : levelFromExp(pokedexId, exp);
+        sourceSlot = `Ficheiro PK3 ${size === 100 ? 'Party' : 'Box'}`;
         
         otId = u16[4 / 2];
+        const secretId = u16[6 / 2];
         const otNameBytes = u8.subarray(20, 27);
         otName = decodeGen3String(otNameBytes);
         
-        const itemId = u16[34 / 2];
+        const itemId = u16[0x22 / 2];
         itemName = formatItemNameForDisplay(REVERSE_ITEMS_MAP_GEN3[itemId] || "");
         
         for (let m = 0; m < 4; m++) {
-            const moveId = u16[(44 + m * 2) / 2];
+            const moveId = u16[(0x2C + m * 2) / 2];
             const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
             moves.push(formatMoveNameForDisplay(rawName));
         }
         
-        const ivWord = u32[72 / 4];
+        const ivWord = u32[0x48 / 4];
         ivs = {
             hp: ivWord & 0x1F,
             atk: (ivWord >> 5) & 0x1F,
@@ -1191,6 +1306,8 @@ function parseDecryptedPKM(buffer, fileName) {
         };
         
         genderVal = getGenderFromPid(pokedexId, pid);
+        natureName = GEN3_NATURES[pid % 25] || "Hardy";
+        isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
         
         rawSaveMeta = { 
             gen: 3, 
@@ -1199,39 +1316,48 @@ function parseDecryptedPKM(buffer, fileName) {
             rawBytes: u8.slice(0) 
         };
     } else if (size === 136 || size === 220 || size === 236) {
-        // PK4 / PK5
-        const pid = u32[0];
-        pokedexId = u16[8 / 2];
-        exp = u32[16 / 4];
-        const nickWords = u16.subarray(72 / 2, 72 / 2 + 11);
-        nickname = decodeUTF16String(nickWords);
+        // Fonte: PKHeX.Core/PKM/PK4.cs (136 Box / 236 Party) e PK5.cs (136 Box / 220 Party)
+        const pid = u32[0] >>> 0;
+        pokedexId = u16[0x08 / 2];
+        exp = u32[0x10 / 4] >>> 0;
+        abilityId = u8[0x15];
         
-        otId = u16[12 / 2];
-        const otWords = u16.subarray(104 / 2, 104 / 2 + 8); // 0x68
-        otName = decodeUTF16String(otWords);
+        const originGame = u8[0x5F];
+        const isGen5 = lowerName.endsWith(".pk5") || (size === 220) || (!lowerName.endsWith(".pk4") && size === 136 && (originGame >= 20 && originGame <= 23 || pokedexId > 493));
+        const detectedGen = isGen5 ? 5 : 4;
         
-        if (size === 236) {
-            level = u8[140] || 5;
+        const nickWords = u16.subarray(0x48 / 2, 0x48 / 2 + 11);
+        nickname = isGen5 ? decodeUTF16String(nickWords) : decodeGen4String(nickWords);
+        
+        otId = u16[0x0C / 2];
+        const secretId = u16[0x0E / 2];
+        const otWords = u16.subarray(0x68 / 2, 0x68 / 2 + 8); // 0x68 (início do Bloco D)
+        otName = isGen5 ? decodeUTF16String(otWords) : decodeGen4String(otWords);
+        
+        if ((size === 220 || size === 236) && u8[0x8C] >= 1 && u8[0x8C] <= 100) {
+            level = u8[0x8C];
         } else {
             level = levelFromExp(pokedexId, exp);
         }
         
-        const originGame = u8[0x5F];
-        const isGen5 = (size === 220) || (size === 136 && originGame >= 20 && originGame <= 23);
-        const detectedGen = isGen5 ? 5 : 4;
         sourceSlot = `Ficheiro PK${detectedGen}${size === 220 || size === 236 ? ' Party' : ' Box'}`;
         
-        const itemId = u16[10 / 2];
+        const itemId = u16[0x0A / 2];
         itemName = formatItemNameForDisplay((typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && POKEAPI_ITEM_ID_TO_NAME[itemId]) || "");
-        if (isGen5 && u8[0x41] < 25) natureName = GEN3_NATURES[u8[0x41]];
+        if (isGen5 && u8[0x41] < 25) {
+            natureName = GEN3_NATURES[u8[0x41]];
+        }
+        if (!natureName) {
+            natureName = GEN3_NATURES[pid % 25] || "Hardy";
+        }
         
         for (let m = 0; m < 4; m++) {
-            const moveId = u16[(40 + m * 2) / 2];
+            const moveId = u16[(0x28 + m * 2) / 2];
             const rawName = (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined' && POKEAPI_MOVE_ID_TO_NAME[moveId]) || REVERSE_MOVES_MAP[moveId] || "";
             moves.push(formatMoveNameForDisplay(rawName));
         }
         
-        const ivWord = u32[56 / 4];
+        const ivWord = u32[0x38 / 4];
         ivs = {
             hp: ivWord & 0x1F,
             atk: (ivWord >> 5) & 0x1F,
@@ -1242,30 +1368,37 @@ function parseDecryptedPKM(buffer, fileName) {
         };
         
         genderVal = getGenderFromPid(pokedexId, pid);
+        isShiny = ((otId ^ secretId ^ (pid & 0xFFFF) ^ (pid >>> 16)) < 8);
         
         rawSaveMeta = { 
             gen: detectedGen, 
             isIndividual: true, 
             pid: pid, 
+            abilityId: abilityId,
             rawBytes: u8.slice(0) 
         };
     } else if (size === 232 || size === 260) {
-        // PK6 / PK7
+        // Fonte: PKHeX.Core/PKM/PK6.cs e PK7.cs (SIZE_6STORED = 232, SIZE_6PARTY = 260 para ambas Gen 6 e Gen 7)
         pokedexId = u16[0x08 / 2];
-        exp = u32[0x10 / 4];
+        exp = u32[0x10 / 4] >>> 0;
+        abilityId = u8[0x14];
         const nickWords = u16.subarray(0x40 / 2, 0x40 / 2 + 12);
         nickname = decodeUTF16String(nickWords);
         
         otId = u16[0x0C / 2];
-        const otWords = u16.subarray(176 / 2, 176 / 2 + 12);
+        const otWords = u16.subarray(0xB0 / 2, 0xB0 / 2 + 12);
         otName = decodeUTF16String(otWords);
         
-        if (size === 260) {
+        if (size === 260 && u8[0xEC] >= 1 && u8[0xEC] <= 100) {
             level = u8[0xEC];
         } else {
             level = levelFromExp(pokedexId, exp);
         }
-        sourceSlot = `Ficheiro PK${size === 232 ? '6/7 Box' : '6/7 Party'}`;
+        
+        const originVersion = u8[0xDF];
+        const isGen7 = lowerName.endsWith(".pk7") || (!lowerName.endsWith(".pk6") && (pokedexId > 721 || (originVersion >= 30 && originVersion <= 33)));
+        const detectedGen = isGen7 ? 7 : 6;
+        sourceSlot = `Ficheiro PK${detectedGen} ${size === 232 ? 'Box' : 'Party'}`;
         
         const itemId = u16[0x0A / 2];
         itemName = formatItemNameForDisplay((typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && POKEAPI_ITEM_ID_TO_NAME[itemId]) || "");
@@ -1292,20 +1425,30 @@ function parseDecryptedPKM(buffer, fileName) {
         genderVal = isGenderless ? "⚲" : (isFemale ? "♀" : "♂");
         if (u8[0x1C] < 25) natureName = GEN3_NATURES[u8[0x1C]];
         
-        rawSaveMeta = { gen: size === 260 ? 6 : 7, isIndividual: true, rawBytes: u8.slice(0) };
+        rawSaveMeta = { gen: detectedGen, isIndividual: true, abilityId: abilityId, rawBytes: u8.slice(0) };
     } else if (size === 328 || size === 344) {
-        // PK8 / PK9
-        pokedexId = u16[0x08 / 2];
-        exp = u32[0x10 / 4];
+        // Fonte: PKHeX.Core/PKM/PK8.cs, G8PKM.cs e PK9.cs (SIZE_8STORED = 328, SIZE_8PARTY = 344 para ambas Gen 8 e Gen 9)
+        const rawSpeciesId = u16[0x08 / 2];
+        const originVersion = u8[0xCE]; // Version em 0xCE (50=Scarlet, 51=Violet)
+        const isGen9 = lowerName.endsWith(".pk9") || (!lowerName.endsWith(".pk8") && (rawSpeciesId > 905 || originVersion === 50 || originVersion === 51));
+        const detectedGen = isGen9 ? 9 : 8;
+        
+        pokedexId = isGen9 ? gen9InternalToNational(rawSpeciesId) : rawSpeciesId;
+        exp = u32[0x10 / 4] >>> 0;
+        abilityId = u16[0x14 / 2];
         const nickWords = u16.subarray(0x58 / 2, 0x58 / 2 + 12);
         nickname = decodeUTF16String(nickWords);
         
         otId = u16[0x0C / 2];
-        const otWords = u16.subarray(248 / 2, 248 / 2 + 12);
+        const otWords = u16.subarray(0xF8 / 2, 0xF8 / 2 + 12);
         otName = decodeUTF16String(otWords);
         
-        level = levelFromExp(pokedexId, exp);
-        sourceSlot = `Ficheiro PK${size === 328 ? '8' : '9'}`;
+        if (size === 344 && u8[0x148] >= 1 && u8[0x148] <= 100) {
+            level = u8[0x148];
+        } else {
+            level = levelFromExp(pokedexId, exp);
+        }
+        sourceSlot = `Ficheiro PK${detectedGen} ${size === 328 ? 'Box' : 'Party'}`;
         
         const itemId = u16[0x0A / 2];
         itemName = formatItemNameForDisplay((typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined' && POKEAPI_ITEM_ID_TO_NAME[itemId]) || "");
@@ -1326,11 +1469,15 @@ function parseDecryptedPKM(buffer, fileName) {
             spd: (ivWord >> 25) & 0x1F
         };
         
-        const genderBits = (u8[0x22] >> 2) & 0x3; // 0 macho, 1 fêmea, 2 sem género
+        // Fonte: PKHeX.Core/PKM/G8PKM.cs ((Data[0x22] >> 2) & 0x3) vs PK9.cs ((Data[0x22] >> 1) & 0x3)
+        let genderBits = isGen9 ? ((u8[0x22] >> 1) & 0x3) : ((u8[0x22] >> 2) & 0x3);
+        if (isGen9 && genderBits > 2) {
+            genderBits = (u8[0x22] >> 2) & 0x3;
+        }
         genderVal = genderBits === 2 ? "⚲" : (genderBits === 1 ? "♀" : "♂");
         if (u8[0x20] < 25) natureName = GEN3_NATURES[u8[0x20]];
         
-        rawSaveMeta = { gen: size === 328 ? 8 : 9, isIndividual: true, rawBytes: u8.slice(0) };
+        rawSaveMeta = { gen: detectedGen, isIndividual: true, abilityId: abilityId, rawBytes: u8.slice(0) };
     } else {
         return null;
     }
@@ -1354,6 +1501,8 @@ function parseDecryptedPKM(buffer, fileName) {
         ivs: ivs,
         gender: genderVal,
         nature: natureName,
+        isShiny: isShiny,
+        abilityId: abilityId || undefined,
         saveMeta: rawSaveMeta
     }];
 }
@@ -1624,9 +1773,9 @@ function handleSaveFileSelect(e) {
             let activeSlotStartSector = 0;
             
             // Check individual files (PK3/4/5/6/7/8/9) first
-            if (size === 100 || size === 136 || size === 220 || size === 232 || size === 236 || size === 260 || size === 328 || size === 344) {
+            if (size === 80 || size === 100 || size === 136 || size === 220 || size === 232 || size === 236 || size === 260 || size === 328 || size === 344) {
                 parsed = parseDecryptedPKM(buffer, file.name);
-                detectedGen = 0;
+                detectedGen = (parsed && parsed[0] && parsed[0].saveMeta && parsed[0].saveMeta.gen) || 0;
             } else if (size >= 32000 && size <= 35000) {
                 parsed = parseGen1Save(buffer);
                 if (parsed && parsed.length > 0) {
@@ -1672,10 +1821,10 @@ function handleSaveFileSelect(e) {
                 }
             } else if (size >= 500000 && size <= 550000) {
                 parsed = parseGen4Gen5Save(buffer);
-                detectedGen = 4;
+                detectedGen = (parsed && parsed[0] && parsed[0].saveMeta && parsed[0].saveMeta.gen) || 4;
             } else if (size >= 900000 && size <= 4800000) {
                 parsed = parseGen8Gen9Save(buffer);
-                detectedGen = 8;
+                detectedGen = (parsed && parsed[0] && parsed[0].saveMeta && parsed[0].saveMeta.gen) || 8;
             } else {
                 alert(`Tamanho de ficheiro não reconhecido (${size} bytes). Apenas saves de cartucho (~32KB, ~128KB, ~512KB), saves de Switch (~1MB-4.5MB) ou ficheiros individuais descodificados (PKM) são suportados.`);
                 return;
@@ -1695,7 +1844,7 @@ function handleSaveFileSelect(e) {
             
             const exportBtn = document.getElementById("btn-export-modified-save");
             if (exportBtn) {
-                exportBtn.style.display = (detectedGen >= 1 && detectedGen <= 3) ? "block" : "none";
+                exportBtn.style.display = (detectedGen >= 1 && detectedGen <= 3 && size >= 32000) ? "block" : "none";
             }
             
             let defaultGameId = currentGameId;
@@ -1949,6 +2098,7 @@ function executeSaveImport() {
                 gender: normalizeGender(p.gender || "⚲"),
                 nature: p.nature || "",
                 ability: p.ability || "",
+                item: p.item || "",
                 type1: p.type1 || "normal",
                 type2: p.type2 || "",
                 moves: p.moves || [],
