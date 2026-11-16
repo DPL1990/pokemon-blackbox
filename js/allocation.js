@@ -1844,7 +1844,7 @@ function loadOpponentPreset(presetId) {
         }
     });
     
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     renderAll();
     
     // Reset selection select
@@ -1952,7 +1952,7 @@ function applyRecommendedAllocation() {
         }
     });
     
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     renderAll();
     switchTab("boxes");
     alert("Frota tática alocada com sucesso! A tua equipa ativa foi atualizada.");
@@ -2465,7 +2465,7 @@ function applyRecommendedMove(pokemonId, moveEnglishName, moveDisplayName) {
     if (targetSlot !== -1) {
         moves[targetSlot] = moveEnglishName;
         pkmn.moves = moves;
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        saveDatabase();
         renderAll();
         alert(`Sucesso! Adicionado o ataque "${moveEnglishName}" no slot vazio de ${pkmn.nickname || pkmn.species}.`);
         return;
@@ -2487,7 +2487,7 @@ function applyRecommendedMove(pokemonId, moveEnglishName, moveDisplayName) {
         const oldMove = moves[choiceNum - 1];
         moves[choiceNum - 1] = moveEnglishName;
         pkmn.moves = moves;
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        saveDatabase();
         renderAll();
         alert(`Sucesso! Substituído o ataque "${oldMove || 'Vazio'}" por "${moveEnglishName}" em ${pkmn.nickname || pkmn.species}.`);
     } else {
@@ -2780,7 +2780,7 @@ function loadPreset(presetId) {
         }
     });
     
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     renderAll();
     switchTab("boxes");
     alert(`Preset "${preset.name}" ativado com sucesso!`);
@@ -2826,7 +2826,7 @@ function cleanSlateActiveTrainer() {
     
     // 1. Limpar Pokémon da base de dados para o treinador ativo e jogo atual
     pokemonDatabase = pokemonDatabase.filter(p => !(p.currentGame === currentGameId && p.trainerId === activeTrainerId));
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     
     // 2. Limpar Presets de Equipa para o treinador ativo e jogo atual
     teamPresetsList = teamPresetsList.filter(tp => !(tp.gameId === currentGameId && tp.trainerId === activeTrainerId));
@@ -2946,7 +2946,7 @@ window.onload = function() {
     initDB().then(() => {
         cleanupDuplicates();
         setupDatalists(); 
-        loadSpeciesDatalist(); 
+        runWhenIdle(loadSpeciesDatalist);
         renderRibbonChecklist();
         initTouchDragAndDrop();
         initGlobalBoxUI();
@@ -2964,7 +2964,7 @@ window.onload = function() {
         console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
         cleanupDuplicates();
         setupDatalists(); 
-        loadSpeciesDatalist(); 
+        runWhenIdle(loadSpeciesDatalist);
         renderRibbonChecklist();
         initTouchDragAndDrop();
         initGlobalBoxUI();
