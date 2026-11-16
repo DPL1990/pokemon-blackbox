@@ -1,7 +1,8 @@
-const CACHE_NAME = 'blackbox-v8';          // ficheiros da app
+const CACHE_NAME = 'blackbox-v9';          // ficheiros da app
 const RUNTIME_CACHE = 'blackbox-runtime-v1'; // sprites, PokeAPI e fontes
 const MAX_RUNTIME_ENTRIES = 1000;
 const ASSETS = [
+  './',
   'index.html',
   'manifest.json',
   'styles.css',
@@ -13,7 +14,9 @@ const ASSETS = [
   'js/save-parser.js',
   'js/editor.js',
   'js/ui.js',
-  'blackbox_app_icon.png'
+  'js/allocation.js',
+  'blackbox_app_icon.png',
+  'blackbox_app_icon_192.png'
 ];
 
 self.addEventListener('install', (e) => {
@@ -36,6 +39,25 @@ async function trimCache(cacheName, max) {
   const cache = await caches.open(cacheName);
   const keys = await cache.keys();
   for (let i = 0; i < keys.length - max; i++) await cache.delete(keys[i]);
+}
+
+// Para os ficheiros próprios da app (HTML/JS/CSS/Manifest): tenta rede primeiro para garantir
+// que o telemóvel/PWA recebe sempre a versão mais recente logo ao abrir, com fallback imediato para cache offline.
+function networkFirstAppShell(request) {
+  return caches.open(CACHE_NAME).then((cache) =>
+    fetch(request)
+      .then((res) => {
+        if (res && res.ok) {
+          cache.put(request, res.clone());
+        }
+        return res;
+      })
+      .catch(() =>
+        cache.match(request, { ignoreSearch: true }).then((cached) =>
+          cached || cache.match('index.html') || Response.error()
+        )
+      )
+  );
 }
 
 // Responde logo com a cópia guardada e atualiza-a em segundo plano
@@ -80,14 +102,11 @@ self.addEventListener('fetch', (e) => {
   const url = new URL(req.url);
 
   if (url.origin === self.location.origin) {
-    e.respondWith(
-      staleWhileRevalidate(req, CACHE_NAME, { ignoreSearch: true }).then((res) =>
-        res && res.status ? res : caches.match('index.html')
-      )
-    );
+    e.respondWith(networkFirstAppShell(req));
   } else if (url.hostname === 'raw.githubusercontent.com' && url.pathname.indexOf('/PokeAPI/sprites/') === 0) {
     e.respondWith(cacheFirst(req));
   } else if (url.hostname === 'pokeapi.co' || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     e.respondWith(staleWhileRevalidate(req, RUNTIME_CACHE));
   }
 });
+

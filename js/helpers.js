@@ -395,79 +395,86 @@ function validateMovesGeneration(moves, targetGameOrGen) {
     return { valid: true };
 }
 
+let _CACHED_MOVES_CATALOG = null;
+let _movesDatalistRafId = null;
+
+function _getMovesCatalog() {
+    if (_CACHED_MOVES_CATALOG) return _CACHED_MOVES_CATALOG;
+    if (typeof POKEAPI_MOVE_ID_TO_NAME === "undefined") return [];
+    const list = [];
+    const entries = Object.entries(POKEAPI_MOVE_ID_TO_NAME);
+    for (let i = 0; i < entries.length; i++) {
+        const idStr = entries[i][0];
+        const rawName = entries[i][1];
+        const englishName = rawName.toLowerCase();
+        if (englishName === "struggle") continue;
+        const moveId = parseInt(idStr, 10);
+        const moveGen = getMoveGeneration(moveId);
+        const formattedName = formatMoveNameForDisplay(englishName);
+        list.push({ id: moveId, english: englishName, display: formattedName, gen: moveGen });
+    }
+    list.sort((a, b) => (a.display < b.display ? -1 : a.display > b.display ? 1 : 0));
+    _CACHED_MOVES_CATALOG = list;
+    return _CACHED_MOVES_CATALOG;
+}
+
 function populateMoveSelects(p) {
     if (!p) return;
-    
-    let gen = 9;
-    const currentGame = GAMES_DB.find(g => g.id === (p.currentGame || currentGameId));
-    if (currentGame) {
-        gen = currentGame.gen;
-    }
-    
-    const currentMoves = (p.moves || []).map(m => m ? getEnglishMoveName(m).toLowerCase() : "");
-    const recommendedList = getFourRecommendedMoves(p, gen);
-    const recommendedEng = recommendedList.map(m => m.english.toLowerCase());
-    
-    const learnableMoves = [];
-    const otherMoves = [];
-    
-    if (typeof POKEAPI_MOVE_ID_TO_NAME !== 'undefined') {
-        Object.entries(POKEAPI_MOVE_ID_TO_NAME).forEach(([idStr, rawName]) => {
-            const moveId = parseInt(idStr, 10);
-            const moveGen = getMoveGeneration(moveId);
-            const englishName = rawName.toLowerCase();
-            
-            if (englishName === "struggle") return;
-            
-            const isCurrentlySelected = currentMoves.includes(englishName);
-            const isRec = recommendedEng.includes(englishName);
-            
-            const formattedName = formatMoveNameForDisplay(englishName);
-            const moveObj = { id: moveId, english: englishName, display: formattedName, gen: moveGen };
-            
-            if (isCurrentlySelected || isRec) {
-                return;
-            }
-            
-            if (moveGen <= gen) {
-                if (canPokemonLearnMove(p, englishName, gen)) {
-                    learnableMoves.push(moveObj);
-                } else {
-                    otherMoves.push(moveObj);
-                }
-            } else {
-                otherMoves.push(moveObj);
-            }
-        });
-    }
-    
-    const sortFn = (a, b) => a.display.localeCompare(b.display);
-    learnableMoves.sort(sortFn);
-    otherMoves.sort(sortFn);
-    
-    let datalistHtml = "";
-    recommendedList.forEach(m => {
-        datalistHtml += `<option value="${m.display}">⭐ ${m.display} (Recomendado)</option>`;
-    });
-    learnableMoves.forEach(m => {
-        datalistHtml += `<option value="${m.display}">${m.display}</option>`;
-    });
-    otherMoves.forEach(m => {
-        const genLabel = m.gen > gen ? `Gen ${m.gen}` : "Incompatível";
-        datalistHtml += `<option value="${m.display}">${m.display} [${genLabel}]</option>`;
-    });
-    
-    const datalistEl = document.getElementById("moves-datalist");
-    if (datalistEl) {
-        datalistEl.innerHTML = datalistHtml;
-    }
-    
+
     for (let slotNum = 1; slotNum <= 4; slotNum++) {
-        const inputId = `form-move${slotNum}`;
-        const inputEl = document.getElementById(inputId);
+        const inputEl = document.getElementById(`form-move${slotNum}`);
         if (inputEl) {
             inputEl.value = p.moves?.[slotNum - 1] || "";
         }
+    }
+
+    const buildDatalist = () => {
+        let gen = 9;
+        const currentGame = GAMES_DB.find(g => g.id === (p.currentGame || currentGameId));
+        if (currentGame) {
+            gen = currentGame.gen;
+        }
+
+        const currentMovesSet = new Set(
+            (p.moves || []).map(m => (m ? getEnglishMoveName(m).toLowerCase() : "")).filter(Boolean)
+        );
+        const recommendedList = getFourRecommendedMoves(p, gen);
+        const recommendedSet = new Set(recommendedList.map(m => m.english.toLowerCase()));
+
+        const catalog = _getMovesCatalog();
+        const learnableParts = [];
+        const otherParts = [];
+
+        for (let i = 0; i < catalog.length; i++) {
+            const m = catalog[i];
+            if (currentMovesSet.has(m.english) || recommendedSet.has(m.english)) continue;
+
+            if (m.gen <= gen && canPokemonLearnMove(p, m.english, gen)) {
+                learnableParts.push(`<option value="${m.display}">${m.display}</option>`);
+            } else {
+                const genLabel = m.gen > gen ? `Gen ${m.gen}` : "Incompatível";
+                otherParts.push(`<option value="${m.display}">${m.display} [${genLabel}]</option>`);
+            }
+        }
+
+        const recHtml = recommendedList
+            .map(m => `<option value="${m.display}">⭐ ${m.display} (Recomendado)</option>`)
+            .join("");
+
+        const datalistEl = document.getElementById("moves-datalist");
+        if (datalistEl) {
+            datalistEl.innerHTML = recHtml + learnableParts.join("") + otherParts.join("");
+        }
+    };
+
+    if (typeof requestAnimationFrame === "function") {
+        if (_movesDatalistRafId) cancelAnimationFrame(_movesDatalistRafId);
+        _movesDatalistRafId = requestAnimationFrame(() => {
+            _movesDatalistRafId = null;
+            buildDatalist();
+        });
+    } else {
+        buildDatalist();
     }
 }
 
@@ -542,3 +549,54 @@ function setupEditorMovesListeners() {
         }
     });
 }
+
+let _searchFilterDebounceTimer = null;
+function onSearchFilterInput() {
+    if (_searchFilterDebounceTimer) clearTimeout(_searchFilterDebounceTimer);
+    _searchFilterDebounceTimer = setTimeout(() => {
+        _searchFilterDebounceTimer = null;
+        if (typeof renderAll === "function") renderAll();
+    }, 120);
+}
+
+let deferredInstallPrompt = null;
+
+function _updateInstallButtonsVisibility(visible) {
+    const headerBtn = document.getElementById("btn-install-pwa");
+    if (headerBtn) headerBtn.style.display = visible ? "inline-flex" : "none";
+}
+
+if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("beforeinstallprompt", (e) => {
+        e.preventDefault();
+        deferredInstallPrompt = e;
+        _updateInstallButtonsVisibility(true);
+    });
+
+    window.addEventListener("appinstalled", () => {
+        deferredInstallPrompt = null;
+        _updateInstallButtonsVisibility(false);
+    });
+}
+
+async function installBlackBoxPWA() {
+    if (deferredInstallPrompt) {
+        deferredInstallPrompt.prompt();
+        try {
+            const { outcome } = await deferredInstallPrompt.userChoice;
+            if (outcome === "accepted") {
+                deferredInstallPrompt = null;
+                _updateInstallButtonsVisibility(false);
+            }
+        } catch (err) {}
+        return;
+    }
+
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent || "") && !window.MSStream;
+    if (isIOS) {
+        alert("Para instalar no iPhone/iPad:\n1. Toque no botão Partilhar (ícone com seta para cima no Safari).\n2. Escolha 'Adicionar ao ecrã principal' (Add to Home Screen).");
+    } else {
+        alert("Para instalar como App no Android/Chrome:\n1. Toque no menu ⋮ (canto superior direito do navegador).\n2. Selecione 'Instalar aplicação' ou 'Adicionar ao ecrã principal'.");
+    }
+}
+

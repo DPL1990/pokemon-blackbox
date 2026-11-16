@@ -2335,10 +2335,20 @@ function applyTypes(t) {
 
 async function loadSpeciesDatalist() {
     try {
+        const speciesEl = document.getElementById("species-list");
+        if (!speciesEl) return;
+        if (typeof POKEMON_NAMES_ALL !== "undefined" && Array.isArray(POKEMON_NAMES_ALL) && POKEMON_NAMES_ALL.length > 1) {
+            const opts = [];
+            for (let i = 1; i < POKEMON_NAMES_ALL.length; i++) {
+                if (POKEMON_NAMES_ALL[i]) opts.push(`<option value="${POKEMON_NAMES_ALL[i]}"></option>`);
+            }
+            speciesEl.innerHTML = opts.join("");
+            return;
+        }
         const res = await fetch("https://pokeapi.co/api/v2/pokemon?limit=1000");
         if (res.ok) { 
             const d = await res.json(); 
-            document.getElementById("species-list").innerHTML = d.results.map(p => {
+            speciesEl.innerHTML = d.results.map(p => {
                 const nameFormatted = p.name.split("-").map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
                 return `<option value="${nameFormatted}"></option>`;
             }).join(""); 

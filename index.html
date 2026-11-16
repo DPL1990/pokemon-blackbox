@@ -61,6 +61,7 @@
 
                 <!-- Unified Settings Button -->
                 <button class="btn btn-action" onclick="openSettingsModal()" style="width: auto; padding: 0 12px; font-size: 0.75rem; border-radius: 8px; height: 32px;" title="Configurações do Cartucho">⚙️ Definições</button>
+                <button class="btn btn-primary" id="btn-install-pwa" onclick="installBlackBoxPWA()" style="display: none; width: auto; padding: 0 12px; font-size: 0.75rem; border-radius: 8px; height: 32px; align-items: center; gap: 4px;" title="Instalar Pokémon BlackBox como Aplicação">📲 Instalar App</button>
             </div>
         </header>
 
@@ -132,7 +133,7 @@
                                 <!-- Advanced Box Filter Panel (Sleek inline row + collapsible details) -->
                                 <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;">
                                     <div style="flex: 1; min-width: 150px;">
-                                        <input type="text" id="filter-search" oninput="renderAll()" placeholder="Pesquisar espécie/nick..." style="width: 100%; padding: 8px 12px; font-size: 0.8rem;">
+                                        <input type="text" id="filter-search" oninput="onSearchFilterInput()" placeholder="Pesquisar espécie/nick..." style="width: 100%; padding: 8px 12px; font-size: 0.8rem;">
                                     </div>
                                     <div style="width: auto;">
                                         <select id="filter-type" onchange="renderAll()" style="padding: 8px 12px; font-size: 0.8rem; height: auto;">
@@ -1188,6 +1189,10 @@
 
                         <button class="btn btn-primary" id="btn-export-modified-save" onclick="exportModifiedSave()" style="grid-column: span 2; display: none; background: linear-gradient(135deg, #10b981, #059669); border: none; font-size: 0.7rem; font-weight: 800; padding: 8px; color: #fff; box-shadow: 0 0 10px rgba(16, 185, 129, 0.25);">
                             📥 Descarregar Save Alterado (.sav)
+                        </button>
+
+                        <button class="btn btn-action" id="btn-settings-install-pwa" onclick="installBlackBoxPWA()" style="grid-column: span 2; background: rgba(99, 102, 241, 0.12); border-color: rgba(99, 102, 241, 0.35); font-size: 0.7rem; font-weight: 800; padding: 8px; color: #fff;">
+                            📲 Instalar como Aplicação (App)
                         </button>
                     </div>
                 </div>

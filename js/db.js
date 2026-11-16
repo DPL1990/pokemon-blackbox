@@ -411,9 +411,9 @@ function populateStaticDatalists() {
     document.getElementById("ability-list").innerHTML = SUGGESTIONS.abilities.map(a => `<option value="${a}"></option>`).join("");
     
     if (typeof POKEAPI_ITEM_ID_TO_NAME !== 'undefined') {
-        const itemNames = Object.values(POKEAPI_ITEM_ID_TO_NAME).map(name => formatItemNameForDisplay(name));
-        itemNames.sort((a, b) => a.localeCompare(b));
-        document.getElementById("items-list").innerHTML = itemNames.map(name => `<option value="${name}"></option>`).join("");
+        const uniqueItems = Array.from(new Set(Object.values(POKEAPI_ITEM_ID_TO_NAME).map(name => formatItemNameForDisplay(name))));
+        uniqueItems.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+        document.getElementById("items-list").innerHTML = uniqueItems.map(name => `<option value="${name}"></option>`).join("");
     }
 }
 
@@ -588,7 +588,9 @@ function updateDexitMonitor() {
 function renderAll() {
     updateStats(); 
     updateDexitMonitor();
-    renderTrainerResume();
+    if (typeof activeTab !== "undefined" && activeTab === "resume") {
+        renderTrainerResume();
+    }
     
     const teamContainer = document.getElementById("team-container");
     const boxContainer = document.getElementById("box-container");

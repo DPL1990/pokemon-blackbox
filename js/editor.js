@@ -2,6 +2,7 @@
 const LEARNSET_CACHE = {};
 const SPECIES_CACHE = {};
 const FETCHING_LEARNSETS = new Set();
+const FAILED_LEARNSETS = new Set();
 
 function normalizeSpeciesNameForApi(name) {
     if (!name) return "";
@@ -17,7 +18,8 @@ function normalizeSpeciesNameForApi(name) {
 async function fetchPokemonLearnset(species) {
     const apiName = normalizeSpeciesNameForApi(species);
     if (!apiName) return;
-    if (LEARNSET_CACHE[apiName] || FETCHING_LEARNSETS.has(apiName)) return;
+    if (LEARNSET_CACHE[apiName] || FETCHING_LEARNSETS.has(apiName) || FAILED_LEARNSETS.has(apiName)) return;
+    if (typeof fetch !== "function" || (typeof navigator !== "undefined" && navigator.onLine === false)) return;
     
     FETCHING_LEARNSETS.add(apiName);
     try {
@@ -62,11 +64,15 @@ async function fetchPokemonLearnset(species) {
             };
             
             // Re-render recommendations since we now have the accurate learnset
-            const game = GAMES_DB.find(g => g.id === currentGameId);
-            const gen = game ? game.gen : 9;
-            const recommendations = getRecommendedAllocation();
-            const activeTeam = recommendations.map(rec => rec.pokemon);
-            renderWeaknessAnalysis(activeTeam, gen);
+            if (activeTab === "allocation" && window.__allocationLoaded) {
+                const game = GAMES_DB.find(g => g.id === currentGameId);
+                const gen = game ? game.gen : 9;
+                const recommendations = getRecommendedAllocation();
+                if (Array.isArray(recommendations)) {
+                    const activeTeam = recommendations.map(rec => rec.pokemon);
+                    renderWeaknessAnalysis(activeTeam, gen);
+                }
+            }
             
             // Re-populate moves dropdowns if editor is active and matches species
             const editorModal = document.getElementById("editor-modal");
@@ -98,9 +104,11 @@ async function fetchPokemonLearnset(species) {
                     populateMoveSelects(tempP);
                 }
             }
+        } else {
+            FAILED_LEARNSETS.add(apiName);
         }
     } catch (e) {
-        console.error("Erro ao procurar learnset para " + species, e);
+        FAILED_LEARNSETS.add(apiName);
     } finally {
         FETCHING_LEARNSETS.delete(apiName);
     }

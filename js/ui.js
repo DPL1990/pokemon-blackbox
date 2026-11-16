@@ -150,70 +150,113 @@ let touchStartX = 0;
 let touchStartY = 0;
 let touchOffset = { x: 0, y: 0 };
 let touchDraggedFromSlot = null;
+let touchHoldTimer = null;
+let lastTouchHoveredSlot = null;
+
+function cleanupTouchDragState() {
+    if (touchHoldTimer) {
+        clearTimeout(touchHoldTimer);
+        touchHoldTimer = null;
+    }
+    if (touchClone) {
+        touchClone.remove();
+        touchClone = null;
+    }
+    if (touchDraggedFromSlot) {
+        touchDraggedFromSlot.style.opacity = "1";
+        touchDraggedFromSlot = null;
+    }
+    if (lastTouchHoveredSlot) {
+        lastTouchHoveredSlot.classList.remove("drag-over");
+        lastTouchHoveredSlot = null;
+    }
+    touchDragActive = false;
+    touchDraggedId = null;
+}
 
 function initTouchDragAndDrop() {
-    // Touch Start
+    // Touch Start: aguarda pressão longa (380ms sem deslizar) para distinguir arrasto de scroll/toque
     document.addEventListener("touchstart", function(e) {
+        if (e.touches.length !== 1) {
+            cleanupTouchDragState();
+            return;
+        }
+        if (typeof selectionMode !== "undefined" && selectionMode) return;
+        if (document.querySelector(".modal-overlay.active")) return;
+
         const slot = e.target.closest(".slot[draggable='true']");
         if (!slot) return;
-        
+
+        cleanupTouchDragState();
+
         const touch = e.touches[0];
         touchStartX = touch.clientX;
         touchStartY = touch.clientY;
-        touchDragActive = false;
         touchDraggedId = slot.getAttribute("data-id");
-        
+
         const rect = slot.getBoundingClientRect();
         touchOffset.x = touchStartX - rect.left;
         touchOffset.y = touchStartY - rect.top;
-        
         touchDraggedFromSlot = slot;
+
+        touchHoldTimer = setTimeout(() => {
+            touchHoldTimer = null;
+            if (!touchDraggedId || !touchDraggedFromSlot) return;
+            touchDragActive = true;
+
+            if (navigator.vibrate) {
+                try { navigator.vibrate(25); } catch (_) {}
+            }
+
+            touchClone = touchDraggedFromSlot.cloneNode(true);
+            touchClone.style.position = "fixed";
+            touchClone.style.left = "0px";
+            touchClone.style.top = "0px";
+            touchClone.style.width = touchDraggedFromSlot.offsetWidth + "px";
+            touchClone.style.height = touchDraggedFromSlot.offsetHeight + "px";
+            touchClone.style.transform = `translate3d(${touchStartX - touchOffset.x}px, ${touchStartY - touchOffset.y}px, 0) scale(1.05)`;
+            touchClone.style.willChange = "transform";
+            touchClone.style.pointerEvents = "none";
+            touchClone.style.zIndex = "10000";
+            touchClone.style.opacity = "0.85";
+            touchClone.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
+            touchClone.style.transition = "none";
+            document.body.appendChild(touchClone);
+
+            touchDraggedFromSlot.style.opacity = "0.3";
+        }, 380);
     }, { passive: true });
 
-    // Touch Move
+    // Touch Move: se o utilizador deslizar antes dos 380ms, é scroll normal da página!
     document.addEventListener("touchmove", function(e) {
         if (!touchDraggedId) return;
-        
+
         const touch = e.touches[0];
+        if (!touch) return;
         const dx = touch.clientX - touchStartX;
         const dy = touch.clientY - touchStartY;
-        
-        if (!touchDragActive && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
-            touchDragActive = true;
-            
-            if (touchDraggedFromSlot) {
-                touchClone = touchDraggedFromSlot.cloneNode(true);
-                touchClone.style.position = "fixed";
-                touchClone.style.width = touchDraggedFromSlot.offsetWidth + "px";
-                touchClone.style.height = touchDraggedFromSlot.offsetHeight + "px";
-                touchClone.style.left = (touch.clientX - touchOffset.x) + "px";
-                touchClone.style.top = (touch.clientY - touchOffset.y) + "px";
-                touchClone.style.pointerEvents = "none";
-                touchClone.style.zIndex = "10000";
-                touchClone.style.opacity = "0.75";
-                touchClone.style.transform = "scale(1.05)";
-                touchClone.style.boxShadow = "0 10px 25px rgba(0,0,0,0.5)";
-                touchClone.style.transition = "none";
-                document.body.appendChild(touchClone);
-                
-                touchDraggedFromSlot.style.opacity = "0.3";
+
+        if (!touchDragActive) {
+            if (Math.abs(dx) > 10 || Math.abs(dy) > 10) {
+                cleanupTouchDragState();
             }
+            return;
         }
-        
-        if (touchDragActive && touchClone) {
-            if (e.cancelable) e.preventDefault(); 
-            
-            touchClone.style.left = (touch.clientX - touchOffset.x) + "px";
-            touchClone.style.top = (touch.clientY - touchOffset.y) + "px";
-            
+
+        if (touchClone) {
+            if (e.cancelable) e.preventDefault();
+
+            const x = touch.clientX - touchOffset.x;
+            const y = touch.clientY - touchOffset.y;
+            touchClone.style.transform = `translate3d(${x}px, ${y}px, 0) scale(1.05)`;
+
             const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-            document.querySelectorAll(".slot").forEach(s => s.classList.remove("drag-over"));
-            
-            if (elementUnder) {
-                const targetSlot = elementUnder.closest(".slot");
-                if (targetSlot) {
-                    targetSlot.classList.add("drag-over");
-                }
+            const targetSlot = elementUnder ? elementUnder.closest(".slot") : null;
+
+            if (lastTouchHoveredSlot !== targetSlot) {
+                if (lastTouchHoveredSlot) lastTouchHoveredSlot.classList.remove("drag-over");
+                if (targetSlot) targetSlot.classList.add("drag-over");
+                lastTouchHoveredSlot = targetSlot;
             }
         }
     }, { passive: false });
@@ -221,41 +264,35 @@ function initTouchDragAndDrop() {
     // Touch End
     document.addEventListener("touchend", function(e) {
         if (!touchDraggedId) return;
-        
+
         const id = touchDraggedId;
-        touchDraggedId = null;
-        
-        if (touchClone) {
-            touchClone.remove();
-            touchClone = null;
-        }
-        
-        if (touchDraggedFromSlot) {
-            touchDraggedFromSlot.style.opacity = "1";
-        }
-        
-        document.querySelectorAll(".slot").forEach(s => s.classList.remove("drag-over"));
-        
-        if (touchDragActive) {
-            e.preventDefault(); 
-            
+        const wasDragging = touchDragActive;
+        cleanupTouchDragState();
+
+        if (wasDragging) {
+            if (e.cancelable) e.preventDefault();
+
             const changedTouch = e.changedTouches[0];
+            if (!changedTouch) return;
             const elementUnder = document.elementFromPoint(changedTouch.clientX, changedTouch.clientY);
-            
+
             if (elementUnder) {
                 const targetSlot = elementUnder.closest(".slot");
                 if (targetSlot) {
                     const targetSlotType = targetSlot.getAttribute("data-slot-type");
                     const targetSlotIndex = parseInt(targetSlot.getAttribute("data-slot-index"), 10);
                     const targetId = targetSlot.getAttribute("data-id");
-                    
+
                     executeDropLogic(id, targetSlotType, targetSlotIndex, targetId);
                 }
             }
         }
-        
-        touchDraggedFromSlot = null;
     }, { passive: false });
+
+    // Touch Cancel
+    document.addEventListener("touchcancel", function() {
+        cleanupTouchDragState();
+    }, { passive: true });
 }
 // -----------------------------------------------------
 
