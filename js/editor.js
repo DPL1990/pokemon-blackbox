@@ -848,29 +848,32 @@ function validateActiveTeamRules(candidatePkmn) {
 let isSavingOpponentPreset = false;
 
 function chooseAndSavePreset(isOpponentPreset = false) {
-    isSavingOpponentPreset = isOpponentPreset;
-    
-    // Bind dynamic click events
-    document.getElementById("btn-choice-save-active").onclick = () => {
-        closeSavePresetChoiceModal();
-        if (isSavingOpponentPreset) {
-            saveActiveTeamAsOpponentPreset();
-        } else {
-            saveActiveTeamAsPreset();
-        }
-    };
-    
-    document.getElementById("btn-choice-save-recommended").onclick = () => {
-        closeSavePresetChoiceModal();
-        if (isSavingOpponentPreset) {
-            saveRecommendedTeamAsOpponentPreset();
-        } else {
-            saveRecommendedTeamAsPreset();
-        }
-    };
-    
-    document.getElementById("save-preset-choice-modal").classList.add("active");
+    ensureAllocationLoaded().then(() => {
+        isSavingOpponentPreset = isOpponentPreset;
+        
+        // Bind dynamic click events
+        document.getElementById("btn-choice-save-active").onclick = () => {
+            closeSavePresetChoiceModal();
+            if (isSavingOpponentPreset) {
+                saveActiveTeamAsOpponentPreset();
+            } else {
+                saveActiveTeamAsPreset();
+            }
+        };
+        
+        document.getElementById("btn-choice-save-recommended").onclick = () => {
+            closeSavePresetChoiceModal();
+            if (isSavingOpponentPreset) {
+                saveRecommendedTeamAsOpponentPreset();
+            } else {
+                saveRecommendedTeamAsPreset();
+            }
+        };
+        
+        document.getElementById("save-preset-choice-modal").classList.add("active");
+    });
 }
+window.openPresetChoiceModal = chooseAndSavePreset;
 
 function closeSavePresetChoiceModal() {
     document.getElementById("save-preset-choice-modal").classList.remove("active");
