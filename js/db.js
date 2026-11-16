@@ -2,25 +2,49 @@
 let dbInstance = null;
 
 function initDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open("bb_assets_db", 1);
-        
-        request.onupgradeneeded = function(e) {
-            const db = e.target.result;
-            if (!db.objectStoreNames.contains("hall_of_fame")) {
-                db.createObjectStore("hall_of_fame");
+    return new Promise((resolve) => {
+        if (typeof indexedDB === "undefined") {
+            resolve(null);
+            return;
+        }
+        let settled = false;
+        const finish = (val) => {
+            if (!settled) {
+                settled = true;
+                resolve(val);
             }
         };
-        
-        request.onsuccess = function(e) {
-            dbInstance = e.target.result;
-            resolve(dbInstance);
-        };
-        
-        request.onerror = function(e) {
-            console.error("Erro ao inicializar IndexedDB:", e.target.error);
-            reject(e.target.error);
-        };
+        const timer = setTimeout(() => finish(null), 2000);
+        try {
+            const request = indexedDB.open("bb_assets_db", 1);
+
+            request.onupgradeneeded = function(e) {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains("hall_of_fame")) {
+                    db.createObjectStore("hall_of_fame");
+                }
+            };
+
+            request.onsuccess = function(e) {
+                clearTimeout(timer);
+                dbInstance = e.target.result;
+                finish(dbInstance);
+            };
+
+            request.onerror = function(e) {
+                clearTimeout(timer);
+                console.error("Erro ao inicializar IndexedDB:", e.target.error);
+                finish(null);
+            };
+
+            request.onblocked = function() {
+                clearTimeout(timer);
+                finish(null);
+            };
+        } catch (err) {
+            clearTimeout(timer);
+            finish(null);
+        }
     });
 }
 

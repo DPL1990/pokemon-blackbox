@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>A atualizar Pokémon BlackBox...</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #05070b;
+            color: #fff;
+            font-family: system-ui, -apple-system, sans-serif;
+            padding: 24px;
+            text-align: center;
+        }
+        .card {
+            background: #141821;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 360px;
+            width: 100%;
+        }
+        h1 { font-size: 1.2rem; margin: 0 0 12px; color: #10b981; }
+        p { font-size: 0.9rem; color: #9ca3af; margin: 0 0 16px; line-height: 1.4; }
+        .btn {
+            display: inline-block;
+            background: #6366f1;
+            color: #fff;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1 id="status-title">🔄 A limpar cache antiga...</h1>
+        <p id="status-desc">Os teus Pokémon, saves e treinadores estão seguros. A atualizar para a nova versão...</p>
+        <a class="btn" id="manual-link" href="./?v=11">Abrir Pokémon BlackBox</a>
+    </div>
+    <script>
+        (async function() {
+            try {
+                if ('serviceWorker' in navigator) {
+                    const regs = await navigator.serviceWorker.getRegistrations();
+                    for (const reg of regs) {
+                        await reg.unregister();
+                    }
+                }
+                if ('caches' in window) {
+                    const keys = await caches.keys();
+                    for (const k of keys) {
+                        await caches.delete(k);
+                    }
+                }
+            } catch (e) {
+                console.error(e);
+            }
+            const target = './?v=' + Date.now();
+            document.getElementById('manual-link').href = target;
+            document.getElementById('status-title').textContent = '✅ Atualização concluída!';
+            setTimeout(() => {
+                window.location.replace(target);
+            }, 300);
+        })();
+    </script>
+</body>
+</html>

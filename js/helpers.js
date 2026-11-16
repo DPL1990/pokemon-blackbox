@@ -81,7 +81,7 @@ function ensureAllocationLoaded() {
     if (_allocationLoadPromise) return _allocationLoadPromise;
     _allocationLoadPromise = new Promise((resolve, reject) => {
         const script = document.createElement("script");
-        script.src = "js/allocation.js?v=10";
+        script.src = "js/allocation.js?v=11";
         script.onload = () => {
             window.__allocationLoaded = true;
             resolve();
@@ -203,49 +203,47 @@ function toggleAdvancedFilters() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-    applyMinimalMode();
-    applyVisualTheme();
-});
+let _blackBoxBootstrapped = false;
+function bootstrapBlackBoxApp() {
+    if (_blackBoxBootstrapped) return;
+    if (!document.getElementById("game-select") || typeof setupDatalists !== "function" || typeof switchGame !== "function") {
+        return;
+    }
+    _blackBoxBootstrapped = true;
 
-window.onload = function() {
-    initDB().then(() => {
-        cleanupDuplicates();
-        setupDatalists(); 
-        runWhenIdle(loadSpeciesDatalist);
-        renderRibbonChecklist();
-        initTouchDragAndDrop();
-        initGlobalBoxUI();
-        
-        const spriteSelect = document.getElementById("settings-sprite-style");
-        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
-        const autoToggle = document.getElementById("settings-auto-ribbon");
-        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
-        const themeSelect = document.getElementById("settings-visual-theme");
-        if (themeSelect) themeSelect.value = currentVisualTheme;
-        
-        switchGame(currentGameId);
-        setupEditorMovesListeners();
-    }).catch(err => {
-        console.error("Falha ao carregar IndexedDB, inicializando com localStorage de fallback:", err);
-        cleanupDuplicates();
-        setupDatalists(); 
-        runWhenIdle(loadSpeciesDatalist);
-        renderRibbonChecklist();
-        initTouchDragAndDrop();
-        initGlobalBoxUI();
-        
-        const spriteSelect = document.getElementById("settings-sprite-style");
-        if (spriteSelect) spriteSelect.value = currentSpriteStyle;
-        const autoToggle = document.getElementById("settings-auto-ribbon");
-        if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
-        const themeSelect = document.getElementById("settings-visual-theme");
-        if (themeSelect) themeSelect.value = currentVisualTheme;
-        
-        switchGame(currentGameId);
-        setupEditorMovesListeners();
-    });
-};
+    try { applyMinimalMode(); } catch (e) { console.error(e); }
+    try { applyVisualTheme(); } catch (e) { console.error(e); }
+    try { cleanupDuplicates(); } catch (e) { console.error(e); }
+    try { setupDatalists(); } catch (e) { console.error(e); }
+    try { runWhenIdle(loadSpeciesDatalist); } catch (e) { console.error(e); }
+    try { renderRibbonChecklist(); } catch (e) { console.error(e); }
+    try { initTouchDragAndDrop(); } catch (e) { console.error(e); }
+    try { initGlobalBoxUI(); } catch (e) { console.error(e); }
+
+    const spriteSelect = document.getElementById("settings-sprite-style");
+    if (spriteSelect) spriteSelect.value = currentSpriteStyle;
+    const autoToggle = document.getElementById("settings-auto-ribbon");
+    if (autoToggle) autoToggle.checked = autoRibbonsEnabled;
+    const themeSelect = document.getElementById("settings-visual-theme");
+    if (themeSelect) themeSelect.value = currentVisualTheme;
+
+    try { switchGame(currentGameId); } catch (e) { console.error(e); }
+    try { setupEditorMovesListeners(); } catch (e) { console.error(e); }
+
+    if (typeof initDB === "function") {
+        initDB().then((db) => {
+            if (db && typeof renderAll === "function") {
+                try { renderAll(); } catch (e) { console.error(e); }
+            }
+        }).catch(() => {});
+    }
+}
+
+document.addEventListener("DOMContentLoaded", bootstrapBlackBoxApp);
+window.addEventListener("load", bootstrapBlackBoxApp);
+if (document.readyState !== "loading") {
+    setTimeout(bootstrapBlackBoxApp, 0);
+}
 
 // ==========================================================================
 // 💾 Dicionários Binários (Gen 1-3) e Validação/Seleção de Ataques

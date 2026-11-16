@@ -2,7 +2,7 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <link rel="manifest" href="manifest.json?v=10">
+    <link rel="manifest" href="manifest.json?v=11">
     <link rel="icon" type="image/png" href="blackbox_app_icon_192.png">
     <link rel="apple-touch-icon" href="blackbox_app_icon_192.png">
     <meta name="theme-color" content="#ff4a4a">
@@ -40,19 +40,17 @@
                     window.location.reload();
                 }
             });
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js?v=10', { updateViaCache: 'none' })
-                    .then(reg => {
-                        console.log('Caixa Negra operando offline!', reg);
-                        reg.update();
-                    })
-                    .catch(err => console.log('Erro no Service Worker:', err));
-            });
+            navigator.serviceWorker.register('sw.js?v=11', { updateViaCache: 'none' })
+                .then(reg => {
+                    console.log('Caixa Negra operando offline!', reg);
+                    reg.update();
+                })
+                .catch(err => console.log('Erro no Service Worker:', err));
         }
     </script>
     
     <!-- External Stylesheet -->
-    <link rel="stylesheet" href="styles.css?v=10">
+    <link rel="stylesheet" href="styles.css?v=11">
 </head>
 <body>
     <div class="container">
@@ -61,11 +59,15 @@
             
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                 <!-- Cartucho Select -->
-                <select id="game-select" onchange="switchGame(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px;"></select>
+                <select id="game-select" onchange="switchGame(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px;">
+                    <option value="red">Pokémon Red (Gen 1)</option>
+                </select>
                 
                 <!-- Trainer Select -->
                 <div style="display: flex; gap: 4px; align-items: center;">
-                    <select id="trainer-select" onchange="switchTrainer(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border-color);"></select>
+                    <select id="trainer-select" onchange="switchTrainer(this.value)" style="width: auto; padding: 6px 12px; font-size: 0.75rem; border-radius: 8px; font-weight: 700; height: 32px; background: rgba(0,0,0,0.3); color: #fff; border: 1px solid var(--border-color);">
+                        <option value="trainer_red_default">Treinador Padrão (00000)</option>
+                    </select>
                     <button class="btn btn-action" onclick="openTrainerManagerModal()" style="width: auto; padding: 0 10px; font-size: 0.75rem; border-radius: 8px; height: 32px;" title="Gerir Treinadores">👤⚙️</button>
                 </div>
 
@@ -1278,13 +1280,13 @@
     </div>
 
     <!-- External Logic Script -->
-    <script src="js/moves-db.js?v=10" defer></script>
-    <script src="js/items-db.js?v=10" defer></script>
-    <script src="js/constants.js?v=10" defer></script>
-    <script src="js/helpers.js?v=10" defer></script>
-    <script src="js/db.js?v=10" defer></script>
-    <script src="js/save-parser.js?v=10" defer></script>
-    <script src="js/editor.js?v=10" defer></script>
-    <script src="js/ui.js?v=10" defer></script>
+    <script src="js/moves-db.js?v=11" defer></script>
+    <script src="js/items-db.js?v=11" defer></script>
+    <script src="js/constants.js?v=11" defer></script>
+    <script src="js/helpers.js?v=11" defer></script>
+    <script src="js/db.js?v=11" defer></script>
+    <script src="js/save-parser.js?v=11" defer></script>
+    <script src="js/editor.js?v=11" defer></script>
+    <script src="js/ui.js?v=11" defer></script>
 </body>
 </html>
