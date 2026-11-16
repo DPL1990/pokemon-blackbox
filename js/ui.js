@@ -102,7 +102,7 @@ function executeDropLogic(id, targetSlotType, targetSlotIndex, targetId) {
         draggedPkmn.slotType = targetSlotType; 
         draggedPkmn.slotIndex = targetSlotIndex;
     }
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
+    saveDatabase(); 
     renderAll();
 }
 
@@ -609,7 +609,7 @@ function executeTransfer() {
         targetPokemon.slotIndex = 0;
         
         renderPassportTimeline(targetPokemon);
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        saveDatabase();
         renderAll();
     } else {
         alert("O Pokémon já se encontra nessa versão!");
@@ -817,7 +817,7 @@ async function savePokemon() {
     targetPokemon.evolutionNotes = evolutionNotes;
     targetPokemon.originGame = originGame;
 
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     closeModal();
     renderAll();
 }
@@ -834,7 +834,7 @@ function deletePokemon() {
     
     if (confirm("Tens a certeza absoluta que queres eliminar este espécime?")) {
         pokemonDatabase = pokemonDatabase.filter(p => p.id !== id);
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
+        saveDatabase(); 
         closeModal(); 
         renderAll();
     }
@@ -964,7 +964,7 @@ async function parseShowdownText() {
         count++;
     }
     if (count > 0) { 
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
+        saveDatabase(); 
         closeModal(); 
         renderAll(); 
     }
@@ -990,7 +990,7 @@ function importData(e) {
                 pokemonDatabase = d; 
                 migrateTrainerIds(); // Run migration immediately so imported data gets trainerId fields assigned!
                 cleanupDuplicates();
-                localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase)); 
+                saveDatabase(); 
                 renderAll(); 
                 alert("Importação de cópia de segurança JSON concluída com sucesso!");
             } else {
@@ -1098,7 +1098,7 @@ function cleanupDuplicates() {
         console.log(`blackbox: Removed ${idsToRemove.size} duplicate specimens from the box.`);
     }
     
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
 }
 
 function toggleSelectionMode() {
@@ -1182,7 +1182,7 @@ function executeMassTransfer() {
     });
     
     if (migratedCount > 0) {
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        saveDatabase();
         alert(`${migratedCount} Pokémon migrados com sucesso para ${targetGameName}!`);
         toggleSelectionMode();
         renderAll();
@@ -1198,7 +1198,7 @@ function executeMassDelete() {
     }
     
     pokemonDatabase = pokemonDatabase.filter(p => !selectedPokemonIds.has(p.id));
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     
     alert(`${count} Pokémon eliminados da base de dados.`);
     toggleSelectionMode();
@@ -1314,7 +1314,7 @@ function deleteTrainerProfile(trainerId) {
             p.trainerId = defaultTrainerId;
         }
     });
-    localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+    saveDatabase();
     
     // 2. Reatribuir HOFs no IndexedDB
     if (dbInstance) {

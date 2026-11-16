@@ -359,7 +359,7 @@ function generateHofFromActiveTeam() {
                     p.ribbons.push(ribbonToGrant);
                 }
             });
-            localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+            saveDatabase();
         }
 
         saveHofRecord(currentGameId, record).then(() => {
@@ -406,7 +406,7 @@ function navigateHof(dir) {
 }
 // ---------------------------------
 
-function setupDatalists() {
+function populateStaticDatalists() {
     document.getElementById("natures-list").innerHTML = SUGGESTIONS.natures.map(n => `<option value="${n}"></option>`).join("");
     document.getElementById("ability-list").innerHTML = SUGGESTIONS.abilities.map(a => `<option value="${a}"></option>`).join("");
     
@@ -415,6 +415,11 @@ function setupDatalists() {
         itemNames.sort((a, b) => a.localeCompare(b));
         document.getElementById("items-list").innerHTML = itemNames.map(name => `<option value="${name}"></option>`).join("");
     }
+}
+
+function setupDatalists() {
+    // As listas de sugestões (milhares de <option>) só são construídas quando o browser está livre
+    runWhenIdle(populateStaticDatalists);
     
     const gameOptions = GAMES_DB.map(g => `<option value="${g.id}">${g.name} (Gen ${g.gen})</option>`).join("");
     document.getElementById("form-origin-game").innerHTML = gameOptions;
@@ -594,13 +599,13 @@ function renderAll() {
         : pokemonDatabase.filter(p => p.currentGame === currentGameId && p.trainerId === activeTrainerId && p.slotType === "box");
 
     // Render Active Team Slots (Exactly 6 slots)
-    teamContainer.innerHTML = "";
+    let teamHTML = "";
     for (let i = 0; i < 6; i++) {
         const p = pokemonDatabase.find(pkmn => pkmn.currentGame === currentGameId && pkmn.slotType === "team" && pkmn.slotIndex === i);
         if (p) {
-            teamContainer.innerHTML += createSlotHTML(p, i, "team");
+            teamHTML += createSlotHTML(p, i, "team");
         } else {
-            teamContainer.innerHTML += `
+            teamHTML += `
                 <div class="slot empty-team-slot" data-slot-type="team" data-slot-index="${i}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
                     <div class="empty-slot-plus">➕</div>
                     <div class="empty-slot-text">Slot ${i + 1}</div>
@@ -608,6 +613,7 @@ function renderAll() {
             `;
         }
     }
+    teamContainer.innerHTML = teamHTML;
 
     // Render HOF dynamically from IndexedDB (supporting multiple generated & uploads)
     const hofDisplayArea = document.getElementById("hof-display-area");
@@ -733,11 +739,7 @@ function renderAll() {
     });
 
     // Render Box Slots
-    boxContainer.innerHTML = "";
-    filteredBox.forEach((p, idx) => { 
-        boxContainer.innerHTML += createSlotHTML(p, idx, "box"); 
-    });
-    boxContainer.innerHTML += `
+    boxContainer.innerHTML = filteredBox.map((p, idx) => createSlotHTML(p, idx, "box")).join("") + `
         <div class="slot drop-zone-only" data-slot-type="box" data-slot-index="${filteredBox.length}" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <div class="empty-slot-plus">➕</div>
             <div class="empty-slot-text">Arrastar</div>
@@ -799,7 +801,7 @@ function createSlotHTML(p, index, type) {
         <div class="slot ${typeClass} ${selectedClass} ${dexitClass}" draggable="true" data-id="${p.id}" data-slot-type="${type}" data-slot-index="${index}" onclick="openModalForEdit('${p.id}')" ondragover="allowDrop(event)" ondragleave="dragLeave(event)" ondrop="handleDrop(event)">
             <span class="version-badge v-${p.currentGame}">${badgeLabel}</span>
             <div class="slot-sprite-container">
-                <img class="slot-sprite" draggable="false" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
+                <img class="slot-sprite" draggable="false" loading="lazy" decoding="async" src="${spriteUrl}" alt="${p.species}" onerror="handleSpriteError(this, ${pokedexId}, '${isShiny ? 'shiny' : 'normal'}')">
             </div>
             <div class="slot-name">${displayName}</div>
             <div class="slot-meta">

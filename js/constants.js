@@ -36,6 +36,35 @@ const ALL_RIBBONS = [
 
 let currentGameId = localStorage.getItem("bb_current_game") || "red";
 let pokemonDatabase = JSON.parse(localStorage.getItem("bb_database")) || [];
+
+// --- Persistência agrupada: várias alterações seguidas = uma só gravação ---
+let _dbDirty = false;
+let _dbSaveTimer = null;
+let _dbQuotaWarned = false;
+function flushDatabase() {
+    if (_dbSaveTimer) { clearTimeout(_dbSaveTimer); _dbSaveTimer = null; }
+    if (!_dbDirty) return;
+    try {
+        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        _dbDirty = false;
+    } catch (e) {
+        console.error("Erro ao gravar a base de dados:", e);
+        if (!_dbQuotaWarned) {
+            _dbQuotaWarned = true;
+            alert("Não foi possível gravar os dados (armazenamento cheio?). Exporta uma cópia de segurança.");
+        }
+    }
+}
+function saveDatabase() {
+    _dbDirty = true;
+    if (_dbSaveTimer) clearTimeout(_dbSaveTimer);
+    _dbSaveTimer = setTimeout(flushDatabase, 250);
+}
+window.addEventListener("pagehide", flushDatabase);
+window.addEventListener("beforeunload", flushDatabase);
+document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushDatabase();
+});
 let currentSpriteStyle = localStorage.getItem("bb_sprite_style") || "classic";
 let activeHofIndex = 0;
 let selectionMode = false;
@@ -133,7 +162,7 @@ function migrateTrainerIds() {
         }
     });
     if (dbChanged) {
-        localStorage.setItem("bb_database", JSON.stringify(pokemonDatabase));
+        saveDatabase();
     }
 
     const trainerExists = trainersList.some(t => t.id === activeTrainerId && t.gameId === currentGameId);
