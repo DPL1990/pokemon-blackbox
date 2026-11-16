@@ -2378,8 +2378,13 @@ async function fetchMissingSpeciesData(speciesName) {
 }
 
 function applyTypes(t) { 
-    document.getElementById("form-type1").value = t.t1; 
-    document.getElementById("form-type2").value = t.t2; 
+    const elT1 = document.getElementById("form-type1");
+    const elT2 = document.getElementById("form-type2");
+    if (elT1) elT1.value = t.t1; 
+    if (elT2) elT2.value = t.t2; 
+    if (typeof updateEditorTypeBadges === "function") {
+        updateEditorTypeBadges();
+    }
 }
 
 async function loadSpeciesDatalist() {

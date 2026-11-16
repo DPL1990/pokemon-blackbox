@@ -2106,4 +2106,183 @@ body.theme-home input {
     box-shadow: 0 0 20px rgba(16, 185, 129, 0.1);
 }
 
+/* ==========================================================================
+   ✨ POKEMON DETAILS / EDITOR MODAL (2-COLUMN REDESIGN)
+   ========================================================================== */
+#editor-modal .modal-content {
+    max-width: 960px;
+    width: 95%;
+}
+
+.editor-two-columns {
+    display: grid;
+    grid-template-columns: 320px 1fr;
+    gap: 20px;
+    align-items: start;
+}
+
+.editor-col-left {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+}
+
+.editor-col-right {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.editor-specimen-header {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.editor-badge-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.badge-slot, .badge-gen {
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 3px 8px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-color);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.badge-slot {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.3);
+    color: #a5b4fc;
+}
+
+.badge-slot.team {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: rgba(34, 197, 94, 0.35);
+    color: #4ade80;
+}
+
+.badge-slot.box {
+    background: rgba(99, 102, 241, 0.15);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+}
+
+#btn-toggle-shiny.active {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(234, 88, 12, 0.25)) !important;
+    border-color: #f59e0b !important;
+    color: #fbbf24 !important;
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.3) !important;
+}
+
+.editor-sprite-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    border-radius: 14px;
+    background: radial-gradient(circle at center, rgba(255, 255, 255, 0.08) 0%, rgba(0, 0, 0, 0.3) 80%);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    min-height: 170px;
+    position: relative;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.4);
+}
+
+.editor-sprite-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 140px;
+}
+
+#editor-pokemon-sprite {
+    width: 140px;
+    height: 140px;
+    object-fit: contain;
+    filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.6));
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+#editor-pokemon-sprite:hover {
+    transform: scale(1.08);
+}
+
+.editor-type-badges {
+    display: flex;
+    gap: 6px;
+    margin-top: 10px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.editor-type-badge {
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+}
+
+.editor-quick-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 2px;
+}
+
+.editor-tech-block {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.editor-section-title {
+    font-size: 0.75rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--game-color, #a855f7);
+    margin-bottom: 4px;
+}
+
+@media (max-width: 768px) {
+    .editor-two-columns {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+    
+    #editor-modal .modal-content {
+        max-width: 100%;
+        width: 100%;
+        max-height: 94vh;
+        margin: 10px auto;
+        border-radius: 16px;
+    }
+
+    #editor-pokemon-sprite {
+        width: 120px;
+        height: 120px;
+    }
+}
+
+
 

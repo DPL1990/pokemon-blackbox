@@ -358,6 +358,182 @@ function setFormLockedState(isLocked) {
     });
 }
 
+let editorCurrentIsShiny = false;
+let editorTargetSlotType = "box";
+
+const TYPE_NAMES_PT = {
+    normal: "Normal", fire: "Fogo", water: "Água", grass: "Planta",
+    electric: "Elétrico", ice: "Gelo", fighting: "Luta", poison: "Veneno",
+    ground: "Terra", flying: "Voador", psychic: "Psíquico", bug: "Inseto",
+    rock: "Rocha", ghost: "Fantasma", dragon: "Dragão", steel: "Aço",
+    dark: "Sombrio", fairy: "Fada"
+};
+
+function getEditorPokedexId() {
+    const species = (document.getElementById("form-species")?.value || "").trim().toLowerCase();
+    if (!species) return 0;
+    if (typeof POKEMON_NAMES_ALL !== "undefined" && Array.isArray(POKEMON_NAMES_ALL)) {
+        let localDexId = POKEMON_NAMES_ALL.findIndex(name => name && name.toLowerCase().trim() === species);
+        if (localDexId === -1) {
+            localDexId = POKEMON_NAMES_ALL.findIndex(name => {
+                if (!name) return false;
+                const cleanA = name.toLowerCase().replace(/[^a-z0-9]/g, "");
+                const cleanB = species.replace(/[^a-z0-9]/g, "");
+                return cleanA === cleanB;
+            });
+        }
+        if (localDexId !== -1) return localDexId;
+    }
+    return 1;
+}
+
+function updateEditorTypeBadges() {
+    const badgesContainer = document.getElementById("editor-type-badges");
+    if (!badgesContainer) return;
+    const t1 = document.getElementById("form-type1")?.value || "normal";
+    const t2 = document.getElementById("form-type2")?.value || "";
+
+    let html = `<span class="editor-type-badge t-${t1}">${TYPE_NAMES_PT[t1] || t1.toUpperCase()}</span>`;
+    if (t2 && t2 !== "" && t2 !== "none") {
+        html += ` <span class="editor-type-badge t-${t2}">${TYPE_NAMES_PT[t2] || t2.toUpperCase()}</span>`;
+    }
+    badgesContainer.innerHTML = html;
+}
+
+function updateEditorSprite() {
+    const spriteImg = document.getElementById("editor-pokemon-sprite");
+    if (!spriteImg) return;
+    const pokedexId = getEditorPokedexId();
+    const isShiny = editorCurrentIsShiny;
+
+    if (pokedexId === 0) {
+        spriteImg.src = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png";
+        updateEditorTypeBadges();
+        return;
+    }
+
+    let spriteUrl = "";
+    if (typeof currentSpriteStyle !== "undefined" && currentSpriteStyle === "3d-home") {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/home/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    } else if (typeof currentSpriteStyle !== "undefined" && currentSpriteStyle === "3d-animated") {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/${isShiny ? 'shiny/' : ''}${pokedexId}.gif`;
+    } else {
+        spriteUrl = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${isShiny ? 'shiny/' : ''}${pokedexId}.png`;
+    }
+    spriteImg.src = spriteUrl;
+    spriteImg.onerror = () => {
+        if (typeof handleSpriteError === "function") {
+            handleSpriteError(spriteImg, pokedexId, isShiny ? 'shiny' : 'normal');
+        } else {
+            spriteImg.src = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pokedexId}.png`;
+        }
+    };
+
+    updateEditorTypeBadges();
+}
+
+function toggleEditorShiny() {
+    editorCurrentIsShiny = !editorCurrentIsShiny;
+    const btn = document.getElementById("btn-toggle-shiny");
+    if (btn) {
+        if (editorCurrentIsShiny) {
+            btn.classList.add("active");
+            btn.innerHTML = "⭐ Shiny: <strong>Sim</strong>";
+        } else {
+            btn.classList.remove("active");
+            btn.innerHTML = "⭐ Shiny: <strong>Não</strong>";
+        }
+    }
+    updateEditorSprite();
+}
+
+function openEditorEvolution() {
+    const currentSpecies = document.getElementById("form-species")?.value.trim() || "";
+    const promptMsg = currentSpecies ? `Evoluir ${currentSpecies} - Insira a nova espécie:` : "Evoluir Pokémon - Insira a nova espécie:";
+    const newSpecies = prompt(promptMsg, currentSpecies);
+    if (!newSpecies || newSpecies.trim().toLowerCase() === currentSpecies.toLowerCase()) return;
+    
+    document.getElementById("form-species").value = newSpecies.trim();
+    if (typeof fetchPokemonTypes === "function") {
+        fetchPokemonTypes(newSpecies.trim());
+    }
+    if (typeof fetchMissingSpeciesData === "function") {
+        fetchMissingSpeciesData(newSpecies.trim());
+    }
+    updateEditorSprite();
+}
+
+function updateEditorSlotBadges(p) {
+    const slotBadge = document.getElementById("editor-slot-badge");
+    const genBadge = document.getElementById("editor-gen-badge");
+    const toggleSlotBtn = document.getElementById("btn-toggle-slot-type");
+    
+    const slotType = p ? p.slotType : editorTargetSlotType;
+    if (slotBadge) {
+        if (slotType === "team") {
+            const slotNum = (p && p.slotIndex !== undefined) ? (p.slotIndex + 1) : 1;
+            slotBadge.textContent = `Equipa • Slot ${slotNum}`;
+            slotBadge.className = "badge-slot team";
+        } else {
+            slotBadge.textContent = "Na Box";
+            slotBadge.className = "badge-slot box";
+        }
+    }
+    
+    if (toggleSlotBtn) {
+        if (slotType === "team") {
+            toggleSlotBtn.innerHTML = "📦 Mover para Box";
+        } else {
+            toggleSlotBtn.innerHTML = "⚔️ Mover para Equipa";
+        }
+    }
+    
+    if (genBadge) {
+        let gen = 9;
+        let gameName = "";
+        const originGameId = p ? (p.originGame || p.currentGame) : (document.getElementById("form-origin-game")?.value || currentGameId);
+        if (typeof GAMES_DB !== "undefined") {
+            const game = GAMES_DB.find(g => g.id === originGameId);
+            if (game) {
+                gen = game.gen;
+                gameName = game.name;
+            }
+        }
+        genBadge.textContent = gameName ? `Gen ${gen} • ${gameName}` : `Gen ${gen}`;
+    }
+}
+
+function togglePokemonSlotType() {
+    const id = document.getElementById("form-id").value;
+    if (!id) {
+        editorTargetSlotType = (editorTargetSlotType === "team") ? "box" : "team";
+        updateEditorSlotBadges(null);
+        return;
+    }
+    const p = pokemonDatabase.find(pkmn => pkmn.id === id);
+    if (!p) return;
+    if (p.isLocked) {
+        alert("Este espécime está trancado e não pode ser movido!");
+        return;
+    }
+    if (p.slotType === "team") {
+        p.slotType = "box";
+        p.slotIndex = 0;
+    } else {
+        const curTrainer = p.trainerId || activeTrainerId;
+        const curTeam = pokemonDatabase.filter(x => x.currentGame === p.currentGame && (x.trainerId || activeTrainerId) === curTrainer && x.slotType === "team");
+        if (curTeam.length >= 6) {
+            alert("A equipa ativa deste treinador já tem 6 membros!");
+            return;
+        }
+        p.slotType = "team";
+        p.slotIndex = curTeam.length;
+    }
+    saveDatabase();
+    updateEditorSlotBadges(p);
+    renderAll();
+}
+
 function openModalForNew() {
     editorViewingAlternativeMoves = false;
     activePokemonEditorMoves = { moves: ["", "", "", ""], alternativeMoves: ["", "", "", ""] };
@@ -418,6 +594,21 @@ function openModalForNew() {
     document.getElementById("modal-title").innerText = "➕ Registar Novo Espécime";
     document.getElementById("passport-display").innerHTML = `<span>O passaporte será gerado ao gravar.</span>`;
     
+    editorCurrentIsShiny = false;
+    editorTargetSlotType = "box";
+    const btnShiny = document.getElementById("btn-toggle-shiny");
+    if (btnShiny) {
+        btnShiny.classList.remove("active");
+        btnShiny.innerHTML = "⭐ Shiny: <strong>Não</strong>";
+    }
+    const btnEvolve = document.getElementById("btn-evolve-pkmn");
+    if (btnEvolve) btnEvolve.style.display = "none";
+    const btnToggleSlot = document.getElementById("btn-toggle-slot-type");
+    if (btnToggleSlot) btnToggleSlot.style.display = "none";
+
+    updateEditorSlotBadges(null);
+    updateEditorSprite();
+
     renderCustomRibbonsTags();
     validateEVs();
     updateFormTrainerSelect(activeTrainerId);
@@ -531,6 +722,27 @@ function openModalForEdit(id) {
     validateEVs();
     renderPassportTimeline(p); 
     updateFormTrainerSelect(p.trainerId);
+
+    editorCurrentIsShiny = Boolean(p.isShiny);
+    editorTargetSlotType = p.slotType || "box";
+    const btnShiny = document.getElementById("btn-toggle-shiny");
+    if (btnShiny) {
+        if (editorCurrentIsShiny) {
+            btnShiny.classList.add("active");
+            btnShiny.innerHTML = "⭐ Shiny: <strong>Sim</strong>";
+        } else {
+            btnShiny.classList.remove("active");
+            btnShiny.innerHTML = "⭐ Shiny: <strong>Não</strong>";
+        }
+    }
+    const btnEvolve = document.getElementById("btn-evolve-pkmn");
+    if (btnEvolve) btnEvolve.style.display = p.isLocked ? "none" : "inline-flex";
+    const btnToggleSlot = document.getElementById("btn-toggle-slot-type");
+    if (btnToggleSlot) btnToggleSlot.style.display = p.isLocked ? "none" : "inline-flex";
+
+    updateEditorSlotBadges(p);
+    updateEditorSprite();
+
     document.getElementById("editor-modal").classList.add("active");
 }
 
@@ -817,6 +1029,7 @@ async function savePokemon() {
     targetPokemon.notes = notes; 
     targetPokemon.evolutionNotes = evolutionNotes;
     targetPokemon.originGame = originGame;
+    targetPokemon.isShiny = editorCurrentIsShiny;
 
     saveDatabase();
     closeModal();

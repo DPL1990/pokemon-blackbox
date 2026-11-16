@@ -430,250 +430,291 @@
             
             <div class="modal-body">
                 <div id="editor-lock-warning" style="display:none; padding: 10px; margin-bottom: 12px; background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.2); color: #f59e0b; border-radius: 8px; font-size: 0.75rem; font-weight: bold; text-align: center;"></div>
-                <!-- Showdown Fast Importer -->
-                <div class="showdown-box">
-                    <h4>📋 Importador Rápido (Showdown / PKHeX Text)</h4>
-                    <div class="showdown-input-row">
+                <!-- Showdown Fast Importer (Colapsável) -->
+                <details class="showdown-box" style="margin-bottom: 14px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 8px 12px;">
+                    <summary style="font-size: 0.7rem; font-weight: 800; cursor: pointer; user-select: none; color: var(--text-muted); outline: none;">
+                        📋 Importador Rápido (Showdown / PKHeX Text)
+                    </summary>
+                    <div class="showdown-input-row" style="margin-top: 8px;">
                         <textarea id="pkhex-text" rows="2" class="showdown-textarea" placeholder="Cole aqui o formato Showdown (ex: Pikachu @ Light Ball...)"></textarea>
                         <button class="btn btn-primary" style="width:auto; white-space:nowrap; padding:0 16px;" onclick="parseShowdownText()">Processar</button>
                     </div>
-                </div>
+                </details>
 
-                <div style="display:flex; flex-direction:column; gap:14px;">
-                    <input type="hidden" id="form-id">
-                    
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                <label style="margin-bottom: 0;">Espécie</label>
-                                <button class="btn btn-action" id="btn-owndex-link" onclick="openOwndexFromEditor()" style="width: auto; font-size: 0.6rem; padding: 2px 6px; display: none; height: 18px; line-height: 14px; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25);">📋 Histórico (Owndex)</button>
+                <input type="hidden" id="form-id">
+
+                <!-- Estrutura de 2 Colunas -->
+                <div class="editor-two-columns">
+                    <!-- ============================================== -->
+                    <!-- COLUNA ESQUERDA: Espécime, Sprite & Ações Rápidas -->
+                    <!-- ============================================== -->
+                    <div class="editor-col-left">
+                        <div class="editor-specimen-header">
+                            <div class="editor-badge-row">
+                                <span id="editor-slot-badge" class="badge-slot">Equipa • Slot 1</span>
+                                <span id="editor-gen-badge" class="badge-gen">Gen ? • Versão</span>
                             </div>
-                            <input type="text" id="form-species" list="species-list" onchange="fetchPokemonTypes(this.value)" placeholder="ex: Pikachu">
-                        </div>
-                        <div class="form-group">
-                            <label>Nickname</label>
-                            <input type="text" id="form-nickname" placeholder="ex: Sparky">
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label>Nível</label>
-                            <input type="number" id="form-level" min="1" max="100" value="50">
-                        </div>
-                        <div class="form-group">
-                            <label>Género</label>
-                            <select id="form-gender">
-                                <option value="⚲">⚲ Nenhum</option>
-                                <option value="♂">♂ Macho</option>
-                                <option value="♀">♀ Fêmea</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Natureza</label>
-                            <input type="text" id="form-nature" list="natures-list" placeholder="ex: Jolly">
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label>Habilidade</label>
-                            <input type="text" id="form-ability" list="ability-list" placeholder="ex: Static">
-                        </div>
-                        <div class="form-group">
-                            <label>Tipo Primário</label>
-                            <select id="form-type1">
-                                <option value="normal">Normal</option>
-                                <option value="fire">Fire</option>
-                                <option value="water">Water</option>
-                                <option value="grass">Grass</option>
-                                <option value="electric">Electric</option>
-                                <option value="ice">Ice</option>
-                                <option value="fighting">Fighting</option>
-                                <option value="poison">Poison</option>
-                                <option value="ground">Ground</option>
-                                <option value="flying">Flying</option>
-                                <option value="psychic">Psychic</option>
-                                <option value="bug">Bug</option>
-                                <option value="rock">Rock</option>
-                                <option value="ghost">Ghost</option>
-                                <option value="dragon">Dragon</option>
-                                <option value="dark">Dark</option>
-                                <option value="steel">Steel</option>
-                                <option value="fairy">Fairy</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label>🎒 Poké Ball</label>
-                            <select id="form-ball">
-                                <option value="poke">Poké Ball</option>
-                                <option value="great">Great Ball</option>
-                                <option value="ultra">Ultra Ball</option>
-                                <option value="master">Master Ball</option>
-                                <option value="premier">Premier Ball</option>
-                                <option value="luxury">Luxury Ball</option>
-                                <option value="nest">Nest Ball</option>
-                                <option value="net">Net Ball</option>
-                                <option value="dive">Dive Ball</option>
-                                <option value="repeat">Repeat Ball</option>
-                                <option value="timer">Timer Ball</option>
-                                <option value="quick">Quick Ball</option>
-                                <option value="dusk">Dusk Ball</option>
-                                <option value="heal">Heal Ball</option>
-                                <option value="cherish">Cherish Ball</option>
-                                <option value="safari">Safari Ball</option>
-                                <option value="sport">Sport Ball</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>📦 Item Equipado</label>
-                            <input type="text" id="form-item" list="items-list" placeholder="ex: Leftovers">
-                        </div>
-                    </div>
-
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
-                        <div class="form-group">
-                            <label>🏷️ Tipo Secundário</label>
-                            <select id="form-type2">
-                                <option value="">Nenhum</option>
-                                <option value="normal">Normal</option>
-                                <option value="fire">Fire</option>
-                                <option value="water">Water</option>
-                                <option value="grass">Grass</option>
-                                <option value="electric">Electric</option>
-                                <option value="ice">Ice</option>
-                                <option value="fighting">Fighting</option>
-                                <option value="poison">Poison</option>
-                                <option value="ground">Ground</option>
-                                <option value="flying">Flying</option>
-                                <option value="psychic">Psychic</option>
-                                <option value="bug">Bug</option>
-                                <option value="rock">Rock</option>
-                                <option value="ghost">Ghost</option>
-                                <option value="dragon">Dragon</option>
-                                <option value="dark">Dark</option>
-                                <option value="steel">Steel</option>
-                                <option value="fairy">Fairy</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <!-- spacer -->
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                            <label style="margin-bottom: 0;">⚔️ Moveset</label>
-                            <button type="button" class="btn btn-action" id="btn-toggle-alt-moves" onclick="toggleEditorMovesetView()" style="width: auto; font-size: 0.65rem; padding: 2px 8px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); height: 20px; line-height: 14px; margin: 0;">🔄 Mostrar Conjunto Alternativo</button>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <input type="text" id="form-move1" list="moves-datalist" placeholder="Ataque 1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
-                            <input type="text" id="form-move2" list="moves-datalist" placeholder="Ataque 2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
-                            <input type="text" id="form-move3" list="moves-datalist" placeholder="Ataque 3" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
-                            <input type="text" id="form-move4" list="moves-datalist" placeholder="Ataque 4" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
-                        </div>
-                        <datalist id="moves-datalist"></datalist>
-                    </div>
-
-                    <!-- IVs and EVs Expandable Section -->
-                    <details class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px; margin-top: 4px;">
-                        <summary style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; user-select: none; color: var(--text-muted); outline: none;">
-                            📊 Estatísticas Competitivas (IVs & EVs)
-                        </summary>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 12px;">
-                            <div>
-                                <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 8px;">Valores Individuais (IVs)</h4>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                                    <div class="form-group" style="margin-bottom:6px;"><label>HP</label><input type="number" id="iv-hp" min="0" max="31" value="31"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>ATK</label><input type="number" id="iv-atk" min="0" max="31" value="31"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>DEF</label><input type="number" id="iv-def" min="0" max="31" value="31"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPA</label><input type="number" id="iv-spa" min="0" max="31" value="31"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPD</label><input type="number" id="iv-spd" min="0" max="31" value="31"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPE</label><input type="number" id="iv-spe" min="0" max="31" value="31"></div>
-                                </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 2px;">Nickname</label>
+                                <input type="text" id="form-nickname" placeholder="ex: Sparky" style="font-weight: 700; font-size: 0.95rem;">
                             </div>
-                            <div>
-                                <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 8px;">Treino de Esforço (EVs)</h4>
-                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                                    <div class="form-group" style="margin-bottom:6px;"><label>HP</label><input type="number" id="ev-hp" min="0" max="252" value="0" onchange="validateEVs()"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>ATK</label><input type="number" id="ev-atk" min="0" max="252" value="0" onchange="validateEVs()"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>DEF</label><input type="number" id="ev-def" min="0" max="252" value="0" onchange="validateEVs()"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPA</label><input type="number" id="ev-spa" min="0" max="252" value="0" onchange="validateEVs()"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPD</label><input type="number" id="ev-spd" min="0" max="252" value="0" onchange="validateEVs()"></div>
-                                    <div class="form-group" style="margin-bottom:6px;"><label>SPE</label><input type="number" id="ev-spe" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+                                    <label style="font-size: 0.65rem; color: var(--text-muted); margin-bottom: 0;">Espécie</label>
+                                    <button type="button" class="btn btn-action" id="btn-owndex-link" onclick="openOwndexFromEditor()" style="width: auto; font-size: 0.55rem; padding: 1px 6px; display: none; height: 18px; line-height: 14px; background: rgba(99,102,241,0.1); border-color: rgba(99,102,241,0.25);">📋 Owndex</button>
                                 </div>
-                                <div id="ev-warning" style="font-size: 0.6rem; color: var(--accent-danger); font-weight: 700; margin-top: 4px; display: none;">Soma dos EVs excede o limite de 510! (Atual: <span id="ev-total-span">0</span>)</div>
-                                <div style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px;">
-                                    <h4 style="font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 6px;">📚 Biblioteca de Builds</h4>
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
-                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('offensive')" style="font-size: 0.65rem; padding: 4px;">Ofensiva</button>
-                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('defensive')" style="font-size: 0.65rem; padding: 4px;">Defensiva</button>
-                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('support')" style="font-size: 0.65rem; padding: 4px;">Suporte</button>
-                                        <button type="button" class="btn btn-action" onclick="applyBuildPreset('coverage')" style="font-size: 0.65rem; padding: 4px;">Bulky/Coverage</button>
+                                <input type="text" id="form-species" list="species-list" onchange="fetchPokemonTypes(this.value); if(typeof updateEditorSprite==='function') updateEditorSprite();" placeholder="ex: Pikachu">
+                            </div>
+                        </div>
+
+                        <!-- Sprite em Destaque Oficial -->
+                        <div class="editor-sprite-card" id="editor-sprite-card">
+                            <div class="editor-sprite-wrapper">
+                                <img id="editor-pokemon-sprite" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/0.png" alt="Pokemon Sprite" onerror="handleSpriteError(this, 1, (typeof editorCurrentIsShiny!=='undefined' && editorCurrentIsShiny) ? 'shiny' : 'normal')">
+                            </div>
+                            <div class="editor-type-badges" id="editor-type-badges"></div>
+                        </div>
+
+                        <!-- Ações Rápidas -->
+                        <div class="editor-quick-actions">
+                            <button type="button" class="btn btn-action" id="btn-toggle-shiny" onclick="toggleEditorShiny()" style="font-size: 0.7rem; font-weight: 700; padding: 6px 10px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                ⭐ Shiny
+                            </button>
+                            <button type="button" class="btn btn-action" id="btn-evolve-pkmn" onclick="openEditorEvolution()" style="font-size: 0.7rem; font-weight: 700; padding: 6px 10px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                                🧬 Evoluir
+                            </button>
+                        </div>
+
+                        <!-- Atributos Básicos da Identidade -->
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem;">Nível</label>
+                                <input type="number" id="form-level" min="1" max="100" value="50">
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem;">Género</label>
+                                <select id="form-gender">
+                                    <option value="⚲">⚲ Nenhum</option>
+                                    <option value="♂">♂ Macho</option>
+                                    <option value="♀">♀ Fêmea</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem;">Poké Ball</label>
+                                <select id="form-ball">
+                                    <option value="poke">Poké Ball</option>
+                                    <option value="great">Great Ball</option>
+                                    <option value="ultra">Ultra Ball</option>
+                                    <option value="master">Master Ball</option>
+                                    <option value="premier">Premier Ball</option>
+                                    <option value="luxury">Luxury Ball</option>
+                                    <option value="nest">Nest Ball</option>
+                                    <option value="net">Net Ball</option>
+                                    <option value="dive">Dive Ball</option>
+                                    <option value="repeat">Repeat Ball</option>
+                                    <option value="timer">Timer Ball</option>
+                                    <option value="quick">Quick Ball</option>
+                                    <option value="dusk">Dusk Ball</option>
+                                    <option value="heal">Heal Ball</option>
+                                    <option value="cherish">Cherish Ball</option>
+                                    <option value="safari">Safari Ball</option>
+                                    <option value="sport">Sport Ball</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem;">🥚 Jogo Origem</label>
+                                <select id="form-origin-game"></select>
+                            </div>
+                            <div class="form-group" style="margin-bottom: 0;">
+                                <label style="font-size: 0.65rem;">👤 Treinador (OT)</label>
+                                <select id="form-trainer"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================== -->
+                    <!-- COLUNA DIREITA: Atributos Técnicos, Golpes & Gestão -->
+                    <!-- ============================================== -->
+                    <div class="editor-col-right">
+                        <!-- Bloco 1: Informação Técnica -->
+                        <div class="editor-tech-block">
+                            <h4 class="editor-section-title">⚙️ Atributos & Combate</h4>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">Habilidade</label>
+                                    <input type="text" id="form-ability" list="ability-list" placeholder="ex: Static">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">Natureza</label>
+                                    <input type="text" id="form-nature" list="natures-list" placeholder="ex: Jolly">
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">📦 Item Equipado</label>
+                                    <input type="text" id="form-item" list="items-list" placeholder="ex: Leftovers">
+                                </div>
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label style="font-size: 0.65rem;">Tipo 1</label>
+                                        <select id="form-type1" onchange="if(typeof updateEditorTypeBadges==='function') updateEditorTypeBadges();">
+                                            <option value="normal">Normal</option>
+                                            <option value="fire">Fire</option>
+                                            <option value="water">Water</option>
+                                            <option value="grass">Grass</option>
+                                            <option value="electric">Electric</option>
+                                            <option value="ice">Ice</option>
+                                            <option value="fighting">Fighting</option>
+                                            <option value="poison">Poison</option>
+                                            <option value="ground">Ground</option>
+                                            <option value="flying">Flying</option>
+                                            <option value="psychic">Psychic</option>
+                                            <option value="bug">Bug</option>
+                                            <option value="rock">Rock</option>
+                                            <option value="ghost">Ghost</option>
+                                            <option value="dragon">Dragon</option>
+                                            <option value="dark">Dark</option>
+                                            <option value="steel">Steel</option>
+                                            <option value="fairy">Fairy</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 0;">
+                                        <label style="font-size: 0.65rem;">Tipo 2</label>
+                                        <select id="form-type2" onchange="if(typeof updateEditorTypeBadges==='function') updateEditorTypeBadges();">
+                                            <option value="">Nenhum</option>
+                                            <option value="normal">Normal</option>
+                                            <option value="fire">Fire</option>
+                                            <option value="water">Water</option>
+                                            <option value="grass">Grass</option>
+                                            <option value="electric">Electric</option>
+                                            <option value="ice">Ice</option>
+                                            <option value="fighting">Fighting</option>
+                                            <option value="poison">Poison</option>
+                                            <option value="ground">Ground</option>
+                                            <option value="flying">Flying</option>
+                                            <option value="psychic">Psychic</option>
+                                            <option value="bug">Bug</option>
+                                            <option value="rock">Rock</option>
+                                            <option value="ghost">Ghost</option>
+                                            <option value="dragon">Dragon</option>
+                                            <option value="dark">Dark</option>
+                                            <option value="steel">Steel</option>
+                                            <option value="fairy">Fairy</option>
+                                        </select>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    </details>
 
-                    <div class="form-group">
-                        <label>🥚 Jogo de Origem</label>
-                        <select id="form-origin-game"></select>
-                    </div>
-
-                    <div class="form-group">
-                        <label>👤 Treinador / Dono (OT)</label>
-                        <select id="form-trainer"></select>
-                    </div>
-
-                    <!-- Location Stamp Transfer panel -->
-                    <div class="form-group" style="background: rgba(255,255,255,0.02); padding: 12px; border-radius: 12px; border: 1px solid var(--border-color); margin-top: 4px;">
-                        <label>✈️ Transferir Localização (Carimbar Viagem)</label>
-                        <div style="display: flex; gap: 8px; margin-top: 6px;">
-                            <select id="form-transfer-game" style="flex: 1;"></select>
-                            <button type="button" class="btn btn-primary" style="width: auto; white-space: nowrap;" onclick="executeTransfer()">Carimbar Viagem</button>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label>🗺️ Passaporte de Viagem</label>
-                        <div class="passport-timeline" id="passport-display"></div>
-                    </div>
-
-                    <!-- Interactive Ribbon Checklist & Custom Ribbons -->
-                    <div class="form-group" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px;">
-                        <label>🏅 Fitas (Ribbon Checklist)</label>
-                        <div id="ribbon-checklist-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; max-height: 180px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 6px;">
-                            <!-- Checkboxes generated dynamically -->
-                        </div>
-                        
-                        <div class="form-group" style="margin-top: 10px; margin-bottom: 0;">
-                            <label style="font-size:0.6rem;">➕ Adicionar Outras Fitas / Fita Personalizada</label>
-                            <div style="display: flex; gap: 8px; margin-top: 4px;">
-                                <input type="text" id="form-custom-ribbon" placeholder="Nome da fita..." style="flex: 1;">
-                                <button type="button" class="btn btn-primary" style="width: auto; padding: 0 16px;" onclick="addCustomRibbon()">Adicionar</button>
+                        <!-- Bloco 2: Secção de Golpes (Moveset) -->
+                        <div class="editor-tech-block">
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <h4 class="editor-section-title" style="margin-bottom: 0;">⚔️ Golpes (Moveset)</h4>
+                                <button type="button" class="btn btn-action" id="btn-toggle-alt-moves" onclick="toggleEditorMovesetView()" style="width: auto; font-size: 0.65rem; padding: 2px 8px; background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.15); height: 20px; line-height: 14px; margin: 0;">🔄 Alternativo</button>
                             </div>
-                            <div id="custom-ribbons-list" style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;"></div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                                <input type="text" id="form-move1" list="moves-datalist" placeholder="Ataque 1" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                                <input type="text" id="form-move2" list="moves-datalist" placeholder="Ataque 2" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                                <input type="text" id="form-move3" list="moves-datalist" placeholder="Ataque 3" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                                <input type="text" id="form-move4" list="moves-datalist" placeholder="Ataque 4" style="padding: 6px; font-size: 0.75rem; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--text-color);">
+                            </div>
+                            <datalist id="moves-datalist"></datalist>
                         </div>
-                    </div>
 
-                    <div class="form-group">
-                        <label>📝 Notas Gerais</label>
-                        <textarea id="form-notes" rows="2" placeholder="Insira anotações sobre capturas, batalhas ou conquistas..."></textarea>
-                    </div>
+                        <!-- Bloco 3: Estatísticas Competitivas (IVs & EVs) -->
+                        <details class="editor-tech-block" style="padding: 10px;">
+                            <summary style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; user-select: none; color: var(--text-muted); outline: none;">
+                                📊 Estatísticas Competitivas (IVs & EVs)
+                            </summary>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px;">
+                                <div>
+                                    <h5 style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 6px;">Valores Individuais (IVs)</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">HP</label><input type="number" id="iv-hp" min="0" max="31" value="31"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">ATK</label><input type="number" id="iv-atk" min="0" max="31" value="31"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">DEF</label><input type="number" id="iv-def" min="0" max="31" value="31"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPA</label><input type="number" id="iv-spa" min="0" max="31" value="31"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPD</label><input type="number" id="iv-spd" min="0" max="31" value="31"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPE</label><input type="number" id="iv-spe" min="0" max="31" value="31"></div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <h5 style="font-size: 0.65rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--game-color); margin-bottom: 6px;">Treino de Esforço (EVs)</h5>
+                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">HP</label><input type="number" id="ev-hp" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">ATK</label><input type="number" id="ev-atk" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">DEF</label><input type="number" id="ev-def" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPA</label><input type="number" id="ev-spa" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPD</label><input type="number" id="ev-spd" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                        <div class="form-group" style="margin-bottom:4px;"><label style="font-size: 0.6rem;">SPE</label><input type="number" id="ev-spe" min="0" max="252" value="0" onchange="validateEVs()"></div>
+                                    </div>
+                                    <div id="ev-warning" style="font-size: 0.6rem; color: var(--accent-danger); font-weight: 700; margin-top: 4px; display: none;">Soma dos EVs excede o limite de 510! (Atual: <span id="ev-total-span">0</span>)</div>
+                                    <div style="margin-top: 8px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 6px;">
+                                        <h6 style="font-size: 0.6rem; text-transform: uppercase; color: var(--game-color); margin-bottom: 4px;">Biblioteca de Builds</h6>
+                                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+                                            <button type="button" class="btn btn-action" onclick="applyBuildPreset('offensive')" style="font-size: 0.6rem; padding: 3px;">Ofensiva</button>
+                                            <button type="button" class="btn btn-action" onclick="applyBuildPreset('defensive')" style="font-size: 0.6rem; padding: 3px;">Defensiva</button>
+                                            <button type="button" class="btn btn-action" onclick="applyBuildPreset('support')" style="font-size: 0.6rem; padding: 3px;">Suporte</button>
+                                            <button type="button" class="btn btn-action" onclick="applyBuildPreset('coverage')" style="font-size: 0.6rem; padding: 3px;">Bulky/Cov.</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </details>
 
-                    <div class="form-group">
-                        <label>🌱 Notas de Evolução (Meta / Planeamento)</label>
-                        <textarea id="form-evolution-notes" rows="2" placeholder="Registe ideias de evolução, planeamento de moveset ou notas competitivas..."></textarea>
-                    </div>
+                        <!-- Bloco 4: Viagem, Fitas & Notas -->
+                        <details class="editor-tech-block" style="padding: 10px;">
+                            <summary style="font-size: 0.75rem; font-weight: 800; text-transform: uppercase; cursor: pointer; user-select: none; color: var(--text-muted); outline: none;">
+                                🗺️ Viagem, Fitas & Notas
+                            </summary>
+                            <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">✈️ Transferir Localização</label>
+                                    <div style="display: flex; gap: 6px;">
+                                        <select id="form-transfer-game" style="flex: 1;"></select>
+                                        <button type="button" class="btn btn-primary" style="width: auto; white-space: nowrap; font-size: 0.7rem;" onclick="executeTransfer()">Carimbar</button>
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">🗺️ Passaporte de Viagem</label>
+                                    <div class="passport-timeline" id="passport-display"></div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">🏅 Fitas (Ribbon Checklist)</label>
+                                    <div id="ribbon-checklist-container" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; max-height: 140px; overflow-y: auto; background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid var(--border-color); margin-top: 4px;"></div>
+                                    <div style="display: flex; gap: 6px; margin-top: 6px;">
+                                        <input type="text" id="form-custom-ribbon" placeholder="Nova fita..." style="flex: 1; font-size: 0.7rem;">
+                                        <button type="button" class="btn btn-primary" style="width: auto; padding: 0 10px; font-size: 0.7rem;" onclick="addCustomRibbon()">Adicionar</button>
+                                    </div>
+                                    <div id="custom-ribbons-list" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;"></div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">📝 Notas Gerais</label>
+                                    <textarea id="form-notes" rows="2" placeholder="Notas sobre capturas, batalhas..."></textarea>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.65rem;">🌱 Notas de Evolução</label>
+                                    <textarea id="form-evolution-notes" rows="2" placeholder="Planeamento e ideias..."></textarea>
+                                </div>
+                            </div>
+                        </details>
 
-                    <div class="footer-actions">
-                        <button class="btn btn-primary" onclick="savePokemon()">💾 Gravar Espécime na Caixa Negra</button>
-                        <button class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none;">🗑️ Eliminar</button>
-                        <button class="btn btn-action" id="btn-export-individual-pkx" onclick="exportIndividualPkx()" style="display:none; background: var(--accent-info); width: auto; padding: 8px 16px;">📥 Descarregar .pkX</button>
+                        <!-- Bloco 5: Botões de Gestão / Inferiores -->
+                        <div class="footer-actions" style="margin-top: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end;">
+                            <button type="button" class="btn btn-action" id="btn-toggle-slot-type" onclick="togglePokemonSlotType()" style="display: none; width: auto; padding: 8px 14px; font-size: 0.75rem; font-weight: 700;">
+                                📦 Mover para Box
+                            </button>
+                            <button type="button" class="btn btn-action" id="btn-export-individual-pkx" onclick="exportIndividualPkx()" style="display:none; background: var(--accent-info); width: auto; padding: 8px 14px; font-size: 0.75rem;">
+                                📥 Descarregar .pkX
+                            </button>
+                            <button type="button" class="btn btn-danger" id="btn-delete-pkmn" onclick="deletePokemon()" style="display:none; width: auto; padding: 8px 14px; font-size: 0.75rem;">
+                                🗑️ Eliminar
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="savePokemon()" style="flex: 1; min-width: 180px; padding: 10px 16px; font-size: 0.8rem; font-weight: 800;">
+                                💾 Gravar Espécime
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
